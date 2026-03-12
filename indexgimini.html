@@ -234,7 +234,7 @@
                 isThinking.value = true;
                 scrollToBottom();
                 try {
-                    const response = await axios.post('http://127.0.0.1:8000/class_chat', { text: "", action: "start" });
+                    const response = await axios.post('https://ai-english-teacher-o63p.onrender.com/class_chat', { text: "", action: "start" });
                     isInClass.value = true; // 锁定网页进入上课模式
                     messages.value.push({ role: 'ai', isClass: true, content: response.data.teacher_reply });
                 } catch (error) {
@@ -259,7 +259,7 @@
                 try {
                     // 🌟 核心拦截器：如果在上课，强行没收发送通道，全部发往 class_chat！
                     if (isInClass.value) {
-                        const response = await axios.post('http://127.0.0.1:8000/class_chat', { text: text, action: "chat" });
+                        const response = await axios.post('https://ai-english-teacher-o63p.onrender.com/class_chat', { text: text, action: "chat" });
                         messages.value.push({ role: 'ai', isClass: true, content: response.data.teacher_reply });
                         
                         // 如果后端宣告下课，前端解除锁定
@@ -270,10 +270,10 @@
                         // 如果没在上课，走原来的自由提问(RAG)或语法诊断逻辑
                         const isQuestion = /[\u4e00-\u9fa5]/.test(text) || text.endsWith('?') || text.endsWith('？');
                         if (isQuestion) {
-                            const response = await axios.post('http://127.0.0.1:8000/ask', { question: text });
+                            const response = await axios.post('https://ai-english-teacher-o63p.onrender.com/ask', { question: text });
                             messages.value.push({ role: 'ai', isQA: true, content: response.data.teacher_answer });
                         } else {
-                            const response = await axios.post('http://127.0.0.1:8000/analyze', { text: text });
+                            const response = await axios.post('https://ai-english-teacher-o63p.onrender.com/analyze', { text: text });
                             messages.value.push({ role: 'ai', isAnalysis: true, originalText: text, report: response.data });
                         }
                     }
