@@ -4,3 +4,4 @@ spacy
 pydantic
 openai
 requests
+python-dotenv
