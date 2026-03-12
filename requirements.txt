@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+spacy
+pydantic
+openai
+requests
