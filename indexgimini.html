@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI 英语语法老师 - 极速节点版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
+    <script src="https://cdn.staticfile.net/axios/1.6.2/axios.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        /* 防止 Vue 加载前闪烁代码的保护罩 */
+        [v-cloak] { display: none !important; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; border: 2px solid white;}
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        textarea { resize: none; overflow-y: hidden; }
+        textarea:focus { outline: none; }
+    </style>
+</head>
+<body class="bg-white text-slate-800 antialiased h-screen overflow-hidden">
+
+<div id="app" class="flex h-full w-full" v-cloak>
+
+    <aside class="hidden md:flex flex-col w-64 bg-slate-50 border-r border-slate-200 h-full flex-shrink-0">
+        <div class="p-4 space-y-3">
+            <button @click="startNewChat" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border border-slate-200 shadow-sm rounded-xl text-slate-700 hover:bg-slate-100 transition-colors font-medium">
+                <i class="fa-solid fa-pen-to-square"></i> 新建自由练习
+            </button>
+            <button @click="startClass" :disabled="isInClass" :class="isInClass ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 shadow-sm rounded-xl text-white transition-colors font-medium">
+                <i class="fa-solid fa-graduation-cap"></i> 开启微课 (系统课)
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-3">
+            <div class="text-xs font-semibold text-slate-400 mb-2 px-2 mt-2">当前状态</div>
+            <div class="w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors" :class="isInClass ? 'text-amber-600 bg-amber-50' : 'text-emerald-600 bg-emerald-50'">
+                <i class="fa-solid" :class="isInClass ? 'fa-chalkboard-user mr-2' : 'fa-link mr-2'"></i> 
+                {{ isInClass ? '微课进行中...' : '自由练习模式' }}
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full min-w-0 bg-white">
+        
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth">
+            
+            <div v-if="messages.length === 0" class="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-70">
+                <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500 text-2xl rotate-12">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <h2 class="text-2xl font-bold text-slate-700">前后端已连通！</h2>
+                <p class="text-slate-500 max-w-md">现在发送的每一句话，都会实时发往 127.0.0.1:8000 交由 FastAPI 处理。</p>
+            </div>
+
+            <div v-for="(msg, index) in messages" :key="index" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
+                
+                <div v-if="msg.role === 'ai'" class="w-8 h-8 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center text-white text-xs mt-1 mr-3">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+
+                <div :class="['max-w-[90%] md:max-w-[80%] rounded-2xl p-4', 
+                             msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-slate-50 border border-slate-100 rounded-bl-sm text-slate-800 shadow-sm']">
+                    
+                    <div v-if="msg.role === 'user'" class="leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
+                    
+                    <div v-else-if="msg.isAnalysis" class="space-y-4">
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-lg tracking-wide leading-loose">
+                            <span v-for="(chunk, cIdx) in generateRenderChunks(msg.originalText, msg.report.basic_components, msg.report.structural_components, msg.report.errors)" 
+                                  :key="cIdx"
+                                  :class="chunk.classStr">
+                                {{ chunk.text }}
+                                <div v-if="chunk.hasTooltip" 
+                                     class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-max max-w-[250px] bg-slate-800 text-white text-xs py-2 px-3 rounded shadow-xl z-20 text-left leading-relaxed"
+                                     v-html="chunk.tooltipHtml">
+                                </div>
+                            </span>
+                        </div>
+
+                        <div class="bg-indigo-50/50 p-4 rounded-xl border-l-4 border-indigo-400">
+                            <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-lightbulb text-amber-500"></i> AI 名师解析
+                            </h4>
+                            <p class="text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">{{ msg.report.teacher_message }}</p>
+                        </div>
+                    </div>
+                    <div v-else-if="msg.isQA" class="space-y-4">
+                        <div class="bg-indigo-50/50 p-4 rounded-xl border-l-4 border-indigo-400">
+                            <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-book-open text-indigo-500"></i> 教材解答
+                            </h4>
+                            <p class="text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">{{ msg.content }}</p>
+                        </div>
+                    </div>
+
+                    <div v-else-if="msg.isClass" class="space-y-4">
+                        <div class="bg-amber-50/80 p-4 rounded-xl border-l-4 border-amber-400">
+                            <h4 class="font-bold text-amber-900 text-sm mb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-chalkboard-user text-amber-500"></i> AI 课堂
+                            </h4>
+                            <p class="text-slate-800 leading-relaxed text-sm whitespace-pre-wrap">{{ msg.content }}</p>
+                        </div>
+                    </div>
+
+                    <div v-else class="leading-relaxed text-red-600 font-medium">{{ msg.content }}</div>
+                </div>
+            </div>
+
+            <div v-if="isThinking" class="flex justify-start">
+                <div class="w-8 h-8 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center text-white text-xs mr-3 mt-1">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div class="bg-slate-50 border border-slate-100 rounded-2xl rounded-bl-sm p-4 flex items-center gap-2 shadow-sm">
+                    <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
+                    <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+                    <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+                    <span class="text-xs text-slate-500 ml-2">正在请求后端 FastAPI，请稍候...</span>
+                </div>
+            </div>
+            
+            <div class="h-4"></div>
+        </div>
+
+        <div class="p-4 bg-white border-t border-slate-100 flex-shrink-0">
+            <div class="max-w-4xl mx-auto relative bg-slate-50 border border-slate-200 rounded-2xl shadow-sm focus-within:ring-1 focus-within:ring-indigo-500 transition-all flex items-end pl-4 pr-2 py-2">
+                <textarea 
+                    id="message-input"
+                    v-model="inputText"
+                    @input="autoResize"
+                    @keydown.enter.prevent="handleEnter"
+                    rows="1"
+                    placeholder="输入英文进行语法诊断，或输入中文向老师提问 (如: 什么是表语？)"
+                    class="flex-1 max-h-[150px] min-h-[40px] bg-transparent py-2.5 px-3 text-slate-800 placeholder-slate-400"
+                ></textarea>
+                <button 
+                    @click="sendMessage"
+                    :disabled="!inputText.trim() || isThinking"
+                    :class="['p-3 mb-1 rounded-xl flex items-center justify-center transition-all', 
+                            inputText.trim() && !isThinking ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md' : 'bg-slate-200 text-slate-400 cursor-not-allowed']">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    const { createApp, ref, nextTick } = Vue;
+
+    createApp({
+        setup() {
+            const inputText = ref('');
+            const isThinking = ref(false);
+            const messages = ref([]);
+            const isInClass = ref(false); // 👈 新增：记录前端是否处于上课模式
+
+            const autoResize = () => {
+                const textarea = document.getElementById('message-input');
+                textarea.style.height = 'auto'; 
+                textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
+            };
+
+            const scrollToBottom = () => {
+                setTimeout(() => {
+                    const container = document.getElementById('chat-container');
+                    if(container) {
+                        container.scrollTop = container.scrollHeight;
+                    }
+                }, 50);
+            };
+
+            const handleEnter = (e) => {
+                if (e.shiftKey) { inputText.value += '\n'; autoResize(); } 
+                else { sendMessage(); }
+            };
+
+            // 升级版物理切片算法：支持多图层叠加
+            const generateRenderChunks = (text, basic, structures, errors) => {
+                if (!text) return [];
+                let markers = new Set([0, text.length]);
+                
+                (basic || []).forEach(c => { markers.add(c.start_char); markers.add(c.end_char); });
+                (structures || []).forEach(c => { markers.add(c.start_char); markers.add(c.end_char); });
+                (errors || []).forEach(e => { markers.add(e.start_char); markers.add(e.end_char); });
+                
+                const sortedMarkers = Array.from(markers).sort((a, b) => a - b);
+                const chunks = [];
+                
+                // 颜色配置字典
+                const basicColors = { "主语": "bg-red-100 text-red-800", "核心谓语": "bg-blue-100 text-blue-800", "宾语": "bg-green-100 text-green-800", "定语": "bg-yellow-100 text-yellow-800", "状语": "bg-purple-100 text-purple-800" };
+                const structColors = { "介词短语": "underline decoration-slate-400 decoration-solid decoration-2 underline-offset-4", "定语从句": "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "名词性从句": "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "非谓语/不定式": "underline decoration-teal-400 decoration-wavy decoration-2 underline-offset-4" };
+
+                for (let i = 0; i < sortedMarkers.length - 1; i++) {
+                    const start = sortedMarkers[i];
+                    const end = sortedMarkers[i+1];
+                    if (start === end) continue; 
+                    
+                    const chunkText = text.substring(start, end);
+                    const errorMatch = (errors || []).find(e => start >= e.start_char && end <= e.end_char);
+                    const basicMatch = (basic || []).find(c => start >= c.start_char && end <= c.end_char);
+                    const structMatch = (structures || []).find(c => start >= c.start_char && end <= c.end_char);
+                    
+                    let classList = "relative group cursor-help transition-colors duration-200 ";
+                    let tooltipLines = [];
+
+                    // 判断并叠加样式
+                    if (errorMatch) {
+                        classList += "bg-red-200 text-red-900 font-bold border-b-2 border-red-500 rounded-sm ";
+                        tooltipLines.push(`❌ ${errorMatch.correction_suggestion}`);
+                    } else if (basicMatch) {
+                        classList += (basicColors[basicMatch.component_type] || "bg-slate-100 text-slate-700") + " rounded px-0.5 mx-[1px] ";
+                        tooltipLines.push(`📌 ${basicMatch.component_type}`);
+                    }
+
+                    if (structMatch) {
+                        classList += (structColors[structMatch.component_type] || "underline") + " ";
+                        tooltipLines.push(`📦 ${structMatch.component_type}`);
+                    }
+
+                    chunks.push({
+                        text: chunkText,
+                        classStr: classList.trim(),
+                        hasTooltip: tooltipLines.length > 0,
+                        tooltipHtml: tooltipLines.join('<br>') // 支持多行提示
+                    });
+                }
+                return chunks;
+            };
+
+            // 新增：触发开启微课
+            const startClass = async () => {
+                messages.value.push({ role: 'user', content: '👨‍🎓 老师好，我准备好上课了！' });
+                isThinking.value = true;
+                scrollToBottom();
+                try {
+                    const response = await axios.post('http://127.0.0.1:8000/class_chat', { text: "", action: "start" });
+                    isInClass.value = true; // 锁定网页进入上课模式
+                    messages.value.push({ role: 'ai', isClass: true, content: response.data.teacher_reply });
+                } catch (error) {
+                    messages.value.push({ role: 'ai', content: "❌ 唤醒老师失败，请检查后端。" });
+                } finally {
+                    isThinking.value = false;
+                    scrollToBottom();
+                }
+            };
+
+            const sendMessage = async () => {
+                const text = inputText.value.trim();
+                if (!text || isThinking.value) return;
+
+                messages.value.push({ role: 'user', content: text });
+                inputText.value = '';
+                nextTick(() => { document.getElementById('message-input').style.height = 'auto'; });
+                scrollToBottom();
+                isThinking.value = true;
+                scrollToBottom();
+
+                try {
+                    // 🌟 核心拦截器：如果在上课，强行没收发送通道，全部发往 class_chat！
+                    if (isInClass.value) {
+                        const response = await axios.post('http://127.0.0.1:8000/class_chat', { text: text, action: "chat" });
+                        messages.value.push({ role: 'ai', isClass: true, content: response.data.teacher_reply });
+                        
+                        // 如果后端宣告下课，前端解除锁定
+                        if (response.data.status === "ENDED") {
+                            isInClass.value = false; 
+                        }
+                    } else {
+                        // 如果没在上课，走原来的自由提问(RAG)或语法诊断逻辑
+                        const isQuestion = /[\u4e00-\u9fa5]/.test(text) || text.endsWith('?') || text.endsWith('？');
+                        if (isQuestion) {
+                            const response = await axios.post('http://127.0.0.1:8000/ask', { question: text });
+                            messages.value.push({ role: 'ai', isQA: true, content: response.data.teacher_answer });
+                        } else {
+                            const response = await axios.post('http://127.0.0.1:8000/analyze', { text: text });
+                            messages.value.push({ role: 'ai', isAnalysis: true, originalText: text, report: response.data });
+                        }
+                    }
+                } catch (error) {
+                    messages.value.push({ role: 'ai', content: "❌ 请求失败！请检查后端网络。" });
+                } finally {
+                    isThinking.value = false;
+                    scrollToBottom();
+                }
+            };
+
+            const startNewChat = () => { messages.value = []; isInClass.value = false; };
+
+            return {
+                inputText, messages, isThinking, isInClass,
+                autoResize, handleEnter, sendMessage, startNewChat, generateRenderChunks, startClass
+            };
+        }
+    }).mount('#app');
+</script>
+
+</body>
+</html>
