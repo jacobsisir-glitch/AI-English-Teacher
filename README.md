@@ -1,3 +1,5 @@
+
+```mermaid
 graph TD
     %% 用户端交互
     User((用户)) -->|输入一段文本| UI[前端界面 Vue3]
@@ -10,7 +12,7 @@ graph TD
     Router -->|纯英文自然句| RouteAnalyze[请求 POST /analyze]
 
     %% 后端服务架构 (main.py)
-    subgraph 后端大脑 (FastAPI @ Render)
+    subgraph 后端大脑服务
         
         %% 业务流 1：语法诊断流水线
         RouteAnalyze -->|第一阶段：物理级解剖| spacy[spaCy 规则引擎]
@@ -43,6 +45,7 @@ graph TD
     %% 多图层叠加与展示
     RenderEngine -->|基于绝对坐标渲染高亮/下划线/Tooltip| FinalDisplay[展示 AI 老师回复与高亮错题]
     FinalDisplay --> User
+```
 
 # AI English Grammar Teacher (AI 英语语法智能辅导系统)
 
