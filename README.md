@@ -1,3 +1,49 @@
+graph TD
+    %% 用户端交互
+    User((用户)) -->|输入一段文本| UI[前端界面 Vue3]
+
+    %% 前端智能路由 (index.html)
+    UI -->|意图识别与状态判断| Router{前端路由分发}
+    
+    Router -->|处于微课模式| RouteClass[请求 POST /class_chat]
+    Router -->|包含中文或问号| RouteAsk[请求 POST /ask]
+    Router -->|纯英文自然句| RouteAnalyze[请求 POST /analyze]
+
+    %% 后端服务架构 (main.py)
+    subgraph 后端大脑 (FastAPI @ Render)
+        
+        %% 业务流 1：语法诊断流水线
+        RouteAnalyze -->|第一阶段：物理级解剖| spacy[spaCy 规则引擎]
+        spacy -->|依存句法分析+坐标提取| RawReport(原始 JSON 体检报告)
+        RawReport -->|第二阶段：情感化包装| deepseek_analyze[DeepSeek 大模型]
+        deepseek_analyze -->|生成专属点评讲义| FinalReport(最终完整 JSON 报告)
+
+        %% 业务流 2：RAG 教材问答流水线
+        RouteAsk -->|第一步：读取本地知识库| LocalDB[(本地 Markdown 教材)]
+        LocalDB -->|拼接严格的 Prompt 上下文| deepseek_rag[DeepSeek RAG 问答引擎]
+        deepseek_rag -->|生成不超纲的解答| QA_Answer(问答 JSON 数据包)
+
+        %% 业务流 3：状态机课堂控制流
+        RouteClass -->|读取全局进度| FSM{有限状态机 FSM}
+        FSM -->|当前为 Teach 讲解节点| TeachNode[下发教学文案，状态步进]
+        FSM -->|当前为 Test 测试节点| TestNode[拦截用户答题文本]
+        
+        TestNode -.->|后台静默调用| spacy
+        spacy -.->|诊断失败| TestFail[阻断步进，打回重做并提示错误]
+        spacy -.->|诊断成功| TestPass[允许步进，进入下一节点]
+    end
+
+    %% 前端渲染引擎接收结果
+    FinalReport --> RenderEngine[前端物理切片渲染引擎]
+    QA_Answer --> RenderEngine
+    TeachNode --> RenderEngine
+    TestFail --> RenderEngine
+    TestPass --> RenderEngine
+
+    %% 多图层叠加与展示
+    RenderEngine -->|基于绝对坐标渲染高亮/下划线/Tooltip| FinalDisplay[展示 AI 老师回复与高亮错题]
+    FinalDisplay --> User
+
 # AI English Grammar Teacher (AI 英语语法智能辅导系统)
 
 ![Vue](https://img.shields.io/badge/Frontend-Vue%203-4FC08D?style=for-the-badge&logo=vuedotjs)
