@@ -96,3 +96,53 @@ def ask_teacher_with_rag(question: str) -> str:
         return response.choices[0].message.content
     except Exception as e:
         return f"老师的脑电波暂时短路啦~ (错误代码: {str(e)})"
+    
+def ask_teacher_with_rag_stream(question: str):
+    """
+    流式 RAG 问答引擎：像水管一样源源不断地吐出文字
+    """
+    print(f"🔍 收到提问: '{question}'，AI 老师正在翻阅教材并准备流式输出...")
+    # 🌟 升级版：自动扫描 textbooks 目录下所有的 .md 教材并拼装
+    import glob
+    textbook_content = ""
+    textbook_folder = "textbooks"
+    
+    if not os.path.exists(textbook_folder):
+        yield "老师的教材库不见啦！"
+        return
+        
+    # 找到所有的 md 文件并按名字排序读取
+    md_files = glob.glob(os.path.join(textbook_folder, "*.md"))
+    for file_path in sorted(md_files):
+        with open(file_path, "r", encoding="utf-8") as f:
+            textbook_content += f"\n\n--- 【章节: {os.path.basename(file_path)}】 ---\n\n"
+            textbook_content += f.read()
+        
+    system_prompt = f"""
+    你是一位严谨且温柔的 AI 英语语法老师。
+    请你**严格且仅仅基于**以下【官方教材】的内容来回答学生的问题。
+    如果学生的问题超出了教材范围，请直接回答：“我们目前的课程大纲还没讲到这里哦，咱们先聚焦现在的知识点吧~”
+    严禁自己编造教材外的内容。
+    
+    【官方教材内容】：
+    {textbook_content}
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": question}
+            ],
+            temperature=0.1,
+            stream=True # 🌟 核心魔法：告诉 DeepSeek 开启水管模式！
+        )
+        
+        # 🌟 核心循环：只要 DeepSeek 吐出一个字，我们就 yield 扔出去一个字
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
+                
+    except Exception as e:
+        yield f"老师的脑电波暂时短路啦~ (错误代码: {str(e)})"

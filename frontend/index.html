@@ -148,8 +148,8 @@
 
 <script>
     // 🛑 切换环境控制台 (每次部署前在这里切换即可)
-    // const BASE_URL = "http://127.0.0.1:8000"; // 本地测试环境 (注释掉这行)
-    const BASE_URL = "https://ai-english-teacher-o63p.onrender.com"; // 线上生产环境 (打开这行，把前面的 // 删掉)
+    const BASE_URL = "http://127.0.0.1:8000"; // 本地测试环境 (注释掉这行)
+    // const BASE_URL = "https://ai-english-teacher-o63p.onrender.com"; // 线上生产环境 (打开这行，把前面的 // 删掉)
     const { createApp, ref, nextTick, watch, onMounted } = Vue;
 
     createApp({
@@ -286,12 +286,41 @@
                         }
                     } else {
                         const isQuestion = /[\u4e00-\u9fa5]/.test(text) || text.endsWith('?') || text.endsWith('？');
+                        
+                        // 👇 从这里开始替换为流式接水管代码
                         if (isQuestion) {
-                            // 🌟 修改点：换成了 BASE_URL
-                            const response = await axios.post(BASE_URL + '/ask', { question: text });
-                            messages.value.push({ role: 'ai', isQA: true, content: response.data.teacher_answer });
+                            // 1. 因为马上要出字了，先关掉前端转圈圈的思考动画
+                            isThinking.value = false; 
+                            
+                            // 2. 先在屏幕上建一个空的聊天气泡，准备接水
+                            const aiMessage = { role: 'ai', isQA: true, content: '' };
+                            messages.value.push(aiMessage);
+                            
+                            // 3. 换用原生的 fetch API 连通水管
+                            const response = await fetch(BASE_URL + '/ask', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ question: text })
+                            });
+                            
+                            const reader = response.body.getReader();
+                            const decoder = new TextDecoder("utf-8");
+                            
+                            // 4. 核心循环：水管里来一滴水，屏幕上的气泡里就加一个字
+                            while (true) {
+                                const { done, value } = await reader.read();
+                                if (done) break; // 水流完了，退出循环
+                                // ❌ 原来的写法（Vue 察觉不到）：
+                                // aiMessage.content += decoder.decode(value, { stream: true });
+
+                                // ✅ 替换为这种写法（直接修改数组里的最后一条消息，强制 Vue 实时刷新屏幕）：
+                                messages.value[messages.value.length - 1].content += decoder.decode(value, { stream: true });
+                                scrollToBottom(); // 保证打字时屏幕自动往下滚
+                            }
+                        // 👆 流式代码结束
+                        
                         } else {
-                            // 🌟 修改点：换成了 BASE_URL
+                            // 👇 下面这部分查错的代码保持不动！
                             const response = await axios.post(BASE_URL + '/analyze', { text: text });
                             messages.value.push({ role: 'ai', isAnalysis: true, originalText: text, report: response.data });
                         }

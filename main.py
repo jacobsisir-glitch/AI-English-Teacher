@@ -1,9 +1,10 @@
 from fastapi import FastAPI, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from diagnostician import analyze_sentence
-from llm_wrapper import generate_teacher_message, ask_teacher_with_rag
+from llm_wrapper import generate_teacher_message, ask_teacher_with_rag_stream
 from schemas import SentenceAnalysisReport
 from memory_manager import save_mistake # 👈 新增：引入记忆写入模块
 
@@ -77,9 +78,9 @@ class QuestionInput(BaseModel):
 
 @app.post("/ask")
 async def ask_question(request: QuestionInput):
-    print(f"\n🙋‍♂️ 收到学生提问: {request.question}")
-    answer = ask_teacher_with_rag(request.question)
-    return {"teacher_answer": answer}
+    print(f"\n🙋‍♂️ 收到学生流式提问: {request.question}")
+    # 🌟 核心魔法：不再返回 JSON，而是返回一条接通的水管 (text/plain 流)
+    return StreamingResponse(ask_teacher_with_rag_stream(request.question), media_type="text/plain")
 
 class ClassInput(BaseModel):
     text: str
