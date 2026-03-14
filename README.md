@@ -23,10 +23,10 @@
 ```mermaid
 graph TD
     %% 用户端交互
-    User((用户)) -->|输入一段文本| UI[前端界面 Vue3]
+    User((用户)) -->|输入一段文本| UI[前端界面 Vue3 + localStorage 状态持久化]
 
     %% 前端智能路由
-    UI -->|意图识别与状态判断| Router{前端路由分发}
+    UI -->|意图识别与状态判断| Router{前端智能路由分发}
     
     Router -->|处于微课模式| RouteClass[请求 POST /class_chat]
     Router -->|包含中文或问号| RouteAsk[请求 POST /ask]
@@ -35,11 +35,21 @@ graph TD
     %% 后端服务架构
     subgraph 后端大脑服务
         
+        %% 记忆引擎 (新增)
+        ChromaDB[(ChromaDB 向量记忆库)]
+
         %% 业务流 1：语法诊断流水线
-        RouteAnalyze -->|第一阶段：物理级解剖| spacy[spaCy 规则引擎]
-        spacy -->|依存句法分析+坐标提取| RawReport(原始 JSON 体检报告)
-        RawReport -->|第二阶段：情感化包装| deepseek_analyze[DeepSeek 大模型]
-        deepseek_analyze -->|生成专属点评讲义| FinalReport(最终完整 JSON 报告)
+        RouteAnalyze -->|1. 物理级解剖| spacy[spaCy 规则引擎]
+        spacy -->|2. 依存句法分析+坐标提取| RawReport(原始 JSON 体检报告)
+        
+        %% 异步写库与同步读库逻辑
+        RawReport -.->|若存在语法错误: FastAPI 异步后台任务| ChromaDB
+        RouteAnalyze -.->|3. 语义检索历史错题| ChromaDB
+        
+        ChromaDB -.->|注入历史记忆上下文| deepseek_analyze[DeepSeek 大模型]
+        RawReport -->|4. 情感化包装| deepseek_analyze
+        
+        deepseek_analyze -->|5. 生成专属点评讲义| FinalReport(最终完整 JSON 报告)
 
         %% 业务流 2：RAG 教材问答流水线
         RouteAsk -->|第一步：读取本地知识库| LocalDB[(本地 Markdown 教材)]
@@ -57,7 +67,7 @@ graph TD
     end
 
     %% 前端渲染引擎接收结果
-    FinalReport --> RenderEngine[前端物理切片渲染引擎]
+    FinalReport --> RenderEngine[marked.js 富文本与物理切片渲染引擎]
     QA_Answer --> RenderEngine
     TeachNode --> RenderEngine
     TestFail --> RenderEngine
@@ -73,47 +83,37 @@ graph TD
 ## 💡 核心技术亮点 (Technical Highlights)
 
 ### 1. 神经符号混合架构 (Neuro-Symbolic Hybrid Architecture)
-摒弃了让 LLM 直接输出前端渲染坐标的不可靠方案。底层由 `spaCy` NLP 引擎进行物理级依存句法分析（Dependency Parsing），并由 Pydantic 严格校验后输出高精度的 JSON 绝对坐标；顶层 LLM（DeepSeek）仅基于该结构化数据进行上下文学习（In-context Learning），生成教学文案。实现了**“工程底线防守 + AI 体验跃升”**。
+摒弃了让 LLM 直接输出前端渲染坐标的不可靠方案。底层由 `spaCy` NLP 引擎进行物理级依存句法分析（Dependency Parsing），输出高精度的 JSON 绝对坐标；顶层 LLM（DeepSeek）仅基于结构化数据进行上下文学习（In-context Learning），生成教学文案。实现了**“工程底线防守 + AI 体验跃升”**。
 
-### 2. 复杂 DOM 多图层物理切片渲染 (Vue 3 Custom Rendering)
-在 Web 端实现了堪比原生客户端的富文本语法高亮交互。基于 Vue 3 Composition API 手写文本分块算法，将后端返回的语法坐标映射为独立 HTML 节点，实现了底层背景色（基础成分）、虚线下划线（长难句/从句结构）及悬浮 Tooltip（错误纠正）的三重物理叠加视图。
+### 2. 跨越时空的双域记忆系统 (Dual-Domain Memory System)
+* **长期记忆 (Long-term Memory)**：接入 `ChromaDB` 本地持久化向量数据库。每次查出语法错误，系统都会将其转化为高维向量静默落盘；用户再次输入新句子时，通过语义检索召回历史相似错题，注入 LLM 提示词，实现“千人千面”的连贯性教学点评。
+* **短期记忆 (Short-term Memory)**：前端利用 Vue 3 的 `watch` 深度监听与 `localStorage`，实现聊天记录的本地实时存档，刷新网页或重启浏览器数据不丢失，提供类似原生 App 的无缝体验。
 
-### 3. 基于 RAG 架构的强管控知识库 (RAG-based Knowledge Retrieval)
-为避免 AI 教师“超纲教学”或胡编乱造，系统接入了本地 Markdown 结构化教材库。触发提问时，系统将动态提取关联教材切片作为强上下文约束 LLM，确保教学严谨性。
+### 3. 异步非阻塞性能优化 (Asynchronous Background Tasks)
+针对向量数据库写库耗时的痛点，利用 FastAPI 的 `BackgroundTasks` 将“错题记入错题本”的重I/O操作剥离出主请求生命周期。前端无需等待数据库写入即可秒级获取 AI 回复，大幅降低感知延迟 (Latency)。
 
-### 4. 状态机驱动的主动式课堂 (FSM-driven Session Management)
-突破传统 Chatbot 的被动问答模式，在后端构建基于有限状态机 (FSM) 的会话中枢。系统主动发起 Teach（讲解）与 Test（测试）节点循环；在测试环节接管用户输入，静默调用底层规则引擎进行校验，实现“不达标即拦截重做”的闭环教学体验。
+### 4. 复杂 DOM 多图层渲染与 Markdown 解析 (Advanced Vue Rendering)
+在 Web 端实现了堪比原生客户端的富文本语法高亮交互。前端不仅接入了 `marked.js` 完美解析大模型输出的 Markdown 格式列表与粗体，还基于 Vue 3 手写了文本分块算法，实现了底层背景色、虚线下划线及悬浮 Tooltip 的三重物理叠加视图。
+
+### 5. 基于 RAG 架构的强管控知识库 (RAG-based Knowledge Retrieval)
+为避免 AI 教师“超纲教学”，系统接入了本地 Markdown 结构化教材库。触发提问时，系统动态提取关联教材切片作为强上下文约束 LLM，确保教学严谨性。
+
+### 6. 状态机驱动的主动式课堂 (FSM-driven Session Management)
+突破传统 Chatbot 的被动问答模式，在后端构建基于有限状态机 (FSM) 的会话中枢。主动发起 Teach（讲解）与 Test（测试）节点循环；在测试环节静默调用底层规则引擎进行校验，实现“不达标即拦截重做”的闭环教学。
 
 ---
 
 ## 🗂️ 项目结构 (Project Structure)
 ```text
 .
-├── main.py                # FastAPI 核心入口与 FSM 路由中枢
+├── main.py                # FastAPI 核心入口与异步任务分发中枢
 ├── diagnostician.py       # spaCy 语法规则引擎与查错逻辑
 ├── llm_wrapper.py         # DeepSeek API 接入与 RAG 查询逻辑
+├── memory_manager.py      # ChromaDB 向量数据库读写管理中枢
 ├── schemas.py             # Pydantic 数据结构模型定义
-├── index.html             # Vue 3 前端界面与多图层渲染引擎
+├── frontend/              # 前端静态资源目录 (独立部署于 Vercel)
+│   └── index.html         # Vue 3 前端界面与多图层渲染引擎
 ├── textbooks/             # RAG 本地教材知识库
 │   └── module2_sentence_structures.md
 ├── requirements.txt       # 云端部署核心依赖清单
-├── .python-version        # 锁定 Vercel/Render 构建环境为 Python 3.12
 └── .env.example           # 环境变量配置模板
-```
-
----
-
-## ⚙️ 本地运行与部署指南 (Local Setup)
-
-1. **环境准备**: 建议使用 Conda 创建 Python 3.12 虚拟环境。
-2. **安装依赖**:
-   ```bash
-   pip install -r requirements.txt
-   python -m spacy download en_core_web_sm
-   ```
-3. **配置密钥**: 复制 `.env.example` 为 `.env`，填入你的 DeepSeek API Key。
-4. **启动服务**:
-   ```bash
-   uvicorn main:app --reload
-   ```
-5. **访问页面**: 直接双击在浏览器中打开根目录下的 `index.html`，享受你的专属 AI 私教！
