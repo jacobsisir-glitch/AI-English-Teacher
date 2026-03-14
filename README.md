@@ -117,3 +117,21 @@ graph TD
 │   └── module2_sentence_structures.md
 ├── requirements.txt       # 云端部署核心依赖清单
 └── .env.example           # 环境变量配置模板
+
+⚙️ 本地运行与部署指南 (Local Setup)
+环境准备: 建议使用 Conda 创建 Python 3.12 虚拟环境。
+
+安装依赖:
+
+Bash
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+(注：首次运行涉及 ChromaDB 调用时，系统会自动下载一个极其轻量的离线语义分析模型，请耐心等待 1-2 分钟。)
+
+配置密钥: 复制 .env.example 为 .env，填入你的 DeepSeek API Key。
+
+启动服务:
+
+Bash
+uvicorn main:app --reload
+访问页面: 确保 frontend/index.html 顶部的 BASE_URL 开关指向 http://127.0.0.1:8000，直接在浏览器中双击打开该 HTML 文件即可体验。
