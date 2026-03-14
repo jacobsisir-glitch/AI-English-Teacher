@@ -4,9 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AI 英语语法老师 - 极速节点版</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
     <script src="https://cdn.staticfile.net/axios/1.6.2/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
@@ -51,7 +52,7 @@
                     <i class="fa-solid fa-bolt"></i>
                 </div>
                 <h2 class="text-2xl font-bold text-slate-700">前后端已连通！</h2>
-                <p class="text-slate-500 max-w-md">现在发送的每一句话，都会实时发往 127.0.0.1:8000 交由 FastAPI 处理。</p>
+                <p class="text-slate-500 max-w-md">现在发送的每一句话，都会实时发往后台接口进行处理。</p>
             </div>
 
             <div v-for="(msg, index) in messages" :key="index" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
@@ -82,7 +83,7 @@
                             <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
                                 <i class="fa-solid fa-lightbulb text-amber-500"></i> AI 名师解析
                             </h4>
-                            <p class="text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">{{ msg.report.teacher_message }}</p>
+                            <div class="prose prose-sm prose-indigo max-w-none text-slate-700" v-html="renderMarkdown(msg.report.teacher_message)"></div>
                         </div>
                     </div>
                     <div v-else-if="msg.isQA" class="space-y-4">
@@ -90,7 +91,7 @@
                             <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
                                 <i class="fa-solid fa-book-open text-indigo-500"></i> 教材解答
                             </h4>
-                            <p class="text-slate-700 leading-relaxed text-sm whitespace-pre-wrap">{{ msg.content }}</p>
+                            <div class="prose prose-sm prose-indigo max-w-none text-slate-700" v-html="renderMarkdown(msg.content)"></div>
                         </div>
                     </div>
 
@@ -99,7 +100,7 @@
                             <h4 class="font-bold text-amber-900 text-sm mb-2 flex items-center gap-2">
                                 <i class="fa-solid fa-chalkboard-user text-amber-500"></i> AI 课堂
                             </h4>
-                            <p class="text-slate-800 leading-relaxed text-sm whitespace-pre-wrap">{{ msg.content }}</p>
+                            <div class="prose prose-sm prose-amber max-w-none text-slate-800" v-html="renderMarkdown(msg.content)"></div>
                         </div>
                     </div>
 
@@ -146,14 +147,35 @@
 </div>
 
 <script>
-    const { createApp, ref, nextTick } = Vue;
+    // 🛑 切换环境控制台 (每次部署前在这里切换即可)
+    // const BASE_URL = "http://127.0.0.1:8000"; // 本地测试环境 (注释掉这行)
+    const BASE_URL = "https://ai-english-teacher-o63p.onrender.com"; // 线上生产环境 (打开这行，把前面的 // 删掉)
+    const { createApp, ref, nextTick, watch, onMounted } = Vue;
 
     createApp({
         setup() {
             const inputText = ref('');
             const isThinking = ref(false);
-            const messages = ref([]);
-            const isInClass = ref(false); // 👈 新增：记录前端是否处于上课模式
+            // 🌟 读取本地小仓库：如果有历史记录就加载，没有就为空数组
+            const savedHistory = localStorage.getItem('aiTeacherChatHistory');
+            const messages = ref(savedHistory ? JSON.parse(savedHistory) : []);
+            // 🌟 开启自动存档雷达：只要 messages 发生任何变化，立刻写进硬盘！
+            watch(messages, (newVal) => {
+                localStorage.setItem('aiTeacherChatHistory', JSON.stringify(newVal));
+            }, { deep: true }); // deep: true 意思是深度监听，连数组里面某个属性变了也能察觉到
+            
+            // 🌟 网页刚加载完时，如果发现有历史记录，自动滚动到最底部
+            onMounted(() => {
+                if (messages.value.length > 0) {
+                    scrollToBottom();
+                }
+            });
+            const isInClass = ref(false); 
+            // 🌟 新增：Markdown 翻译器
+            const renderMarkdown = (text) => {
+                if (!text) return '';
+                return marked.parse(text);
+            };
 
             const autoResize = () => {
                 const textarea = document.getElementById('message-input');
@@ -175,7 +197,6 @@
                 else { sendMessage(); }
             };
 
-            // 升级版物理切片算法：支持多图层叠加
             const generateRenderChunks = (text, basic, structures, errors) => {
                 if (!text) return [];
                 let markers = new Set([0, text.length]);
@@ -187,7 +208,6 @@
                 const sortedMarkers = Array.from(markers).sort((a, b) => a - b);
                 const chunks = [];
                 
-                // 颜色配置字典
                 const basicColors = { "主语": "bg-red-100 text-red-800", "核心谓语": "bg-blue-100 text-blue-800", "宾语": "bg-green-100 text-green-800", "定语": "bg-yellow-100 text-yellow-800", "状语": "bg-purple-100 text-purple-800" };
                 const structColors = { "介词短语": "underline decoration-slate-400 decoration-solid decoration-2 underline-offset-4", "定语从句": "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "名词性从句": "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "非谓语/不定式": "underline decoration-teal-400 decoration-wavy decoration-2 underline-offset-4" };
 
@@ -204,7 +224,6 @@
                     let classList = "relative group cursor-help transition-colors duration-200 ";
                     let tooltipLines = [];
 
-                    // 判断并叠加样式
                     if (errorMatch) {
                         classList += "bg-red-200 text-red-900 font-bold border-b-2 border-red-500 rounded-sm ";
                         tooltipLines.push(`❌ ${errorMatch.correction_suggestion}`);
@@ -222,20 +241,20 @@
                         text: chunkText,
                         classStr: classList.trim(),
                         hasTooltip: tooltipLines.length > 0,
-                        tooltipHtml: tooltipLines.join('<br>') // 支持多行提示
+                        tooltipHtml: tooltipLines.join('<br>') 
                     });
                 }
                 return chunks;
             };
 
-            // 新增：触发开启微课
             const startClass = async () => {
                 messages.value.push({ role: 'user', content: '👨‍🎓 老师好，我准备好上课了！' });
                 isThinking.value = true;
                 scrollToBottom();
                 try {
-                    const response = await axios.post('https://ai-english-teacher-o63p.onrender.com/class_chat', { text: "", action: "start" });
-                    isInClass.value = true; // 锁定网页进入上课模式
+                    // 🌟 修改点：换成了 BASE_URL
+                    const response = await axios.post(BASE_URL + '/class_chat', { text: "", action: "start" });
+                    isInClass.value = true; 
                     messages.value.push({ role: 'ai', isClass: true, content: response.data.teacher_reply });
                 } catch (error) {
                     messages.value.push({ role: 'ai', content: "❌ 唤醒老师失败，请检查后端。" });
@@ -257,23 +276,23 @@
                 scrollToBottom();
 
                 try {
-                    // 🌟 核心拦截器：如果在上课，强行没收发送通道，全部发往 class_chat！
                     if (isInClass.value) {
-                        const response = await axios.post('https://ai-english-teacher-o63p.onrender.com/class_chat', { text: text, action: "chat" });
+                        // 🌟 修改点：换成了 BASE_URL
+                        const response = await axios.post(BASE_URL + '/class_chat', { text: text, action: "chat" });
                         messages.value.push({ role: 'ai', isClass: true, content: response.data.teacher_reply });
                         
-                        // 如果后端宣告下课，前端解除锁定
                         if (response.data.status === "ENDED") {
                             isInClass.value = false; 
                         }
                     } else {
-                        // 如果没在上课，走原来的自由提问(RAG)或语法诊断逻辑
                         const isQuestion = /[\u4e00-\u9fa5]/.test(text) || text.endsWith('?') || text.endsWith('？');
                         if (isQuestion) {
-                            const response = await axios.post('https://ai-english-teacher-o63p.onrender.com/ask', { question: text });
+                            // 🌟 修改点：换成了 BASE_URL
+                            const response = await axios.post(BASE_URL + '/ask', { question: text });
                             messages.value.push({ role: 'ai', isQA: true, content: response.data.teacher_answer });
                         } else {
-                            const response = await axios.post('https://ai-english-teacher-o63p.onrender.com/analyze', { text: text });
+                            // 🌟 修改点：换成了 BASE_URL
+                            const response = await axios.post(BASE_URL + '/analyze', { text: text });
                             messages.value.push({ role: 'ai', isAnalysis: true, originalText: text, report: response.data });
                         }
                     }
@@ -285,11 +304,15 @@
                 }
             };
 
-            const startNewChat = () => { messages.value = []; isInClass.value = false; };
+            const startNewChat = () => { 
+                messages.value = []; 
+                isInClass.value = false; 
+                localStorage.removeItem('aiTeacherChatHistory'); // 💣 彻底清空本地小仓库
+            };
 
             return {
                 inputText, messages, isThinking, isInClass,
-                autoResize, handleEnter, sendMessage, startNewChat, generateRenderChunks, startClass
+                autoResize, handleEnter, sendMessage, startNewChat, generateRenderChunks, startClass, renderMarkdown
             };
         }
     }).mount('#app');

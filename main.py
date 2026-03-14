@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -47,7 +47,8 @@ class UserInput(BaseModel):
 CURRENT_STUDENT_ID = "user_zhouziyu"
 
 @app.post("/analyze", response_model=SentenceAnalysisReport)
-async def analyze_student_sentence(request: UserInput):
+@app.post("/analyze", response_model=SentenceAnalysisReport)
+async def analyze_student_sentence(request: UserInput, background_tasks: BackgroundTasks):
     print(f"\n📩 收到前端发来的学生句子: {request.text}")
     
     # 1. 把句子交给 B超室医生 (spaCy) 解剖查错
@@ -56,8 +57,9 @@ async def analyze_student_sentence(request: UserInput):
     # 🌟 核心焊接点 2：全自动记仇机制！
     if not raw_report.is_grammar_correct:
         for error in raw_report.errors:
-            # 只要有错，立刻扔进 ChromaDB 向量数据库
-            save_mistake(
+            # 🚨 修改这里！把原来直接调用 save_mistake(...) 改成让后台任务去执行
+            background_tasks.add_task(
+                save_mistake, # 注意：这里只写函数名，不要加括号
                 student_id=CURRENT_STUDENT_ID,
                 original_sentence=request.text,
                 error_type=error.error_type,
