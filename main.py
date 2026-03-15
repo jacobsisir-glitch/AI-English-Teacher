@@ -12,6 +12,11 @@ from memory_manager import save_mistake
 # 🌟 全新的 Agent 教学任务库
 COURSE_TASKS = [
     {
+        "task_name": "课程导读与开场白",
+        "goal": "这是微课的第一环。请用你毒舌、傲娇充满英式幽默的语气的导师人设，向学生宣读本节课的宏观大纲（参考00_grammar_overview.md）绝对不要提问任何具体的语法知识点。 你的目标只是进行课前Overview，并在最后冷冷地问一句：'你那可怜的脑容量准备好接收这些硬核知识了吗？' 或者引用莎士比亚的名言：你就一定要毁了这门优雅的语言吗？当学生回复类似'准备好了/来吧'等确认话语时，输出 [TASK_COMPLETED] 推进到下一关。",
+        "reference": "本节课涵盖：动词的过去、现在、将来、过去将来；以及一般、进行、完成、完成进行状态。"
+    },
+    {
         "task_name": "引言与不及物动词",
         "goal": "向学生介绍英语语法的核心是动词，并确保学生理解第1类：不及物动词(intransitive verbs)及主谓结构(SV)。引导学生自己造一个 SV 的句子来证明他们懂了。",
         "reference": "绝大多数句子表达的含义其实只有一个：“什么+怎么样”... 第一种是能够独立完成动作的动词，称为不及物动词，对应的句子结构就是：主语 + 不及物动词。经典例句：The birds fly."
@@ -35,6 +40,36 @@ COURSE_TASKS = [
         "task_name": "主系表与系动词",
         "goal": "讲解第5类动词：系动词(linking verbs)及主系表结构(SVP/SVC)。让学生理解系动词不是表示动作，而是把表语的信息「赋予」主语，表示状态或身份，并会辨认常见系动词（如 be, look, seem）和表语。",
         "reference": "并非表示特定动作，而是将动词后的信息赋予动词前的动词，表示连接状态。主系表结构 (SVP/SVC)。系动词后的补充信息称为主语补语/表语(predicative)。可理解为 Jacob = tall；Smith = in the room。经典例句：Jacob is tall. Smith is in the room. Jim looks very sad."
+    },
+    {
+        "task_name": "动词的时间（过去、现在、将来、过去将来）",
+        "goal": "向学生解释动词的四种时间坐标（现在、过去、将来、过去将来），确保学生理解每种时间对应的形态标志与典型用法，并能区分「过去将来」是站在过去看未来的概念。",
+        "reference": "动词的时间有四种，分别是：过去、现在、将来、过去将来。现在：形态标志：动词原形或第三人称单数形式（加 -s/-es）。经典例句：I buy apples every day. 过去：形态标志：动词的过去式（通常加 -ed，或有不规则变化如 go -> went）。经典例句：I bought apples yesterday. 将来：形态标志：通常需要助动词 will / shall + 动词原形（或者用 be going to 结构）。经典例句：I will buy apples tomorrow. 过去将来：对于过去某个时间点而言的将来。形态标志：通常用过去时的助动词 would / should + 动词原形（或者用 was/were going to）。经典例句：He said he would buy apples."
+    },
+    {
+        "task_name": "动词的状态（一般、进行、完成、完成进行）",
+        "goal": "向学生解释动词的四种状态（一般、进行、完成、完成进行）及其形态标志，重点让学生理解每种状态背后的「潜台词」，能根据语境体会说话人的隐含意思。",
+        "reference": "动词的状态有四种：进行、完成、完成进行、一般状态。进行状态：形态标志 be + v-ing。经典例句：I am eating an apple.（潜台词：别跟我说话，我嘴里有东西。）完成状态：形态标志 have/has/had + v-ed。经典例句：I have eaten the apple.（潜台词：苹果没了，我现在肚子很饱，不用叫我吃饭了。）完成进行状态：形态标志 have/has/had + been + v-ing。经典例句：I have been eating apples all morning.（潜台词：我嚼得腮帮子都酸了，到现在还在嚼，或者刚刚才停下。）一般状态：形态标志动词原形/过去式等。经典例句：I eat apples.（潜台词：我不挑食，我具备吃苹果的习惯或能力。）"
+    },
+    {
+        "task_name": "聚焦「现在」的四大时态",
+        "goal": "对比讲解一般现在、现在进行、现在完成、现在完成进行四种时态，向学生解释形态标志与典型例句；重点考察学生对「现在完成时」潜台词的理解（过去动作对现在的影响或持续到现在）。",
+        "reference": "一般现在时态：形态标志动词原形以及第三人称单数。经典例句：I live in Beijing. She eats apples. I go to lunch at 12:30 every day. 现在进行时态：形态标志助动词be的变位 + 动词现在分词。经典例句：I am doing homework. 现在完成时态：过去发生的动作对现在造成了影响，或过去的动作一直持续到现在。形态标志助动词have变位 + 动词的过去分词。经典例句：I have lost my keys. I have eaten a carrot. 与 I ate a carrot. 的区别。现在完成进行时态：形态标志 have的变位 + been + 动词的现在分词。经典例句：I have been waiting for you for two hours!"
+    },
+    {
+        "task_name": "聚焦「过去」的四大时态",
+        "goal": "讲解一般过去、过去进行、过去完成、过去完成进行四种时态；重点区分一般过去时与过去完成时（过去的过去），确保学生理解过去完成时表示在过去的某个时间点之前已经发生并产生影响。",
+        "reference": "一般过去时态：过去某个时间里发生的动作或状态，已彻底结束。形态标志动词过去式。经典例句：I loved her.（潜台词：现在不爱了，彻底结束了。）过去进行时态：形态标志助动词be的变位(be的过去式) + 动词现在分词。经典例句：I was taking a shower when the phone rang. 现在完成时、一般过去时、过去进行时的区别：现在完成时强调对现在而言是否完成及对现在的影响；一般过去时侧重过去的事实；过去进行时强调过去某时正在发生。过去完成时态：强调过去的某个时间以前发生的事情，对之后(但仍是过去)造成影响。形态标志 have的过去式 + 过去分词。经典例句：When I arrived at the station, the train had left. 过去完成进行时态：形态标志 have的过去式 + been + 现在分词。经典例句：He was exhausted because he had been working all night."
+    },
+    {
+        "task_name": "聚焦「将来」的四大时态",
+        "goal": "讲解一般将来、将来进行、将来完成、将来完成进行四种时态，结合教材例句说明形态标志与用法；要求学生能用将来完成进行时造句，表达到将来某时将持续完成的动作。",
+        "reference": "一般将来时态：形态标志 will + 动原。经典例句：I will buy some milk. 将来进行时态：形态标志 will + be + 现在分词。经典例句：I will be having dinner. 将来完成时态：形态标志 will + have + 过去分词。经典例句：I will have finished the report by Friday. 将来完成进行时态：对于将来某个时间，不但已经完成了，并且还要持续完成的动作。形态标志 will + have + been + 现在分词。经典例句：By next month, I will have been working at my job for 10 years."
+    },
+    {
+        "task_name": "时空穿越的「过去将来」",
+        "goal": "向学生解释过去将来时态的概念（站在过去看未来），说明它在从句转述与虚拟语气中的用法；让学生能区分 would 表时态、表虚拟、表礼貌请求等不同用法。",
+        "reference": "一般过去将来时态：对于过去某个时间点而言的将来，常用于从句中。形态标志 would(will的过去式) + 动原。经典例句：He promised that he would help me. 过去将来进行：would + be + 现在分词。例句：I thought he would be sleeping when I called. 过去将来完成：would + have + 过去分词，极常用于虚拟语气。经典例句：If I had money, I would have bought that car.（虚拟语气：如果当时有钱，我就已经买下那辆车了。）过去将来完成进行：would + have + been + 现在分词。例句：He told me that by the end of the year, he would have been living there for a decade. would 可作为 will 的过去式构成时态；也可用作虚拟语气；表示礼貌：Would you like to have a lunch with me?"
     }
 ]
 
@@ -141,7 +176,18 @@ async def handle_class_interaction(request: ClassInput):
 
     if is_task_completed:
         student_state["current_task_index"] += 1
-        clean_reply += "\n\n*(🎉 恭喜！当前任务通关，老师带你进入下一个知识点...)*"
         print(f"✅ 进度推进成功，下一个任务索引将变为: {student_state['current_task_index']}")
+        
+        # 无缝衔接：自动触发下一关的第一段讲授内容（无需等待学生再发一句）
+        if student_state["current_task_index"] < len(COURSE_TASKS):
+            next_task = COURSE_TASKS[student_state["current_task_index"]]
+            print(f"⏭️ 自动衔接下一关: {next_task['task_name']}")
+            # 这里的“轻推”提示只用于让老师立即开讲下一关，不应向学生透露任何系统机制
+            nudge_msg = "好，进入下一关。请直接开始讲授本关的第一段内容。"
+            next_reply = generate_agent_class_reply(next_task, student_state["class_history"], nudge_msg)
+            # 如果模型误把暗号带出来，后端继续清理，避免前端看见
+            next_reply = next_reply.replace("[TASK_COMPLETED]", "").strip()
+            # 合并：上一关的通关确认 + 下一关开场（或你也可以只返回 next_reply）
+            clean_reply = (clean_reply + "\n\n" + next_reply).strip()
 
     return {"teacher_reply": clean_reply, "status": "TEACHING"}
