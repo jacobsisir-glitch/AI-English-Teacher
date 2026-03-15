@@ -58,7 +58,7 @@ def recall_mistakes(student_id: str, current_sentence: str, n_results: int = 2) 
 
 # === 本地简单测试 ===
 if __name__ == "__main__":
-    test_student = "user_zhouziyu" # 假设这是你的账号
+    test_student = "user_Zeratul" # 假设这是你的账号
     
     print("--- 1. 模拟昨天上课犯错 ---")
     save_mistake(test_student, "The boy go to school.", "主谓不一致", "boy是三单，go应该加es")
