@@ -7,7 +7,7 @@
 - 经典例句：The birds fly. 鸟儿飞。
 - 概念说明: 没有动作承受者的动词，称为**不及物动词(intransitive verbs)**，对应的句子结构就是：主语 + 不及物动词。
 
-### 2. 有一个动作的承受者的动词 主谓宾结构(SVO - Subject + Verb + Object)
+### 2. 有1个动作的承受者的动词 主谓宾结构(SVO - Subject + Verb + Object)
 - 经典例句：I love apples. 我喜欢苹果。
 - 概念说明: 如果只说"I love"，这个句子的句意是不完整的，对于"love“这样的动词，没有承受者就没有实际的意义，这类动词称为**及物动词(transitive verbs)**，对应的动作的承受者，称为**宾语(object)**。对应的句子结构就是：主语 + 及物动词 + 宾语。此外，相对于第3类动词，只有一个宾语的及物动词也可以称之为**单及物动词(monotransitive verbs)**，对应的句子结构也可以表达为：主语 + 单及物动词 + 宾语。
 
@@ -15,7 +15,7 @@
 - 经典例句：Jack teaches me English. 杰克教我英语。
 - 概念说明: 这里teaches作为动词，教授的是英语，但是教授的对象是me, 在英语语法中，我们把这两个动词的承受者分别称为**直接宾语(direct object)**和**间接宾语(indirect object)**。 如果只说"Jack teaches English."句子事实上已经完整了，"English"在这个句子中作为直接宾语；但如果说"Jack teaches you."在没有上下文的情况下，读者会觉得这个句子缺了些什么，在这里"you”作为间接宾语。综上，"teach"在这里被称为**双及物动词(ditransitive verbs)**， 对应的句子结构：主语 + 双及物动词 + 间接宾语 + 直接宾语。
 
-### 4. 有一个动作承受者（但需要补充）的动词 主谓宾补结构 (SVOC - Subject + Verb + Object + Object Complement)
+### 4. 有1个动作承受者（但需要补充）的动词 主谓宾补结构 (SVOC - Subject + Verb + Object + Object Complement)
 - 经典例句：Mary considers Tom smart. 玛丽认为汤姆聪明。
 - 概念说明: 这句话虽然只有一个动作承受者"Tom", 但如果只说"Marry considers Tom."会觉得话没有说完，并且"smart"也不同于第3类中的作为双宾语中的一个宾语，因为"smart"没有承受"considers"这个动作。 事实上，对于句中的"considers"，必须要对动作的承受者"Tom"补充信息，这样句子才会完整，而对于这个补充的信息，在语法上称之为**补足语/补语(complement)**， 更准确的名称是**宾语补语(object complement)**。对于这类需要补语的动词，我们称为**复杂及物动词(complex-transitive Verbs)**, 对应的句子结构：主语 + 复杂及物动词 + 宾语 + 宾语补语。
 
@@ -51,7 +51,7 @@
 - 经典例句：The dog eats quickly. "quickly"修饰动词"eats";
            The new AI model is incredibly smart. "incredibly"修饰"smart".
            He solved the coding problem surprisingly quickly."surprisingly"修饰"quickly".
-           Because the server crashed, we lost all our chat history."Because the server crashed"作为原因状语从句，修饰"quickly".
+           Because the server crashed, we lost all our chat history."Because the server crashed"作为原因状语从句.
 
 8. **同位语(Appositive)**: 相当于再重复一遍主语或宾语，有强调、解释的含义。
 - 经典例句：Mackle, a rocket scientist, is very famous. 这里的"a rocket scientist"
@@ -72,8 +72,8 @@
 - 结构解析：简单句 A：I love apples (SVO)，连词：but (表示转折关系)，简单句 B：my brother loves bananas (SVO)，两套主谓结构完全独立，去掉 but 也能各自成为完整的句子。
 
 3. **复杂句 / 主从复合句 (Complex Sentence)**: 包含一个**主句（Main Clause）**和一个或多个**从句（Subordinate Clause）**。从句本质上说是将一个简单句进行修改，并用作另一个句子的句子成分（比如充当主句的宾语、定语或状语，谓语动词除外）。从句必须由从属连词（如 that, because, which, if）引导。
-- 经典例句：I know [that you love apples]. 我知道 [你喜欢苹果] 。
-- 结构解析：主句骨架：I (主语) + know (谓语动词) + [一整个从句] (宾语), 从属连词：that (把后面的句子降级为从句), 从句内部：you (从句的主语) + love (从句的谓语) + apples (从句的宾语), 这就是“宾语从句”, 一整个句子 "you love apples" 充当了主句动词 know 的宾语。
+- 经典例句：I know [that you love apples]. 我知道 "你喜欢苹果" 。
+- 结构解析：主句骨架：I (主语) + know (谓语动词) + "一整个从句" (宾语), 从属连词：that (把后面的句子降级为从句), 从句内部：you (从句的主语) + love (从句的谓语) + apples (从句的宾语), 这就是“宾语从句”, 一整个句子 "you love apples" 充当了主句动词 know 的宾语。
 
 ## 第三节：词性/词类(Part of speech)
 语法中的**词性(Part of speech)**包括：
@@ -112,7 +112,8 @@
 - 经典例句：I like apples, but she likes oranges. 我喜欢苹果，但是她喜欢橘子。
 - 语法解析：but 作为并列连词，完美连接了前后两个独立的简单句。
 
-10. **谓语动词/限定动词(Predicate Verb / Finite Verb)**：
+10. **动词(Verb)**：
+动词在句中作核心时叫**谓语动词/限定性动词(Predicate Verb/Finite Verb)**
  - 描述动作的时间（现在、过去、将来、过去将来）；
  - 描述动作的**状态(Aspect)**（ 一般、完成、进行、完成进行）上述两方面的作用合称为谓语动词的**时态(tense)**。理论上，时态的自由排列有16种组合；
  - 表示动作的假设、情感，语法上称为谓语动词的**语气(mood)** 包括虚拟语气、陈述语气、祈使语气。时间、状态、语气合称为**时体气(TAM)**；
@@ -123,12 +124,12 @@
 这里需要格外注意的是：**句子成分(Clause Elements)**和**词性(Part of speech)**是两个不同的概念，词性是对词汇本身的分类。它关注的是这个词脱离句子独立存在时，它的词汇意义和形态特征，通常查阅词典即可确定。而句子成分是词汇在具体句子结构中所承担的语法任务。它关注的是这个词在这个特定的句子环境中，与其他词语形成了什么结构关系，必须放在具体的句子上下文中才能划定。
 
 ## 第四节：非谓语动词/非限定动词(Non-finite Verb)
-动词除了充当句子中的谓语动词外，还可以充当主语、宾语、宾语补语、主语补语、定语等成分。此外，非谓语动词可以取代几乎所有的从句，从而简化句子，但这样的动词就不会再具备谓语动词描述时体气的能力。非谓语动词会以动词不定式、现在分词、动名词、过去分词的形式出现。
+动词除了充当句子中的谓语动词外，还可以充当主语、宾语、宾语补语、主语补语、定语等成分。此外，非谓语动词可以取代几乎所有的从句，从而简化句子，但这样的动词就失去了描述“时间 (Tense)”和受主语限制的“语气 (Mood)”能力，但它依然保留了描述状态/体 (Aspect) 和语态 (Voice) 的能力（比如 to be doing, having done, to be done）。非谓语动词会以动词不定式、现在分词、动名词、过去分词的形式出现。
 非谓语动词在外观上主要分为以下三种（四类）形式:
-1. **动词不定式 (Infinitive)**：`to + 动词原形`。常自带“目的”和“将来”的意味。
-2. **动名词 (Gerund)**：`动词 + ing`。完全把动词当名词用，常表示习惯性或抽象的动作。
+1. **动词不定式 (Infinitive)**：to + 动词原形。常自带“目的”和“将来”的意味。
+2. **动名词 (Gerund)**：动词 + ing。完全把动词当名词用，常表示习惯性或抽象的动作。
 3. **分词 (Participle)**：具有强烈的形容词或副词特性。
-   - **现在分词 (Present Participle)**：`动词 + ing`。表示“主动”和“正在进行”。
-   - **过去分词 (Past Participle)**：`动词的过去分词形式 (done)`。表示“被动”和“已经完成”。
+   - **现在分词 (Present Participle)**：动词 + ing。表示“主动”和“正在进行”。
+   - **过去分词 (Past Participle)**：动词的过去分词形式 (done)。表示“被动”和“已经完成”。
 
 以上，是英语语法的主体框架。

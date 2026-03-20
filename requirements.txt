@@ -6,3 +6,4 @@ openai
 requests
 python-dotenv
 chromadb
+sqlalchemy

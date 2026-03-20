@@ -1,11 +1,26 @@
-from fastapi import FastAPI, BackgroundTasks
-from fastapi.responses import StreamingResponse
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+import json
 
+from fastapi import BackgroundTasks, Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+import database.models
+from config import DEFAULT_STUDENT_ID
+from database.database import Base, engine, get_db
+from database.models import ErrorBook
 from diagnostician import analyze_sentence
 # 🌟 优化点：把所有的 import 都统一整齐地放在最上面
-from llm_wrapper import generate_teacher_message, ask_teacher_with_rag_stream, generate_agent_class_reply
+from llm_wrapper import (
+    generate_teacher_message,
+    generate_teacher_message_stream,
+    ask_teacher_with_rag_stream,
+    generate_agent_class_reply,
+    generate_agent_class_reply_stream,
+    classify_user_intent,
+)
 from schemas import SentenceAnalysisReport
 from memory_manager import save_mistake
 
@@ -80,7 +95,248 @@ student_state = {
     "class_history": []      
 }
 
+TASK_COMPLETED_MARKER = "[TASK_COMPLETED]"
+CLASS_COMPLETED_MESSAGE = "🎉 恭喜你！我们所有的语法特训任务都通关啦！现在退出微课模式咯~"
+NEXT_TASK_NUDGE = "好，进入下一关。请直接开始讲授本关的第一段内容。"
+ANALYZE_META_START = "===META_START==="
+ANALYZE_META_END = "===META_END==="
+DB_LOG_START = "===DB_START==="
+DB_LOG_END = "===DB_END==="
+
+class TaskCompletedBuffer:
+    """
+    滑动窗口缓冲器：安全拦截被切片的 [TASK_COMPLETED]，其余字符正常放行。
+    """
+    def __init__(self, marker: str):
+        self.marker = marker
+        self.buffer = ""
+        self.visible_parts = []
+        self.detected = False
+
+    def push(self, chunk: str) -> str:
+        if not chunk:
+            return ""
+
+        released_chars = []
+
+        for char in chunk:
+            self.buffer += char
+
+            if self.buffer == self.marker:
+                self.detected = True
+                self.buffer = ""
+                continue
+
+            while self.buffer and not self.marker.startswith(self.buffer):
+                released_chars.append(self.buffer[0])
+                self.visible_parts.append(self.buffer[0])
+                self.buffer = self.buffer[1:]
+
+        return "".join(released_chars)
+
+    def finalize(self) -> str:
+        if not self.buffer:
+            return ""
+
+        remaining = self.buffer
+        self.visible_parts.append(remaining)
+        self.buffer = ""
+        return remaining
+
+    @property
+    def clean_text(self) -> str:
+        return "".join(self.visible_parts)
+
+
+class AnalyzeDBLogBuffer:
+    def __init__(self, start_marker: str, end_marker: str):
+        self.start_marker = start_marker
+        self.end_marker = end_marker
+        self.mode = "text"
+        self.text_buffer = ""
+        self.db_buffer = ""
+        self.visible_parts = []
+        self.db_parts = []
+        self.detected = False
+        self.completed = False
+
+    def push(self, chunk: str) -> str:
+        if not chunk or self.mode == "done":
+            return ""
+
+        released_chars = []
+
+        for char in chunk:
+            if self.mode == "text":
+                self.text_buffer += char
+
+                if self.text_buffer == self.start_marker:
+                    self.detected = True
+                    self.mode = "db"
+                    self.text_buffer = ""
+                    continue
+
+                while self.text_buffer and not self.start_marker.startswith(self.text_buffer):
+                    released_chars.append(self.text_buffer[0])
+                    self.visible_parts.append(self.text_buffer[0])
+                    self.text_buffer = self.text_buffer[1:]
+            elif self.mode == "db":
+                self.db_buffer += char
+
+                if self.db_buffer == self.end_marker:
+                    self.completed = True
+                    self.mode = "done"
+                    self.db_buffer = ""
+                    continue
+
+                while self.db_buffer and not self.end_marker.startswith(self.db_buffer):
+                    self.db_parts.append(self.db_buffer[0])
+                    self.db_buffer = self.db_buffer[1:]
+
+        return "".join(released_chars)
+
+    def finalize(self) -> str:
+        if self.mode == "text" and self.text_buffer:
+            remaining = self.text_buffer
+            self.visible_parts.append(remaining)
+            self.text_buffer = ""
+            return remaining
+
+        if self.mode == "db" and self.db_buffer:
+            while self.db_buffer and not self.end_marker.startswith(self.db_buffer):
+                self.db_parts.append(self.db_buffer[0])
+                self.db_buffer = self.db_buffer[1:]
+
+        return ""
+
+    @property
+    def ai_comment(self) -> str:
+        return "".join(self.visible_parts).strip()
+
+    @property
+    def db_json_text(self) -> str:
+        return "".join(self.db_parts).strip()
+
+
+def _save_error_book_entry(db: Session, user_input: str, ai_comment: str, db_json_text: str) -> None:
+    try:
+        payload = json.loads(db_json_text)
+    except json.JSONDecodeError as exc:
+        print(f"⚠️ ErrorBook JSON 解析失败: {exc}. 原始内容: {db_json_text}")
+        return
+
+    grammar_point = str(payload.get("grammar_point", "")).strip()
+    error_tag = str(payload.get("error_tag", "")).strip()
+
+    if not grammar_point or not error_tag:
+        print(f"⚠️ ErrorBook JSON 缺少必要字段: {payload}")
+        return
+
+    try:
+        db.add(
+            ErrorBook(
+                grammar_point=grammar_point,
+                error_tag=error_tag,
+                user_input=user_input,
+                ai_comment=ai_comment,
+            )
+        )
+        db.commit()
+        print(f"📝 ErrorBook 写入成功: grammar_point={grammar_point}, error_tag={error_tag}")
+    except Exception as exc:
+        db.rollback()
+        print(f"⚠️ ErrorBook 写入失败: {exc}")
+
+
+def _trim_class_history():
+    if len(student_state["class_history"]) > 12:
+        student_state["class_history"] = student_state["class_history"][-12:]
+
+def _strip_task_completed(text: str) -> tuple[str, bool]:
+    has_marker = TASK_COMPLETED_MARKER in text
+    clean_text = text.replace(TASK_COMPLETED_MARKER, "").strip()
+    return clean_text, has_marker
+
+
+def _build_meta_chunk(payload: dict) -> str:
+    return f"{ANALYZE_META_START}{json.dumps(payload, ensure_ascii=False)}{ANALYZE_META_END}"
+
+
+def _build_analyze_stream_response(
+    text: str,
+    background_tasks: BackgroundTasks,
+    db: Session,
+) -> StreamingResponse:
+    print(f"\n📩 收到前端发来的学生句子: {text}")
+    raw_report = analyze_sentence(text)
+    raw_report.teacher_message = ""
+
+    if not raw_report.is_grammar_correct:
+        for error in raw_report.errors:
+            background_tasks.add_task(
+                save_mistake,
+                student_id=CURRENT_STUDENT_ID,
+                original_sentence=text,
+                error_type=error.error_type,
+                suggestion=error.correction_suggestion
+            )
+
+    meta_payload = {
+        "intent": "ANALYZE",
+        "originalText": raw_report.original_sentence,
+        "report": raw_report.model_dump()
+    }
+
+    def generate():
+        yield _build_meta_chunk(meta_payload)
+
+        db_log_buffer = AnalyzeDBLogBuffer(DB_LOG_START, DB_LOG_END)
+        for chunk in generate_teacher_message_stream(raw_report, student_id=CURRENT_STUDENT_ID):
+            visible_chunk = db_log_buffer.push(chunk)
+            if visible_chunk:
+                yield visible_chunk
+
+        remaining_text = db_log_buffer.finalize()
+        if remaining_text:
+            yield remaining_text
+
+        if db_log_buffer.detected:
+            if db_log_buffer.completed:
+                _save_error_book_entry(
+                    db=db,
+                    user_input=text,
+                    ai_comment=db_log_buffer.ai_comment,
+                    db_json_text=db_log_buffer.db_json_text,
+                )
+            else:
+                print("⚠️ 检测到 DB_START，但未找到完整的 DB_END，已跳过 ErrorBook 写入。")
+
+    print("📤 句法分析已完成，正在以 Meta + 文本流的形式返回前端...")
+    return StreamingResponse(
+        generate(),
+        media_type="text/plain; charset=utf-8",
+        background=background_tasks
+    )
+
+
+def _build_question_stream_response(text: str, include_meta: bool = False) -> StreamingResponse:
+    print(f"\n🙋‍♂️ 收到学生流式提问: {text}")
+
+    def generate():
+        if include_meta:
+            yield _build_meta_chunk({"intent": "QUESTION"})
+
+        for chunk in ask_teacher_with_rag_stream(text):
+            yield chunk
+
+    return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
+
 app = FastAPI(title="AI English Teacher API")
+
+
+@app.on_event("startup")
+def on_startup():
+    Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
@@ -93,34 +349,76 @@ app.add_middleware(
 class UserInput(BaseModel):
     text: str
 
-CURRENT_STUDENT_ID = "user_Zeratul"
+CURRENT_STUDENT_ID = DEFAULT_STUDENT_ID
 
-@app.post("/analyze", response_model=SentenceAnalysisReport)
-async def analyze_student_sentence(request: UserInput, background_tasks: BackgroundTasks):
-    print(f"\n📩 收到前端发来的学生句子: {request.text}")
-    raw_report = analyze_sentence(request.text)
-    
-    if not raw_report.is_grammar_correct:
-        for error in raw_report.errors:
-            background_tasks.add_task(
-                save_mistake,
-                student_id=CURRENT_STUDENT_ID,
-                original_sentence=request.text,
-                error_type=error.error_type,
-                suggestion=error.correction_suggestion
-            )
-            
-    final_report = generate_teacher_message(raw_report, student_id=CURRENT_STUDENT_ID)
-    print("📤 处理完毕，正在将报告返回给前端...")
-    return final_report
+@app.post("/analyze")
+async def analyze_student_sentence(
+    request: UserInput,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    return _build_analyze_stream_response(request.text, background_tasks, db)
 
 class QuestionInput(BaseModel):
     question: str
 
 @app.post("/ask")
 async def ask_question(request: QuestionInput):
-    print(f"\n🙋‍♂️ 收到学生流式提问: {request.question}")
-    return StreamingResponse(ask_teacher_with_rag_stream(request.question), media_type="text/plain")
+    return _build_question_stream_response(request.question, include_meta=False)
+
+
+@app.get("/api/dashboard/data")
+async def get_dashboard_data(db: Session = Depends(get_db)):
+    total_errors = db.query(func.count(ErrorBook.id)).scalar() or 0
+
+    radar_rows = (
+        db.query(
+            ErrorBook.grammar_point.label("name"),
+            func.count(ErrorBook.id).label("value"),
+        )
+        .group_by(ErrorBook.grammar_point)
+        .order_by(func.count(ErrorBook.id).desc(), ErrorBook.grammar_point.asc())
+        .all()
+    )
+    radar_data = [{"name": row.name, "value": row.value} for row in radar_rows]
+
+    recent_rows = (
+        db.query(ErrorBook)
+        .order_by(ErrorBook.created_at.desc(), ErrorBook.id.desc())
+        .limit(3)
+        .all()
+    )
+    recent_errors = [
+        {
+            "user_input": row.user_input,
+            "error_tag": row.error_tag,
+            "ai_comment": row.ai_comment,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in recent_rows
+    ]
+
+    return {
+        "total_errors": total_errors,
+        "radar_data": radar_data,
+        "recent_errors": recent_errors,
+    }
+
+
+@app.post("/practice_chat")
+async def practice_chat(
+    request: UserInput,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    print(f"\n🧭 收到统一练习入口请求: {request.text}")
+    intent = classify_user_intent(request.text)
+    print(f"🧠 LLM 语义路由判定结果: {intent}")
+
+    if intent == "ANALYZE":
+        return _build_analyze_stream_response(request.text, background_tasks, db)
+
+    return _build_question_stream_response(request.text, include_meta=True)
 
 class ClassInput(BaseModel):
     text: str
@@ -153,7 +451,7 @@ async def handle_class_interaction(request: ClassInput):
     if student_state["current_task_index"] >= len(COURSE_TASKS):
         print("🎉 所有任务已通关，下课！")
         student_state["is_in_class"] = False
-        return {"teacher_reply": "🎉 恭喜你！我们所有的语法特训任务都通关啦！现在退出微课模式咯~", "status": "ENDED"}
+        return {"teacher_reply": CLASS_COMPLETED_MESSAGE, "status": "ENDED"}
 
     current_task = COURSE_TASKS[student_state["current_task_index"]]
     print(f"🎯 正在派发当前教学任务: {current_task['task_name']}")
@@ -161,18 +459,13 @@ async def handle_class_interaction(request: ClassInput):
     raw_reply = generate_agent_class_reply(current_task, student_state["class_history"], user_msg)
     print(f"🤖 Agent 原始回复生成完毕。")
     
-    is_task_completed = False
-    if "[TASK_COMPLETED]" in raw_reply:
+    clean_reply, is_task_completed = _strip_task_completed(raw_reply)
+    if is_task_completed:
         print("🔑 触发通关秘钥：[TASK_COMPLETED]！准备推进进度！")
-        is_task_completed = True
-        clean_reply = raw_reply.replace("[TASK_COMPLETED]", "").strip()
-    else:
-        clean_reply = raw_reply
 
     student_state["class_history"].append({"role": "user", "content": user_msg})
     student_state["class_history"].append({"role": "assistant", "content": clean_reply})
-    if len(student_state["class_history"]) > 12: 
-        student_state["class_history"] = student_state["class_history"][-12:]
+    _trim_class_history()
 
     if is_task_completed:
         student_state["current_task_index"] += 1
@@ -183,11 +476,92 @@ async def handle_class_interaction(request: ClassInput):
             next_task = COURSE_TASKS[student_state["current_task_index"]]
             print(f"⏭️ 自动衔接下一关: {next_task['task_name']}")
             # 这里的“轻推”提示只用于让老师立即开讲下一关，不应向学生透露任何系统机制
-            nudge_msg = "好，进入下一关。请直接开始讲授本关的第一段内容。"
-            next_reply = generate_agent_class_reply(next_task, student_state["class_history"], nudge_msg)
-            # 如果模型误把暗号带出来，后端继续清理，避免前端看见
-            next_reply = next_reply.replace("[TASK_COMPLETED]", "").strip()
-            # 合并：上一关的通关确认 + 下一关开场（或你也可以只返回 next_reply）
-            clean_reply = (clean_reply + "\n\n" + next_reply).strip()
+            next_reply_raw = generate_agent_class_reply(next_task, student_state["class_history"], NEXT_TASK_NUDGE)
+            next_reply, _ = _strip_task_completed(next_reply_raw)
+            if next_reply:
+                student_state["class_history"].append({"role": "assistant", "content": next_reply})
+                _trim_class_history()
+                clean_reply = (clean_reply + "\n\n" + next_reply).strip()
+            return {"teacher_reply": clean_reply, "status": "TEACHING"}
+
+        student_state["is_in_class"] = False
+        clean_reply = (clean_reply + "\n\n" + CLASS_COMPLETED_MESSAGE).strip()
+        return {"teacher_reply": clean_reply, "status": "ENDED"}
 
     return {"teacher_reply": clean_reply, "status": "TEACHING"}
+
+@app.post("/class_chat_stream")
+async def handle_class_interaction_stream(request: ClassInput):
+    global student_state
+
+    def generate():
+        global student_state
+        print(f"\n🌊 收到流式微课互动: action={request.action}, text='{request.text}'")
+
+        if request.action == "start":
+            print("🎬 正在初始化全新 Agent 微课状态（流式）...")
+            student_state["is_in_class"] = True
+            student_state["current_task_index"] = 0
+            student_state["class_history"] = []
+            user_msg = "老师好，我准备好上课了！"
+        else:
+            user_msg = request.text
+
+        if student_state["current_task_index"] >= len(COURSE_TASKS):
+            print("🎉 所有任务已通关，直接返回结课提示。")
+            student_state["is_in_class"] = False
+            yield CLASS_COMPLETED_MESSAGE
+            return
+
+        current_task = COURSE_TASKS[student_state["current_task_index"]]
+        print(f"🎯 正在流式派发当前教学任务: {current_task['task_name']}")
+
+        current_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
+        for chunk in generate_agent_class_reply_stream(current_task, student_state["class_history"], user_msg):
+            visible_chunk = current_filter.push(chunk)
+            if visible_chunk:
+                yield visible_chunk
+
+        remaining_text = current_filter.finalize()
+        if remaining_text:
+            yield remaining_text
+
+        clean_reply = current_filter.clean_text.strip()
+        student_state["class_history"].append({"role": "user", "content": user_msg})
+        student_state["class_history"].append({"role": "assistant", "content": clean_reply})
+        _trim_class_history()
+
+        if not current_filter.detected:
+            return
+
+        print("🔑 流式通关秘钥拦截成功：[TASK_COMPLETED] 已被过滤，准备推进进度！")
+        student_state["current_task_index"] += 1
+        print(f"✅ 流式进度推进成功，下一个任务索引将变为: {student_state['current_task_index']}")
+
+        if student_state["current_task_index"] >= len(COURSE_TASKS):
+            print("🎓 微课全部完成，准备退出微课模式。")
+            student_state["is_in_class"] = False
+            yield "\n\n" + CLASS_COMPLETED_MESSAGE
+            return
+
+        next_task = COURSE_TASKS[student_state["current_task_index"]]
+        print(f"⏭️ 流式自动衔接下一关: {next_task['task_name']}")
+
+        yield "\n\n"
+
+        next_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
+        for chunk in generate_agent_class_reply_stream(next_task, student_state["class_history"], NEXT_TASK_NUDGE):
+            visible_chunk = next_filter.push(chunk)
+            if visible_chunk:
+                yield visible_chunk
+
+        next_remaining_text = next_filter.finalize()
+        if next_remaining_text:
+            yield next_remaining_text
+
+        next_reply = next_filter.clean_text.strip()
+        if next_reply:
+            student_state["class_history"].append({"role": "assistant", "content": next_reply})
+            _trim_class_history()
+
+    return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")

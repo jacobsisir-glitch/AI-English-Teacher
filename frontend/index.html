@@ -8,9 +8,22 @@
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
     <script src="https://cdn.staticfile.net/axios/1.6.2/axios.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
+        :root {
+            --brand-primary: #4f46e5;
+            --brand-primary-strong: #4338ca;
+            --brand-accent: #6366f1;
+            --brand-soft: #eef2ff;
+            --brand-sky: #eff6ff;
+            --ink-900: #0f172a;
+            --ink-700: #334155;
+            --ink-500: #64748b;
+            --line-soft: #e2e8f0;
+            --panel-shadow: 0 28px 90px rgba(79, 70, 229, 0.18), 0 10px 35px rgba(15, 23, 42, 0.10);
+        }
         /* 防止 Vue 加载前闪烁代码的保护罩 */
         [v-cloak] { display: none !important; }
         ::-webkit-scrollbar { width: 8px; }
@@ -19,6 +32,68 @@
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
         textarea { resize: none; overflow-y: hidden; }
         textarea:focus { outline: none; }
+        body {
+            background:
+                radial-gradient(circle at top left, rgba(99, 102, 241, 0.10), transparent 30%),
+                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+        }
+        .report-trigger {
+            background: linear-gradient(135deg, var(--brand-primary), #3b82f6);
+            box-shadow: 0 12px 30px rgba(79, 70, 229, 0.18);
+        }
+        .report-trigger:hover {
+            background: linear-gradient(135deg, var(--brand-primary-strong), #2563eb);
+        }
+        .dashboard-overlay {
+            background: rgba(15, 23, 42, 0.35);
+            backdrop-filter: blur(12px);
+        }
+        .dashboard-modal {
+            background:
+                linear-gradient(180deg, rgba(238, 242, 255, 0.72) 0%, rgba(255, 255, 255, 0.98) 16%, #ffffff 100%);
+            box-shadow: var(--panel-shadow);
+        }
+        .dashboard-close-btn {
+            color: var(--ink-500);
+            transition: all 0.2s ease;
+        }
+        .dashboard-close-btn:hover {
+            color: var(--brand-primary);
+            background: var(--brand-soft);
+        }
+        .dashboard-total-card {
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.09), rgba(59, 130, 246, 0.08));
+            border: 1px solid rgba(129, 140, 248, 0.18);
+        }
+        .dashboard-chart-panel {
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96));
+        }
+        .dashboard-list-panel {
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background: rgba(255, 255, 255, 0.92);
+        }
+        .dashboard-user-bubble {
+            background: var(--brand-primary);
+            color: white;
+            border-radius: 1rem 1rem 0.25rem 1rem;
+            box-shadow: 0 12px 24px rgba(79, 70, 229, 0.16);
+        }
+        .dashboard-ai-bubble {
+            background: #f8fafc;
+            color: #1e293b;
+            border: 1px solid #e2e8f0;
+            border-radius: 1rem 1rem 1rem 0.25rem;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }
+        .dashboard-empty {
+            background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(238, 242, 255, 0.8));
+            border: 1px dashed rgba(148, 163, 184, 0.6);
+        }
+        #radar-chart {
+            width: 100%;
+            height: 300px;
+        }
     </style>
 </head>
 <body class="bg-white text-slate-800 antialiased h-screen overflow-hidden">
@@ -30,8 +105,11 @@
             <button @click="startNewChat" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border border-slate-200 shadow-sm rounded-xl text-slate-700 hover:bg-slate-100 transition-colors font-medium">
                 <i class="fa-solid fa-pen-to-square"></i> 新建自由练习
             </button>
-            <button @click="startClass" :disabled="isInClass" :class="isInClass ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 shadow-sm rounded-xl text-white transition-colors font-medium">
+            <button @click="startClass" :disabled="isInClass || isInputLocked" :class="isInClass || isInputLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 shadow-sm rounded-xl text-white transition-colors font-medium">
                 <i class="fa-solid fa-graduation-cap"></i> 开启微课 (系统课)
+            </button>
+            <button @click="openDashboard" :disabled="dashboardLoading" :class="dashboardLoading ? 'opacity-60 cursor-wait' : ''" class="report-trigger w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-white transition-all font-medium">
+                <i class="fa-solid fa-chart-column"></i> 个人学习报告
             </button>
             <button v-if="isInClass" @click="exitClass" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-500 shadow-sm rounded-xl text-white hover:bg-red-600 transition-colors font-medium">
                 <i class="fa-solid fa-door-open"></i> 退出微课
@@ -47,6 +125,20 @@
     </aside>
 
     <main class="flex-1 flex flex-col h-full min-w-0 bg-white">
+        <div class="md:hidden flex items-center gap-2 px-4 pt-4 pb-2 bg-white/90 backdrop-blur-sm border-b border-slate-100 flex-shrink-0">
+            <button @click="startNewChat" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 shadow-sm rounded-xl text-slate-700 text-sm font-medium">
+                <i class="fa-solid fa-pen-to-square"></i> 新建
+            </button>
+            <button @click="openDashboard" :disabled="dashboardLoading" :class="dashboardLoading ? 'opacity-60 cursor-wait' : ''" class="report-trigger flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-white text-sm font-medium">
+                <i class="fa-solid fa-chart-column"></i> 报告
+            </button>
+            <button v-if="!isInClass" @click="startClass" :disabled="isInputLocked" :class="isInputLocked ? 'opacity-50 cursor-not-allowed' : 'bg-indigo-600'" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-white text-sm font-medium">
+                <i class="fa-solid fa-graduation-cap"></i> 微课
+            </button>
+            <button v-else @click="exitClass" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-red-500 rounded-xl text-white text-sm font-medium">
+                <i class="fa-solid fa-door-open"></i> 退出
+            </button>
+        </div>
         
         <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth">
             
@@ -131,34 +223,167 @@
                 <textarea 
                     id="message-input"
                     v-model="inputText"
+                    :disabled="isInputLocked"
                     @input="autoResize"
                     @keydown.enter.prevent="handleEnter"
                     rows="1"
                     placeholder="输入英文进行语法诊断，或输入中文向老师提问 (如: 什么是表语？)"
-                    class="flex-1 max-h-[150px] min-h-[40px] bg-transparent py-2.5 px-3 text-slate-800 placeholder-slate-400"
+                    class="flex-1 max-h-[150px] min-h-[40px] bg-transparent py-2.5 px-3 text-slate-800 placeholder-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                 ></textarea>
                 <button 
                     @click="sendMessage"
-                    :disabled="!inputText.trim() || isThinking"
+                    :disabled="!inputText.trim() || isThinking || isInputLocked"
                     :class="['p-3 mb-1 rounded-xl flex items-center justify-center transition-all', 
-                            inputText.trim() && !isThinking ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md' : 'bg-slate-200 text-slate-400 cursor-not-allowed']">
+                            inputText.trim() && !isThinking && !isInputLocked ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md' : 'bg-slate-200 text-slate-400 cursor-not-allowed']">
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </div>
         </div>
     </main>
+
+    <div v-if="isDashboardOpen" class="dashboard-overlay fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6" @click.self="closeDashboard">
+        <div class="dashboard-modal w-full max-w-5xl max-h-[92vh] rounded-[28px] overflow-hidden border border-white/80">
+            <div class="flex items-center justify-between px-6 md:px-8 py-5 border-b border-slate-100">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.28em] text-indigo-500 font-semibold">Dashboard</p>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">个人学习报告</h2>
+                    <p class="text-sm text-slate-500 mt-1">把最近积累的错题，整理成一块看得顺眼的战损面板。</p>
+                </div>
+                <button @click="closeDashboard" class="dashboard-close-btn w-11 h-11 rounded-full flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="overflow-y-auto px-6 md:px-8 py-6 space-y-6">
+                <section class="dashboard-total-card rounded-[24px] p-6 md:p-7">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                        <div>
+                            <p class="text-sm font-medium text-indigo-700">错题总览</p>
+                            <div class="flex items-end gap-3 mt-3">
+                                <span class="text-5xl md:text-6xl font-black tracking-tight text-slate-800">{{ dashboardLoading ? '--' : dashboardData.total_errors }}</span>
+                                <span class="text-sm text-slate-500 pb-2">累计记录</span>
+                            </div>
+                            <p class="text-sm text-slate-600 mt-3">这些不是黑历史，是你把语法坑一个个填平之前留下的坐标。</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 min-w-[220px]">
+                            <div class="bg-white/80 rounded-2xl p-4 border border-white/80 shadow-sm">
+                                <p class="text-xs uppercase tracking-[0.22em] text-slate-400">语法点</p>
+                                <p class="text-2xl font-bold text-slate-800 mt-2">{{ dashboardLoading ? '--' : dashboardData.radar_data.length }}</p>
+                            </div>
+                            <div class="bg-white/80 rounded-2xl p-4 border border-white/80 shadow-sm">
+                                <p class="text-xs uppercase tracking-[0.22em] text-slate-400">最近更新</p>
+                                <p class="text-sm font-semibold text-slate-700 mt-2 leading-6">{{ latestDashboardTime }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dashboard-chart-panel rounded-[24px] p-5 md:p-6">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800">语法薄弱项雷达图</h3>
+                            <p class="text-sm text-slate-500 mt-1">配色已经收回主页面的紫蓝体系，不让图表自己乱开彩虹。</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-indigo-50 text-indigo-700 px-3 py-1 text-xs font-semibold">ECharts</span>
+                    </div>
+                    <div class="relative">
+                        <div id="radar-chart"></div>
+                        <div v-if="dashboardLoading" class="absolute inset-0 rounded-2xl bg-white/82 backdrop-blur-[1px] flex flex-col items-center justify-center gap-3 text-slate-500">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce"></span>
+                                <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce" style="animation-delay: 0.1s"></span>
+                                <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce" style="animation-delay: 0.2s"></span>
+                            </div>
+                            <p class="text-sm">正在整理你的错题轨迹...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dashboard-list-panel rounded-[24px] p-5 md:p-6">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800">最近 3 条错题</h3>
+                            <p class="text-sm text-slate-500 mt-1">底下这部分直接沿用聊天气泡逻辑，省得它长得像另一个产品。</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-semibold">最近更新</span>
+                    </div>
+
+                    <div v-if="dashboardError" class="dashboard-empty rounded-2xl p-6 text-sm text-slate-600">
+                        {{ dashboardError }}
+                    </div>
+
+                    <div v-else-if="!dashboardLoading && dashboardData.recent_errors.length === 0" class="dashboard-empty rounded-2xl p-6 text-sm text-slate-600">
+                        目前还没有错题数据。先去写点句子，让系统有机会抓住你的语法破绽。
+                    </div>
+
+                    <div v-else class="space-y-5">
+                        <div v-for="(item, idx) in dashboardData.recent_errors" :key="idx" class="rounded-[22px] border border-slate-100 bg-white p-4 md:p-5 shadow-sm">
+                            <div class="flex items-center justify-between gap-3 mb-4">
+                                <span class="inline-flex items-center rounded-full bg-indigo-50 text-indigo-700 px-3 py-1 text-xs font-semibold">
+                                    <i class="fa-solid fa-tag mr-2 text-[10px]"></i>{{ item.error_tag }}
+                                </span>
+                                <span class="text-xs text-slate-400">{{ formatDashboardTime(item.created_at) }}</span>
+                            </div>
+
+                            <div class="flex justify-end mb-3">
+                                <div class="dashboard-user-bubble max-w-[92%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+                                    {{ item.user_input }}
+                                </div>
+                            </div>
+
+                            <div class="flex items-start gap-3">
+                                <div class="w-8 h-8 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center text-white text-xs mt-1">
+                                    <i class="fa-solid fa-robot"></i>
+                                </div>
+                                <div class="dashboard-ai-bubble flex-1 px-4 py-3">
+                                    <div class="prose prose-sm prose-indigo max-w-none text-slate-700" v-html="renderMarkdown(item.ai_comment)"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
     // 🛑 切换环境控制台 (每次部署前在这里切换即可)
     const BASE_URL = "http://127.0.0.1:8000"; // 本地测试环境 (注释掉这行)
     // const BASE_URL = "https://ai-english-teacher-o63p.onrender.com"; // 线上生产环境 (打开这行，把前面的 // 删掉)
-    const { createApp, ref, nextTick, watch, onMounted } = Vue;
+    const CLASS_COMPLETED_HINT = "现在退出微课模式咯~";
+    const ANALYZE_META_START = "===META_START===";
+    const ANALYZE_META_END = "===META_END===";
+    const DASHBOARD_CACHE_KEY = 'aiTeacherDashboardCache';
+    const DASHBOARD_PALETTE = {
+        primary: '#4f46e5',
+        secondary: '#6366f1',
+        tertiary: '#818cf8',
+        blue: '#3b82f6',
+        soft: '#eef2ff',
+        ink: '#334155',
+        muted: '#64748b',
+        grid: '#e2e8f0'
+    };
+    const { createApp, ref, nextTick, watch, onMounted, onBeforeUnmount } = Vue;
 
     createApp({
         setup() {
             const inputText = ref('');
             const isThinking = ref(false);
+            const isInputLocked = ref(false);
+            const isDashboardOpen = ref(false);
+            const dashboardLoading = ref(false);
+            const dashboardError = ref('');
+            const dashboardData = ref({
+                total_errors: 0,
+                radar_data: [],
+                recent_errors: []
+            });
+            const latestDashboardTime = ref('暂无记录');
+            let radarChart = null;
+            let radarResizeFrame = null;
+            let radarResizeObserver = null;
             // 🌟 读取本地小仓库：如果有历史记录就加载，没有就为空数组
             const savedHistory = localStorage.getItem('aiTeacherChatHistory');
             const messages = ref(savedHistory ? JSON.parse(savedHistory) : []);
@@ -168,9 +393,79 @@
             }, { deep: true }); // deep: true 意思是深度监听，连数组里面某个属性变了也能察觉到
             
             // 🌟 网页刚加载完时，如果发现有历史记录，自动滚动到最底部
+            const scheduleRadarResize = () => {
+                if (!radarChart) return;
+
+                if (radarResizeFrame) {
+                    cancelAnimationFrame(radarResizeFrame);
+                }
+
+                radarResizeFrame = requestAnimationFrame(() => {
+                    radarChart?.resize();
+                    radarResizeFrame = null;
+                });
+            };
+
+            const disconnectRadarObserver = () => {
+                if (radarResizeObserver) {
+                    radarResizeObserver.disconnect();
+                    radarResizeObserver = null;
+                }
+            };
+
+            const observeRadarContainer = () => {
+                disconnectRadarObserver();
+
+                if (!window.ResizeObserver) return;
+
+                const chartDom = document.getElementById('radar-chart');
+                if (!chartDom) return;
+
+                radarResizeObserver = new ResizeObserver(() => {
+                    scheduleRadarResize();
+                });
+                radarResizeObserver.observe(chartDom);
+            };
+
+            const loadDashboardCache = () => {
+                try {
+                    const raw = localStorage.getItem(DASHBOARD_CACHE_KEY);
+                    if (!raw) return null;
+                    return JSON.parse(raw);
+                } catch (error) {
+                    console.warn('⚠️ Dashboard 缓存读取失败，已忽略：', error);
+                    return null;
+                }
+            };
+
+            const saveDashboardCache = (payload) => {
+                try {
+                    localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(payload));
+                } catch (error) {
+                    console.warn('⚠️ Dashboard 缓存写入失败，已忽略：', error);
+                }
+            };
+
+            const resizeRadarChart = () => {
+                scheduleRadarResize();
+            };
+
             onMounted(() => {
                 if (messages.value.length > 0) {
                     scrollToBottom();
+                }
+                window.addEventListener('resize', resizeRadarChart);
+            });
+            onBeforeUnmount(() => {
+                window.removeEventListener('resize', resizeRadarChart);
+                disconnectRadarObserver();
+                if (radarResizeFrame) {
+                    cancelAnimationFrame(radarResizeFrame);
+                    radarResizeFrame = null;
+                }
+                if (radarChart) {
+                    radarChart.dispose();
+                    radarChart = null;
                 }
             });
             const isInClass = ref(false); 
@@ -178,6 +473,217 @@
             const renderMarkdown = (text) => {
                 if (!text) return '';
                 return marked.parse(text);
+            };
+
+            const formatDashboardTime = (isoString) => {
+                if (!isoString) return '暂无记录';
+                const parsed = new Date(isoString);
+                if (Number.isNaN(parsed.getTime())) return '时间未知';
+                return parsed.toLocaleString('zh-CN', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            };
+
+            const syncDashboardMeta = () => {
+                const recent = dashboardData.value.recent_errors || [];
+                latestDashboardTime.value = recent.length > 0
+                    ? formatDashboardTime(recent[0].created_at)
+                    : '暂无记录';
+            };
+
+            const normalizeDashboardPayload = (payload) => ({
+                total_errors: Number(payload?.total_errors || 0),
+                radar_data: Array.isArray(payload?.radar_data) ? payload.radar_data : [],
+                recent_errors: Array.isArray(payload?.recent_errors) ? payload.recent_errors : []
+            });
+
+            const applyDashboardData = (payload) => {
+                dashboardData.value = normalizeDashboardPayload(payload);
+                syncDashboardMeta();
+            };
+
+            const destroyRadarChart = () => {
+                disconnectRadarObserver();
+                if (radarResizeFrame) {
+                    cancelAnimationFrame(radarResizeFrame);
+                    radarResizeFrame = null;
+                }
+                if (radarChart) {
+                    radarChart.dispose();
+                    radarChart = null;
+                }
+            };
+
+            const renderRadarChart = async () => {
+                await nextTick();
+                const chartDom = document.getElementById('radar-chart');
+                if (!chartDom || !window.echarts) return;
+
+                destroyRadarChart();
+                radarChart = window.echarts.init(chartDom);
+                observeRadarContainer();
+
+                const radarItems = dashboardData.value.radar_data || [];
+                if (radarItems.length === 0) {
+                    radarChart.setOption({
+                        animation: false,
+                        color: [DASHBOARD_PALETTE.primary],
+                        graphic: [
+                            {
+                                type: 'text',
+                                left: 'center',
+                                top: '42%',
+                                style: {
+                                    text: '还没有可视化数据',
+                                    fill: DASHBOARD_PALETTE.ink,
+                                    fontSize: 18,
+                                    fontWeight: 700
+                                }
+                            },
+                            {
+                                type: 'text',
+                                left: 'center',
+                                top: '52%',
+                                style: {
+                                    text: '先去写几句英语，让错题本有东西可画。',
+                                    fill: DASHBOARD_PALETTE.muted,
+                                    fontSize: 13
+                                }
+                            }
+                        ]
+                    });
+                    scheduleRadarResize();
+                    return;
+                }
+
+                const maxValue = Math.max(...radarItems.map(item => Number(item.value) || 0), 1);
+                const indicatorMax = Math.max(3, Math.ceil(maxValue * 1.25));
+
+                radarChart.setOption({
+                    color: [
+                        DASHBOARD_PALETTE.primary,
+                        DASHBOARD_PALETTE.secondary,
+                        DASHBOARD_PALETTE.tertiary,
+                        DASHBOARD_PALETTE.blue
+                    ],
+                    tooltip: {
+                        trigger: 'item',
+                        backgroundColor: 'rgba(255,255,255,0.96)',
+                        borderColor: DASHBOARD_PALETTE.soft,
+                        borderWidth: 1,
+                        textStyle: {
+                            color: DASHBOARD_PALETTE.ink
+                        },
+                        extraCssText: 'box-shadow: 0 16px 40px rgba(15,23,42,0.12); border-radius: 14px;',
+                        formatter: () => radarItems.map(item => `${item.name}：${item.value}`).join('<br>')
+                    },
+                    radar: {
+                        radius: '60%',
+                        center: ['50%', '54%'],
+                        splitNumber: 4,
+                        shape: 'polygon',
+                        indicator: radarItems.map(item => ({
+                            name: item.name,
+                            max: indicatorMax
+                        })),
+                        axisName: {
+                            color: DASHBOARD_PALETTE.ink,
+                            fontSize: 12,
+                            fontWeight: 600,
+                            formatter: (name) => name.replace(/(.{1,8})/g, '$1\n').trim()
+                        },
+                        splitLine: {
+                            lineStyle: {
+                                color: 'rgba(226, 232, 240, 0.92)',
+                                width: 1
+                            }
+                        },
+                        splitArea: {
+                            areaStyle: {
+                                color: [
+                                    'rgba(248, 250, 252, 0.82)',
+                                    'rgba(241, 245, 249, 0.54)'
+                                ]
+                            }
+                        },
+                        axisLine: {
+                            lineStyle: {
+                                color: 'rgba(203, 213, 225, 0.8)'
+                            }
+                        }
+                    },
+                    series: [
+                        {
+                            name: '错题分布',
+                            type: 'radar',
+                            symbol: 'circle',
+                            symbolSize: 8,
+                            lineStyle: {
+                                width: 2.5,
+                                color: DASHBOARD_PALETTE.primary
+                            },
+                            itemStyle: {
+                                color: DASHBOARD_PALETTE.secondary,
+                                borderColor: '#ffffff',
+                                borderWidth: 2
+                            },
+                            areaStyle: {
+                                color: 'rgba(79, 70, 229, 0.20)'
+                            },
+                            data: [
+                                {
+                                    value: radarItems.map(item => Number(item.value) || 0),
+                                    name: '错题分布'
+                                }
+                            ]
+                        }
+                    ]
+                });
+                scheduleRadarResize();
+            };
+
+            const openDashboard = async () => {
+                isDashboardOpen.value = true;
+                dashboardLoading.value = true;
+                dashboardError.value = '';
+                latestDashboardTime.value = '加载中...';
+
+                const cachedPayload = loadDashboardCache();
+                if (cachedPayload) {
+                    applyDashboardData(cachedPayload);
+                    await renderRadarChart();
+                } else {
+                    dashboardData.value = {
+                        total_errors: 0,
+                        radar_data: [],
+                        recent_errors: []
+                    };
+                }
+
+                try {
+                    const response = await axios.get(BASE_URL + '/api/dashboard/data');
+                    const freshPayload = normalizeDashboardPayload(response.data);
+                    applyDashboardData(freshPayload);
+                    saveDashboardCache(freshPayload);
+                } catch (error) {
+                    console.error('❌ Dashboard 数据加载失败：', error);
+                    if (!cachedPayload) {
+                        dashboardError.value = '学习报告加载失败，请检查后端接口或数据库连接。';
+                        syncDashboardMeta();
+                    }
+                } finally {
+                    dashboardLoading.value = false;
+                    await renderRadarChart();
+                }
+            };
+
+            const closeDashboard = () => {
+                isDashboardOpen.value = false;
+                dashboardLoading.value = false;
+                destroyRadarChart();
             };
 
             const autoResize = () => {
@@ -198,6 +704,154 @@
             const handleEnter = (e) => {
                 if (e.shiftKey) { inputText.value += '\n'; autoResize(); } 
                 else { sendMessage(); }
+            };
+
+            const resetInputBox = () => {
+                inputText.value = '';
+                nextTick(() => {
+                    const textarea = document.getElementById('message-input');
+                    if (textarea) {
+                        textarea.style.height = 'auto';
+                    }
+                });
+            };
+
+            const readStreamIntoMessage = async (url, payload, messageIndex) => {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                if (!response.body) {
+                    throw new Error('响应体为空，无法读取流式内容');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    messages.value[messageIndex].content += decoder.decode(value, { stream: true });
+                    scrollToBottom();
+                }
+
+                const finalChunk = decoder.decode();
+                if (finalChunk) {
+                    messages.value[messageIndex].content += finalChunk;
+                    scrollToBottom();
+                }
+            };
+
+            const streamClassMessage = async (text, action) => {
+                const aiMessage = { role: 'ai', isClass: true, content: '' };
+                messages.value.push(aiMessage);
+                const aiMessageIndex = messages.value.length - 1;
+
+                isThinking.value = false;
+                await readStreamIntoMessage(BASE_URL + '/class_chat_stream', { text, action }, aiMessageIndex);
+
+                if (messages.value[aiMessageIndex].content.includes(CLASS_COMPLETED_HINT)) {
+                    isInClass.value = false;
+                } else {
+                    isInClass.value = true;
+                }
+            };
+
+            const readPracticeStreamIntoMessage = async (text, messageIndex) => {
+                const response = await fetch(BASE_URL + '/practice_chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                if (!response.body) {
+                    throw new Error('响应体为空，无法读取分析流');
+                }
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder("utf-8");
+                let buffer = "";
+                let metaResolved = false;
+
+                const flushBuffer = () => {
+                    if (!buffer) return;
+                    if (messages.value[messageIndex].isAnalysis) {
+                        messages.value[messageIndex].report.teacher_message += buffer;
+                    } else {
+                        messages.value[messageIndex].content += buffer;
+                    }
+                    buffer = "";
+                    scrollToBottom();
+                };
+
+                const tryResolveMeta = () => {
+                    if (metaResolved) return;
+
+                    const endIndex = buffer.indexOf(ANALYZE_META_END);
+                    if (endIndex === -1) return;
+
+                    const startIndex = buffer.indexOf(ANALYZE_META_START);
+                    if (startIndex === -1 || startIndex > endIndex) {
+                        throw new Error('分析流 Meta 分隔符异常');
+                    }
+
+                    const metaJson = buffer.slice(startIndex + ANALYZE_META_START.length, endIndex);
+                    const meta = JSON.parse(metaJson);
+
+                    if (meta.intent === 'ANALYZE') {
+                        messages.value[messageIndex].isQA = false;
+                        messages.value[messageIndex].isAnalysis = true;
+                        messages.value[messageIndex].originalText = meta.originalText || text;
+                        messages.value[messageIndex].report = {
+                            original_sentence: text,
+                            is_grammar_correct: false,
+                            basic_components: [],
+                            structural_components: [],
+                            errors: [],
+                            teacher_message: '',
+                            ...(meta.report || {})
+                        };
+                    } else {
+                        messages.value[messageIndex].isQA = true;
+                        messages.value[messageIndex].isAnalysis = false;
+                    }
+
+                    buffer = buffer.slice(endIndex + ANALYZE_META_END.length);
+                    metaResolved = true;
+                    scrollToBottom();
+                };
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    tryResolveMeta();
+
+                    if (metaResolved) {
+                        flushBuffer();
+                    }
+                }
+
+                buffer += decoder.decode();
+                tryResolveMeta();
+
+                if (!metaResolved) {
+                    throw new Error('分析流未返回完整 Meta 数据');
+                }
+
+                flushBuffer();
             };
 
             const generateRenderChunks = (text, basic, structures, errors) => {
@@ -251,17 +905,18 @@
             };
 
             const startClass = async () => {
+                if (isInputLocked.value) return;
+
                 messages.value.push({ role: 'user', content: '👨‍🎓 老师好，我准备好上课了！' });
+                isInputLocked.value = true;
                 isThinking.value = true;
                 scrollToBottom();
                 try {
-                    // 🌟 修改点：换成了 BASE_URL
-                    const response = await axios.post(BASE_URL + '/class_chat', { text: "", action: "start" });
-                    isInClass.value = true; 
-                    messages.value.push({ role: 'ai', isClass: true, content: response.data.teacher_reply });
+                    await streamClassMessage("", "start");
                 } catch (error) {
                     messages.value.push({ role: 'ai', content: "❌ 唤醒老师失败，请检查后端。" });
                 } finally {
+                    isInputLocked.value = false;
                     isThinking.value = false;
                     scrollToBottom();
                 }
@@ -269,6 +924,8 @@
 
             // 👇 加了显微镜的退出函数
             const exitClass = async () => {
+                if (isInputLocked.value) return;
+
                 try {
                     console.log("正在尝试向后端发送退出请求...");
                     // 确保这里的接口路径和 main.py 里完全一致，不要带任何参数
@@ -276,7 +933,10 @@
                     
                     console.log("后端已成功响应退出请求！");
                     isInClass.value = false;
-                    messages.value.push({ role: 'ai', content: '🚪 **已退出微课！** 老师已经回到自由练习模式啦，现在您可以随意造句让我查错，或者向我提问哦~' });
+                    messages.value.push({ 
+                        role: 'ai', 
+                        content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算放弃了吗？很好，微课模式关闭。现在进入自由散漫的练习模式，随便扔点你写的破烂句子过来让我挑刺吧。' 
+                    });
                     scrollToBottom();
                 } catch (error) {
                     // 🌟 这一句极其关键，它会在浏览器的控制台里打印出真正的死因！
@@ -287,68 +947,43 @@
 
             const sendMessage = async () => {
                 const text = inputText.value.trim();
-                if (!text || isThinking.value) return;
+                if (!text || isThinking.value || isInputLocked.value) return;
 
                 messages.value.push({ role: 'user', content: text });
-                inputText.value = '';
-                nextTick(() => { document.getElementById('message-input').style.height = 'auto'; });
+                resetInputBox();
+                isInputLocked.value = true;
                 scrollToBottom();
                 isThinking.value = true;
                 scrollToBottom();
 
                 try {
                     if (isInClass.value) {
-                        // 🌟 修改点：换成了 BASE_URL
-                        const response = await axios.post(BASE_URL + '/class_chat', { text: text, action: "chat" });
-                        messages.value.push({ role: 'ai', isClass: true, content: response.data.teacher_reply });
-                        
-                        if (response.data.status === "ENDED") {
-                            isInClass.value = false; 
-                        }
+                        await streamClassMessage(text, "chat");
                     } else {
-                        const isQuestion = /[\u4e00-\u9fa5]/.test(text) || text.endsWith('?') || text.endsWith('？');
-                        
-                        // 👇 从这里开始替换为流式接水管代码
-                        if (isQuestion) {
-                            // 1. 因为马上要出字了，先关掉前端转圈圈的思考动画
-                            isThinking.value = false; 
-                            
-                            // 2. 先在屏幕上建一个空的聊天气泡，准备接水
-                            const aiMessage = { role: 'ai', isQA: true, content: '' };
-                            messages.value.push(aiMessage);
-                            
-                            // 3. 换用原生的 fetch API 连通水管
-                            const response = await fetch(BASE_URL + '/ask', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ question: text })
-                            });
-                            
-                            const reader = response.body.getReader();
-                            const decoder = new TextDecoder("utf-8");
-                            
-                            // 4. 核心循环：水管里来一滴水，屏幕上的气泡里就加一个字
-                            while (true) {
-                                const { done, value } = await reader.read();
-                                if (done) break; // 水流完了，退出循环
-                                // ❌ 原来的写法（Vue 察觉不到）：
-                                // aiMessage.content += decoder.decode(value, { stream: true });
-
-                                // ✅ 替换为这种写法（直接修改数组里的最后一条消息，强制 Vue 实时刷新屏幕）：
-                                messages.value[messages.value.length - 1].content += decoder.decode(value, { stream: true });
-                                scrollToBottom(); // 保证打字时屏幕自动往下滚
+                        const aiMessage = {
+                            role: 'ai',
+                            isQA: true,
+                            isAnalysis: false,
+                            content: '',
+                            originalText: text,
+                            report: {
+                                original_sentence: text,
+                                is_grammar_correct: false,
+                                basic_components: [],
+                                structural_components: [],
+                                errors: [],
+                                teacher_message: ''
                             }
-                        // 👆 流式代码结束
-                        
-                        } else {
-                            // 👇 下面这部分查错的代码保持不动！
-                            const response = await axios.post(BASE_URL + '/analyze', { text: text });
-                            messages.value.push({ role: 'ai', isAnalysis: true, originalText: text, report: response.data });
-                        }
+                        };
+                        messages.value.push(aiMessage);
+                        const aiMessageIndex = messages.value.length - 1;
+                        isThinking.value = false;
+                        await readPracticeStreamIntoMessage(text, aiMessageIndex);
                     }
                 } catch (error) {
                     messages.value.push({ role: 'ai', content: "❌ 请求失败！请检查后端网络。" });
                 } finally {
+                    isInputLocked.value = false;
                     isThinking.value = false;
                     scrollToBottom();
                 }
@@ -357,12 +992,16 @@
             const startNewChat = () => { 
                 messages.value = []; 
                 isInClass.value = false; 
+                isInputLocked.value = false;
+                isThinking.value = false;
                 localStorage.removeItem('aiTeacherChatHistory'); // 💣 彻底清空本地小仓库
             };
 
             return {
-                inputText, messages, isThinking, isInClass,
-                autoResize, handleEnter, sendMessage, startNewChat, generateRenderChunks, startClass, exitClass, renderMarkdown
+                inputText, messages, isThinking, isInClass, isInputLocked,
+                isDashboardOpen, dashboardLoading, dashboardError, dashboardData, latestDashboardTime,
+                autoResize, handleEnter, sendMessage, startNewChat, generateRenderChunks, startClass, exitClass, renderMarkdown,
+                openDashboard, closeDashboard, formatDashboardTime
             };
         }
     }).mount('#app');

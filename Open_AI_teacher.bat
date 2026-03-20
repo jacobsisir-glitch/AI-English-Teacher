@@ -1,13 +1,21 @@
 @echo off
 chcp 65001 >nul
-echo 正在唤醒 AI 语法老师专属大脑...
-call C:\Users\lenovo\miniconda3\Scripts\activate.bat ai_teacher
-cd /d D:\AIEnglish_grammar_teacher
-echo 环境就绪！正在打开浏览器并点火...
+setlocal
+set "PROJECT_DIR=%~dp0"
 
-:: 自动在默认浏览器中打开微课网页
-start "" "D:\AIEnglish_grammar_teacher\frontend\index.html"
+echo 正在启动 AI 语法老师...
+pushd "%PROJECT_DIR%"
 
-:: 启动后端服务器
+if exist ".venv\Scripts\activate.bat" (
+    call ".venv\Scripts\activate.bat"
+) else (
+    echo 未检测到 .venv\Scripts\activate.bat，将直接使用当前 Python 环境。
+)
+
+echo 正在打开前端并启动后端服务...
+start "" "%PROJECT_DIR%frontend\index.html"
 uvicorn main:app --reload
+
+popd
+endlocal
 pause

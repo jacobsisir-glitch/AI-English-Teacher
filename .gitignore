@@ -1,11 +1,25 @@
-# 忽略 Python 缓存文件
-__pycache__/
-*.py[cod]
-
-# 忽略虚拟环境 (如果你建在目录里的话)
-venv/
-env/
+# Secrets
 .env
 
-# 忽略系统文件
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE files
+.cursor/
+
+# Local databases and generated stores
+*.db
+*.sqlite3
+data/chroma_db/
+chroma_db/
+
+# OS files
 .DS_Store
