@@ -1,4 +1,5 @@
 import json
+import os
 
 from fastapi import BackgroundTasks, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,6 +7,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+import uvicorn
 
 import database.models
 from config import DEFAULT_STUDENT_ID
@@ -334,13 +336,35 @@ def _build_question_stream_response(text: str, include_meta: bool = False) -> St
 app = FastAPI(title="AI English Teacher API")
 
 
+def _build_cors_origins() -> list[str]:
+    default_origins = {
+        "http://localhost",
+        "http://127.0.0.1",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "https://ai-english-teacher-77da-6bwzywihd-jacobsisir-glitchs-projects.vercel.app",
+    }
+    extra_origins = {
+        origin.strip()
+        for origin in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+        if origin.strip()
+    }
+    return sorted(default_origins | extra_origins)
+
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_build_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -565,3 +589,12 @@ async def handle_class_interaction_stream(request: ClassInput):
             _trim_class_history()
 
     return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
+
+
+if __name__ == "__main__":
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=int(os.getenv("PORT", 8000)),
+        reload=True,
+    )

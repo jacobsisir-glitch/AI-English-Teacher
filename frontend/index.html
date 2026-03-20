@@ -352,6 +352,17 @@
     const BASE_URL = "http://127.0.0.1:8000"; // 本地测试环境 (注释掉这行)
     // const BASE_URL = "https://ai-english-teacher-o63p.onrender.com"; // 线上生产环境 (打开这行，把前面的 // 删掉)
     const CLASS_COMPLETED_HINT = "现在退出微课模式咯~";
+    const LOCAL_API_BASE_URL = "http://127.0.0.1:8000";
+    const PROD_API_BASE_URL = "https://ai-english-teacher-o63p.onrender.com";
+
+    function getApiBaseUrl() {
+        const hostname = window.location.hostname;
+        const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
+        const isDirectFileOpen = window.location.protocol === "file:";
+        return (isLocalHost || isDirectFileOpen) ? LOCAL_API_BASE_URL : PROD_API_BASE_URL;
+    }
+
+    const API_BASE_URL = getApiBaseUrl();
     const ANALYZE_META_START = "===META_START===";
     const ANALYZE_META_END = "===META_END===";
     const DASHBOARD_CACHE_KEY = 'aiTeacherDashboardCache';
@@ -664,7 +675,7 @@
                 }
 
                 try {
-                    const response = await axios.get(BASE_URL + '/api/dashboard/data');
+                    const response = await axios.get(API_BASE_URL + '/api/dashboard/data');
                     const freshPayload = normalizeDashboardPayload(response.data);
                     applyDashboardData(freshPayload);
                     saveDashboardCache(freshPayload);
@@ -755,7 +766,7 @@
                 const aiMessageIndex = messages.value.length - 1;
 
                 isThinking.value = false;
-                await readStreamIntoMessage(BASE_URL + '/class_chat_stream', { text, action }, aiMessageIndex);
+                await readStreamIntoMessage(API_BASE_URL + '/class_chat_stream', { text, action }, aiMessageIndex);
 
                 if (messages.value[aiMessageIndex].content.includes(CLASS_COMPLETED_HINT)) {
                     isInClass.value = false;
@@ -765,7 +776,7 @@
             };
 
             const readPracticeStreamIntoMessage = async (text, messageIndex) => {
-                const response = await fetch(BASE_URL + '/practice_chat', {
+                const response = await fetch(API_BASE_URL + '/practice_chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text })
@@ -929,7 +940,7 @@
                 try {
                     console.log("正在尝试向后端发送退出请求...");
                     // 确保这里的接口路径和 main.py 里完全一致，不要带任何参数
-                    await axios.post(BASE_URL + '/course/exit');
+                    await axios.post(API_BASE_URL + '/course/exit');
                     
                     console.log("后端已成功响应退出请求！");
                     isInClass.value = false;
