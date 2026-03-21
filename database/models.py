@@ -39,6 +39,8 @@ class StudentQuestion(Base):
     __tablename__ = "student_questions"
 
     id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(String(64), nullable=False, default="default_student", index=True)
     question_text = Column(Text, nullable=False)
+    mode = Column(String(50), nullable=False, default="practice")
     source = Column(String(50), nullable=False, default="practice")
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

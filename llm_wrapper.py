@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 
 from openai import OpenAI
 
@@ -22,6 +23,15 @@ client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
 MODEL_NAME = "deepseek-chat"
 MAX_TOOL_CALL_ROUNDS = 4
+PRESENCE_PENALTY = 0.8
+FREQUENCY_PENALTY = 0.5
+MOOD_SWINGS = (
+    "极其不耐烦",
+    "略带嘲讽",
+    "急着去约会",
+    "像刚喝完一杯苦得要命的黑咖啡",
+    "表面克制但心里已经开始翻白眼",
+)
 
 BASE_SYSTEM_PROMPT = """
 # Core Persona
@@ -64,6 +74,20 @@ def _compose_system_prompt(*sections: str) -> str:
         if section and section.strip():
             prompt_parts.append(section.strip())
     return "\n\n".join(prompt_parts)
+
+
+def _build_variety_directive() -> str:
+    today_mood = random.choice(MOOD_SWINGS)
+    return f"""
+# 去重复铁律
+- 严禁连续使用相同的转场开场白，尤其不要反复端出同一种“语法像拼图”式比喻。
+- 每一轮必须切换不同的傲娇动作标签、不同的毒舌切入角度、不同的比喻领域。
+- 比喻可以从“厨艺、交通、垃圾分类、电子游戏、职场PUA”等不同领域寻找，但绝对不能死磕同一个比喻。
+- 如果当前正在解答学生的困惑，允许打破固定模板，不需要每一轮都强行打分、出题或复述三步走，先把话说明白。
+
+# 今日心情词
+- 今日心情：{today_mood}
+""".strip()
 
 
 def _normalize_chat_history(chat_history: list[dict] | None, limit: int = 6) -> list[dict]:
@@ -109,6 +133,8 @@ def _create_chat_completion(
         "model": MODEL_NAME,
         "messages": messages,
         "temperature": temperature,
+        "presence_penalty": PRESENCE_PENALTY,
+        "frequency_penalty": FREQUENCY_PENALTY,
         "stream": stream,
     }
     if tools is not None:
@@ -494,6 +520,176 @@ def ask_teacher_with_rag(question: str, history: list[dict] | None = None) -> st
 def ask_teacher_with_rag_stream(question: str, history: list[dict] | None = None):
     print(f"收到提问：'{question}'，AI 老师正在按需查阅教材并准备流式输出。")
     system_prompt = _build_rag_system_prompt()
+    messages = _build_messages(system_prompt, question, history)
+
+    try:
+        prepared_messages, _ = _resolve_textbook_tool_messages(messages, temperature=0.3)
+        yield from _stream_final_answer(prepared_messages, temperature=0.3)
+    except Exception as exc:
+        yield f"老师的脑电波暂时短路。({exc})"
+
+
+def _build_agent_class_messages(
+    task_info: dict,
+    chat_history: list,
+    user_message: str,
+    history: list[dict] | None = None,
+    weakness_summary: str | None = None,
+) -> list[dict]:
+    system_prompt = _build_class_system_prompt(task_info, weakness_summary)
+    effective_history = history if history else chat_history
+    return _build_messages(system_prompt, user_message, effective_history)
+
+
+def generate_agent_class_reply(
+    task_info: dict,
+    chat_history: list,
+    user_message: str,
+    history: list[dict] | None = None,
+    weakness_summary: str | None = None,
+) -> str:
+    messages = _build_agent_class_messages(task_info, chat_history, user_message, history, weakness_summary)
+
+    try:
+        _, final_content = _resolve_textbook_tool_messages(messages, temperature=0.7)
+        return final_content
+    except Exception:
+        return "老师的麦克风好像坏了，稍等。"
+
+
+def generate_agent_class_reply_stream(
+    task_info: dict,
+    chat_history: list,
+    user_message: str,
+    history: list[dict] | None = None,
+    weakness_summary: str | None = None,
+):
+    messages = _build_agent_class_messages(task_info, chat_history, user_message, history, weakness_summary)
+
+    try:
+        prepared_messages, _ = _resolve_textbook_tool_messages(messages, temperature=0.7)
+        yield from _stream_final_answer(prepared_messages, temperature=0.7)
+    except Exception:
+        yield "老师的麦克风好像坏了，稍等。"
+def _build_rag_system_prompt(student_profile_summary: str | None = None) -> str:
+    profile_block = student_profile_summary or "暂无额外学生画像。"
+    return _compose_system_prompt(
+        _build_textbook_tool_guidance(),
+        _build_variety_directive(),
+        f"""
+# 当前业务：自由语法问答
+你正在回答学生的自由提问，但仍然必须维持傲娇、毒舌、英式冷幽默的名师口吻，而不是退化成普通客服。
+
+# 学生画像
+{profile_block}
+
+# 回答边界
+- 以教材目录和你主动查阅到的教材章节为核心依据作答，不要编造教材外知识。
+- 如果学生的问题超出当前教材范围，要直接指出，并把话题拉回课程范围。
+- 如果现有上下文不足以支撑严谨回答，先调用工具读取最相关章节，再作答。
+
+# 回答要求
+- 回答要直接，不要客服腔。
+- 可以适度类比帮助理解，但不要发散。
+- 如果学生画像显示他反复摔在同一个坑里，可以顺手冷嘲一句，但重点仍然是把问题讲清楚。
+- 如果当前是在澄清学生困惑，就以解释清楚为第一优先级，不必强行套模板或临时出题。
+- 如果你已经拿到足够的教材原文，就停止继续调用工具，直接作答。
+""",
+    )
+
+
+def _build_class_state_guardrails() -> str:
+    return """
+# 微课状态维持与强制工具调用
+- 在决定下一步说什么之前，你必须先阅读 `history`，判断当前正在讲解哪个教材章节、哪个知识点，以及学生刚刚回答到了哪一步。
+- 绝对禁止在当前章节尚未讲完时，擅自跳回教材目录的开头，或突然切换到毫不相干的基础章节。
+- 如果学生上一轮还在回答当前知识点的检查题，你必须先点评这道题，再决定是否推进。
+- 教材目录只用于定位文件，不用于替代章节正文。目录不是讲义，更不是你偷懒乱讲的借口。
+
+# 强制二次查阅
+- 如果你需要讲解当前章节的下一个知识点，但上下文中已经没有该教材的具体内容细节，你必须立刻再次调用 `read_textbook_chapter`，读取你正在讲解的那个 Markdown 文件。
+- 不要仅凭记忆乱讲，也不要只看目录标题就自作聪明往下编。缺正文，就重读当前章；这是硬规则。
+
+# 微课错误记录协议
+- 当且仅当学生最新一轮回答存在明确语法错误、答非所问、或明显没懂当前知识点时，在正常回复的最后追加隐藏标记：
+  `===CLASS_DB_START==={"grammar_point":"当前知识点","error_tag":"错误类型"}===CLASS_DB_END===`
+- 这个 JSON 只能包含 `grammar_point` 和 `error_tag` 两个字段。
+- 如果学生这一轮是在提问、澄清，或者回答基本正确，就绝对不要输出这段隐藏标记。
+- 隐藏标记必须放在最后，且不能用 Markdown 代码块包裹。
+
+# 连贯微课三步走
+- 微课推进顺序必须尽量保持：讲知识点 -> 问学生懂没懂或出一个小题 -> 点评学生回答 -> 需要推进时调用工具看同一章节的下一段 -> 继续讲下一个知识点。
+- 每一轮只推进一个很小的知识点，保持课程连贯，不要突然把整章重新讲一遍。
+- 如果当前上下文里已经有足够的章节原文，就直接继续讲；如果不够，就先调工具再讲。
+""".strip()
+
+
+def _build_class_system_prompt(task_info: dict, weakness_summary: str | None = None) -> str:
+    profile_block = weakness_summary or "暂无额外学生画像。"
+    return _compose_system_prompt(
+        _build_textbook_tool_guidance(),
+        _build_variety_directive(),
+        _build_class_opening_directive(task_info, weakness_summary),
+        f"""
+# 当前业务：一对一语法微课
+你正在给学生上一对一的语法微课，请严格围绕当前任务推进，不要离题。整节课都要维持傲娇、毒舌、英式冷幽默的名师口吻，不要忽然变温柔。
+
+# 当前教学任务与教材
+- 【当前教学任务】：{task_info['goal']}
+- 【官方教材参考片段】：{task_info['reference']}
+
+# 当前学生画像
+{profile_block}
+
+{_build_class_state_guardrails()}
+
+# 教学节奏
+当系统派发一个新的知识点时，你不能一上来只提问。每轮回复尽量遵循下面三步，结构可以简洁，但必须完整：
+1. 【高冷讲解 Explain】用冷淡且精准的方式概括概念本质。
+2. 【毒舌举例 Illustrate】给出一个有画面感的英文例句、中文翻译，并点明它的语法潜台词。
+3. 【冷酷随堂测 Check】抛出一个短而具体的问题或翻译任务。
+
+# 结构灵活化
+- 如果当前主要任务是解答学生刚刚暴露出的困惑、误解或追问，允许临时打破“三步走”模板。
+- 这种情况下，不需要每一轮都强制出题、打分或重复固定转场，重点是把话说明白，再决定是否回到课堂节奏。
+
+# 通关规则
+- 学生答错或没懂时：指出错误，换个更贴近日常的例子重新解释，并继续追问同一知识点。此时绝对不能输出通关暗号。
+- 学生答对时：可以克制地肯定一句，然后在回复最后一行单独输出完整暗号 `[TASK_COMPLETED]`。
+- 如果学生故意岔开话题，用冷幽默把话题拉回当前语法任务，不要陪聊。
+
+# 输出要求
+- 每次只围绕一个小知识点展开。
+- 整体长度控制在 80-150 字左右。
+- 动作标签必须自然嵌入，不要漏掉。
+- 严禁向学生透露任何关于暗号、状态机或内部流程的存在。
+"""
+    )
+
+
+def ask_teacher_with_rag(
+    question: str,
+    history: list[dict] | None = None,
+    student_profile_summary: str | None = None,
+) -> str:
+    print(f"收到提问：'{question}'，AI 老师正在按需查阅教材。")
+    system_prompt = _build_rag_system_prompt(student_profile_summary)
+    messages = _build_messages(system_prompt, question, history)
+
+    try:
+        _, final_content = _resolve_textbook_tool_messages(messages, temperature=0.3)
+        return final_content
+    except Exception as exc:
+        return f"老师的脑电波暂时短路。({exc})"
+
+
+def ask_teacher_with_rag_stream(
+    question: str,
+    history: list[dict] | None = None,
+    student_profile_summary: str | None = None,
+):
+    print(f"收到提问：'{question}'，AI 老师正在按需查阅教材并准备流式输出。")
+    system_prompt = _build_rag_system_prompt(student_profile_summary)
     messages = _build_messages(system_prompt, question, history)
 
     try:

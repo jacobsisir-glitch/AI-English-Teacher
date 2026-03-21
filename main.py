@@ -6,7 +6,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session
 import uvicorn
 
@@ -105,6 +105,8 @@ ANALYZE_META_START = "===META_START==="
 ANALYZE_META_END = "===META_END==="
 DB_LOG_START = "===DB_START==="
 DB_LOG_END = "===DB_END==="
+CLASS_DB_LOG_START = "===CLASS_DB_START==="
+CLASS_DB_LOG_END = "===CLASS_DB_END==="
 QUESTION_PREFIX_PATTERN = re.compile(r"^(什么是|什么叫|什么意思|为什么|为啥|怎么|如何|请问|想问|能否|可不可以|有没有|是不是|主将从现)")
 CHINESE_CHAR_PATTERN = re.compile(r"[\u4e00-\u9fff]")
 GRAMMAR_QUESTION_KEYWORDS = (
@@ -326,18 +328,100 @@ def _should_log_student_question(text: str, intent: str | None = None) -> bool:
     )
 
 
-def _save_student_question(db: Session, question_text: str, source: str) -> None:
+def _save_student_question(
+    db: Session,
+    question_text: str,
+    source: str,
+    student_id: str = DEFAULT_STUDENT_ID,
+) -> None:
     normalized_text = re.sub(r"\s+", " ", question_text or "").strip()
     if not normalized_text:
         return
 
     try:
-        db.add(StudentQuestion(question_text=normalized_text, source=source))
+        db.add(
+            StudentQuestion(
+                student_id=student_id,
+                question_text=normalized_text,
+                mode=source,
+                source=source,
+            )
+        )
         db.commit()
-        print(f"StudentQuestion saved: source={source}, question={normalized_text}")
+        print(
+            f"StudentQuestion saved: student_id={student_id}, "
+            f"source={source}, question={normalized_text}"
+        )
     except Exception as exc:
         db.rollback()
         print(f"StudentQuestion save failed: {exc}")
+
+
+def _ensure_student_question_schema() -> None:
+    inspector = inspect(engine)
+    if "student_questions" not in inspector.get_table_names():
+        return
+
+    column_names = {column["name"] for column in inspector.get_columns("student_questions")}
+    alter_statements: list[str] = []
+
+    if "student_id" not in column_names:
+        alter_statements.append(
+            "ALTER TABLE student_questions "
+            "ADD COLUMN student_id VARCHAR(64) NOT NULL DEFAULT 'default_student'"
+        )
+    if "mode" not in column_names:
+        alter_statements.append(
+            "ALTER TABLE student_questions "
+            "ADD COLUMN mode VARCHAR(50) NOT NULL DEFAULT 'practice'"
+        )
+
+    if not alter_statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in alter_statements:
+            connection.execute(text(statement))
+
+
+def _extract_db_log(text_value: str, start_marker: str, end_marker: str) -> tuple[str, str, bool]:
+    buffer = AnalyzeDBLogBuffer(start_marker, end_marker)
+    buffer.push(text_value or "")
+    visible_remainder = buffer.finalize()
+    visible_text = (buffer.ai_comment + visible_remainder).strip()
+    return visible_text, buffer.db_json_text, buffer.detected and buffer.completed
+
+
+def _build_student_profile_summary(
+    db: Session,
+    student_id: str = DEFAULT_STUDENT_ID,
+    question_limit: int = 3,
+) -> str:
+    weakness_summary = _get_top_weakness_summary(db)
+    question_rows = (
+        db.query(StudentQuestion)
+        .filter(StudentQuestion.student_id == student_id)
+        .order_by(StudentQuestion.created_at.desc(), StudentQuestion.id.desc())
+        .limit(question_limit)
+        .all()
+    )
+
+    if not question_rows:
+        return weakness_summary
+
+    recent_question_lines = [
+        f"- [{row.mode or row.source}] {row.question_text}"
+        for row in question_rows
+        if row.question_text
+    ]
+    if not recent_question_lines:
+        return weakness_summary
+
+    return (
+        f"{weakness_summary}\n"
+        "最近学生主动暴露出来的疑问有：\n"
+        + "\n".join(recent_question_lines)
+    )
 
 
 def _get_top_weakness_summary(db: Session) -> str:
@@ -441,6 +525,7 @@ def _build_analyze_stream_response(
 def _build_question_stream_response(
     text: str,
     include_meta: bool = False,
+    db: Session | None = None,
     history: list[dict] | None = None,
 ) -> StreamingResponse:
     print(f"\n🙋‍♂️ 收到学生流式提问: {text}")
@@ -449,7 +534,17 @@ def _build_question_stream_response(
         if include_meta:
             yield _build_meta_chunk({"intent": "QUESTION"})
 
-        for chunk in ask_teacher_with_rag_stream(text, history=_normalize_history(history)):
+        student_profile_summary = (
+            _build_student_profile_summary(db, CURRENT_STUDENT_ID)
+            if db is not None
+            else None
+        )
+
+        for chunk in ask_teacher_with_rag_stream(
+            text,
+            history=_normalize_history(history),
+            student_profile_summary=student_profile_summary,
+        ):
             yield chunk
 
     return StreamingResponse(
@@ -468,6 +563,7 @@ app = FastAPI(title="AI English Teacher API")
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
+    _ensure_student_question_schema()
 
 app.add_middleware(
     CORSMiddleware,
@@ -500,8 +596,13 @@ class QuestionInput(BaseModel):
     history: list[dict] = Field(default_factory=list)
 
 @app.post("/ask")
-async def ask_question(request: QuestionInput):
-    return _build_question_stream_response(request.question, include_meta=False, history=request.history)
+async def ask_question(request: QuestionInput, db: Session = Depends(get_db)):
+    return _build_question_stream_response(
+        request.question,
+        include_meta=False,
+        db=db,
+        history=request.history,
+    )
 
 
 @app.get("/api/dashboard/data")
@@ -537,6 +638,7 @@ async def get_dashboard_data(db: Session = Depends(get_db)):
 
     recent_question_rows = (
         db.query(StudentQuestion)
+        .filter(StudentQuestion.student_id == CURRENT_STUDENT_ID)
         .order_by(StudentQuestion.created_at.desc(), StudentQuestion.id.desc())
         .limit(5)
         .all()
@@ -544,7 +646,7 @@ async def get_dashboard_data(db: Session = Depends(get_db)):
     recent_questions = [
         {
             "question_text": row.question_text,
-            "source": row.source,
+            "source": row.mode or row.source,
             "created_at": row.created_at.isoformat() if row.created_at else None,
         }
         for row in recent_question_rows
@@ -569,12 +671,22 @@ async def practice_chat(
     print(f"🧠 LLM 语义路由判定结果: {intent}")
 
     if _should_log_student_question(request.text, intent=intent):
-        _save_student_question(db, request.text, source="practice")
+        _save_student_question(
+            db,
+            request.text,
+            source="practice",
+            student_id=CURRENT_STUDENT_ID,
+        )
 
     if intent == "ANALYZE":
         return _build_analyze_stream_response(request.text, background_tasks, db, history=request.history)
 
-    return _build_question_stream_response(request.text, include_meta=True, history=request.history)
+    return _build_question_stream_response(
+        request.text,
+        include_meta=True,
+        db=db,
+        history=request.history,
+    )
 
 class ClassInput(BaseModel):
     text: str
@@ -597,7 +709,7 @@ async def handle_class_interaction(request: ClassInput, db: Session = Depends(ge
     print(f"\n👩‍🏫 收到微课互动: action={request.action}, text='{request.text}'")
     
     prompt_history = [] if request.action == "start" else _pick_prompt_history(request.history, student_state["class_history"])
-    weakness_summary = _get_top_weakness_summary(db) if request.action == "start" else None
+    student_profile_summary = _build_student_profile_summary(db, CURRENT_STUDENT_ID)
 
     if request.action == "start":
         print("🎬 正在初始化全新 Agent 微课状态...")
@@ -609,7 +721,12 @@ async def handle_class_interaction(request: ClassInput, db: Session = Depends(ge
         user_msg = request.text
 
     if request.action != "start" and _should_log_student_question(user_msg):
-        _save_student_question(db, user_msg, source="class")
+        _save_student_question(
+            db,
+            user_msg,
+            source="class",
+            student_id=CURRENT_STUDENT_ID,
+        )
         
     if student_state["current_task_index"] >= len(COURSE_TASKS):
         print("🎉 所有任务已通关，下课！")
@@ -624,13 +741,26 @@ async def handle_class_interaction(request: ClassInput, db: Session = Depends(ge
         student_state["class_history"],
         user_msg,
         history=prompt_history,
-        weakness_summary=weakness_summary,
+        weakness_summary=student_profile_summary,
     )
     print(f"🤖 Agent 原始回复生成完毕。")
     
-    clean_reply, is_task_completed = _strip_task_completed(raw_reply)
+    visible_reply, class_db_json_text, has_class_db_log = _extract_db_log(
+        raw_reply,
+        CLASS_DB_LOG_START,
+        CLASS_DB_LOG_END,
+    )
+    clean_reply, is_task_completed = _strip_task_completed(visible_reply)
     if is_task_completed:
         print("🔑 触发通关秘钥：[TASK_COMPLETED]！准备推进进度！")
+
+    if has_class_db_log:
+        _save_error_book_entry(
+            db=db,
+            user_input=user_msg,
+            ai_comment=clean_reply,
+            db_json_text=class_db_json_text,
+        )
 
     student_state["class_history"].append({"role": "user", "content": user_msg})
     student_state["class_history"].append({"role": "assistant", "content": clean_reply})
@@ -645,7 +775,12 @@ async def handle_class_interaction(request: ClassInput, db: Session = Depends(ge
             next_task = COURSE_TASKS[student_state["current_task_index"]]
             print(f"⏭️ 自动衔接下一关: {next_task['task_name']}")
             # 这里的“轻推”提示只用于让老师立即开讲下一关，不应向学生透露任何系统机制
-            next_reply_raw = generate_agent_class_reply(next_task, student_state["class_history"], NEXT_TASK_NUDGE)
+            next_reply_raw = generate_agent_class_reply(
+                next_task,
+                student_state["class_history"],
+                NEXT_TASK_NUDGE,
+                weakness_summary=student_profile_summary,
+            )
             next_reply, _ = _strip_task_completed(next_reply_raw)
             if next_reply:
                 student_state["class_history"].append({"role": "assistant", "content": next_reply})
@@ -663,10 +798,21 @@ async def handle_class_interaction(request: ClassInput, db: Session = Depends(ge
 async def handle_class_interaction_stream(request: ClassInput, db: Session = Depends(get_db)):
     global student_state
     prompt_history = [] if request.action == "start" else _pick_prompt_history(request.history, student_state["class_history"])
-    weakness_summary = _get_top_weakness_summary(db) if request.action == "start" else None
+    student_profile_summary = _build_student_profile_summary(db, CURRENT_STUDENT_ID)
 
     if request.action != "start" and _should_log_student_question(request.text):
-        _save_student_question(db, request.text, source="class")
+        _save_student_question(
+            db,
+            request.text,
+            source="class",
+            student_id=CURRENT_STUDENT_ID,
+        )
+
+    student_profile_summary = (
+        _build_student_profile_summary(db, CURRENT_STUDENT_ID)
+        if db is not None
+        else None
+    )
 
     def generate():
         global student_state
@@ -691,22 +837,36 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
         print(f"🎯 正在流式派发当前教学任务: {current_task['task_name']}")
 
         current_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
+        class_db_buffer = AnalyzeDBLogBuffer(CLASS_DB_LOG_START, CLASS_DB_LOG_END)
         for chunk in generate_agent_class_reply_stream(
             current_task,
             student_state["class_history"],
             user_msg,
             history=prompt_history,
-            weakness_summary=weakness_summary,
+            weakness_summary=student_profile_summary,
         ):
-            visible_chunk = current_filter.push(chunk)
+            visible_chunk = class_db_buffer.push(current_filter.push(chunk))
             if visible_chunk:
                 yield visible_chunk
 
         remaining_text = current_filter.finalize()
         if remaining_text:
-            yield remaining_text
+            trailing_chunk = class_db_buffer.push(remaining_text)
+            if trailing_chunk:
+                yield trailing_chunk
 
-        clean_reply = current_filter.clean_text.strip()
+        class_db_remaining = class_db_buffer.finalize()
+        if class_db_remaining:
+            yield class_db_remaining
+
+        clean_reply = class_db_buffer.ai_comment.strip()
+        if class_db_buffer.detected and class_db_buffer.completed:
+            _save_error_book_entry(
+                db=db,
+                user_input=user_msg,
+                ai_comment=clean_reply,
+                db_json_text=class_db_buffer.db_json_text,
+            )
         student_state["class_history"].append({"role": "user", "content": user_msg})
         student_state["class_history"].append({"role": "assistant", "content": clean_reply})
         _trim_class_history()
@@ -730,7 +890,12 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
         yield "\n\n"
 
         next_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
-        for chunk in generate_agent_class_reply_stream(next_task, student_state["class_history"], NEXT_TASK_NUDGE):
+        for chunk in generate_agent_class_reply_stream(
+            next_task,
+            student_state["class_history"],
+            NEXT_TASK_NUDGE,
+            weakness_summary=student_profile_summary,
+        ):
             visible_chunk = next_filter.push(chunk)
             if visible_chunk:
                 yield visible_chunk
