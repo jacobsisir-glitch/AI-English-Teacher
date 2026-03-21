@@ -315,10 +315,15 @@ def _build_analyze_stream_response(
 
     print("📤 句法分析已完成，正在以 Meta + 文本流的形式返回前端...")
     return StreamingResponse(
-        generate(),
-        media_type="text/plain; charset=utf-8",
-        background=background_tasks
-    )
+    generate(),
+    media_type="text/plain; charset=utf-8",
+    background=background_tasks,
+    headers={
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+    }
+)
 
 
 def _build_question_stream_response(text: str, include_meta: bool = False) -> StreamingResponse:
@@ -331,7 +336,15 @@ def _build_question_stream_response(text: str, include_meta: bool = False) -> St
         for chunk in ask_teacher_with_rag_stream(text):
             yield chunk
 
-    return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
+    return StreamingResponse(
+    generate(), 
+    media_type="text/plain; charset=utf-8",
+    headers={
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+    }
+)
 
 app = FastAPI(title="AI English Teacher API")
 
@@ -589,7 +602,15 @@ async def handle_class_interaction_stream(request: ClassInput):
             student_state["class_history"].append({"role": "assistant", "content": next_reply})
             _trim_class_history()
 
-    return StreamingResponse(generate(), media_type="text/plain; charset=utf-8")
+    return StreamingResponse(
+    generate(), 
+    media_type="text/plain; charset=utf-8",
+    headers={
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive"
+    }
+)
 
 
 if __name__ == "__main__":
