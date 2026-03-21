@@ -33,3 +33,12 @@ class ErrorBook(Base):
     user_input = Column(Text, nullable=False)
     ai_comment = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class StudentQuestion(Base):
+    __tablename__ = "student_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    question_text = Column(Text, nullable=False)
+    source = Column(String(50), nullable=False, default="practice")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

@@ -1,11 +1,18 @@
-import glob
-import os
+from __future__ import annotations
+
+import json
 
 from openai import OpenAI
 
 from config import DEFAULT_STUDENT_ID, DEEPSEEK_API_KEY
 from memory_manager import recall_mistakes
 from schemas import SentenceAnalysisReport
+from tools.textbook_tool import (
+    TEXTBOOK_TOOLS_SCHEMA,
+    get_textbook_index,
+    read_textbook_chapter,
+)
+
 
 api_key = DEEPSEEK_API_KEY
 if not api_key:
@@ -13,13 +20,16 @@ if not api_key:
 
 client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
+MODEL_NAME = "deepseek-chat"
+MAX_TOOL_CALL_ROUNDS = 4
+
 BASE_SYSTEM_PROMPT = """
 # Core Persona
-你是一位高冷、毒舌、专业、逻辑严谨的英语语法导师。学生的问题再基础，你也只会冷静处理，不会卖萌，不会客服腔，不会故作热情。
+你是一位傲娇、毒舌、专业、逻辑严谨，并带着英式冷幽默的英语语法导师。学生的问题再基础，你也只会冷静处理，不会卖萌，不会客服腔，不会故作热情。
 
 # Personality & Tone
-- 可以轻微讽刺，但不能胡说八道。
-- 讲解必须专业、锐利、简洁，避免空话和套话。
+- 可以阴阳怪气、可以轻微讽刺，但不能胡说八道，更不能变成人身攻击。
+- 讲解必须专业、锋利、简洁，带一点“恨铁不成钢”的英式冷幽默。
 - 默认用中文作答，必要时保留英文术语和例句。
 
 # Live2D 标签规则
@@ -48,24 +58,6 @@ INTENT_CLASSIFIER_SYSTEM_PROMPT = """
 """.strip()
 
 
-def _load_textbook_content(file_path: str | None = None, folder: str = "data/textbooks") -> str:
-    if file_path:
-        if not os.path.exists(file_path):
-            return ""
-        file_paths = [file_path]
-    else:
-        if not os.path.exists(folder):
-            return ""
-        file_paths = sorted(glob.glob(os.path.join(folder, "*.md")))
-
-    chunks = []
-    for current_path in file_paths:
-        with open(current_path, "r", encoding="utf-8") as file:
-            chunks.append(f"\n\n--- 【章节：{os.path.basename(current_path)}】---\n\n{file.read()}")
-
-    return "".join(chunks)
-
-
 def _compose_system_prompt(*sections: str) -> str:
     prompt_parts = [BASE_SYSTEM_PROMPT]
     for section in sections:
@@ -74,21 +66,168 @@ def _compose_system_prompt(*sections: str) -> str:
     return "\n\n".join(prompt_parts)
 
 
-def _build_messages(system_prompt: str, user_message: str, chat_history: list | None = None) -> list:
+def _normalize_chat_history(chat_history: list[dict] | None, limit: int = 6) -> list[dict]:
+    if not chat_history:
+        return []
+
+    normalized_messages: list[dict] = []
+    for item in chat_history[-limit:]:
+        if not isinstance(item, dict):
+            continue
+
+        raw_role = str(item.get("role", "")).strip().lower()
+        content = str(item.get("content", "")).strip()
+        if not content:
+            continue
+
+        if raw_role == "ai":
+            raw_role = "assistant"
+        if raw_role not in {"user", "assistant"}:
+            continue
+
+        normalized_messages.append({"role": raw_role, "content": content})
+
+    return normalized_messages
+
+
+def _build_messages(system_prompt: str, user_message: str, chat_history: list | None = None) -> list[dict]:
     messages = [{"role": "system", "content": system_prompt}]
-    if chat_history:
-        messages.extend(chat_history)
+    normalized_history = _normalize_chat_history(chat_history)
+    if normalized_history:
+        messages.extend(normalized_history)
     messages.append({"role": "user", "content": user_message})
     return messages
 
 
-def _create_chat_completion(messages: list, temperature: float, stream: bool = False):
-    return client.chat.completions.create(
-        model="deepseek-chat",
-        messages=messages,
-        temperature=temperature,
-        stream=stream,
+def _create_chat_completion(
+    messages: list[dict],
+    temperature: float,
+    stream: bool = False,
+    tools: list[dict] | None = None,
+):
+    request_payload = {
+        "model": MODEL_NAME,
+        "messages": messages,
+        "temperature": temperature,
+        "stream": stream,
+    }
+    if tools is not None:
+        request_payload["tools"] = tools
+    return client.chat.completions.create(**request_payload)
+
+
+def _build_textbook_tool_guidance() -> str:
+    textbook_index = get_textbook_index()
+    return f"""
+# 教材查阅工具
+你现在拥有查阅教材的工具，这是目前的教材大纲：
+{textbook_index}
+
+如果学生的问题需要深入核对某个特有知识点，请务必先调用工具查阅具体章节，然后再作答。
+
+工具使用规则：
+- 先阅读目录，再决定是否需要调用工具。
+- 只有在需要具体教材细节时，才调用 `read_textbook_chapter`。
+- 调用时必须传入目录中真实存在的 Markdown 文件名。
+- 优先只读取最相关的一个章节；确有必要时再继续读取下一个章节。
+- 已经掌握足够信息后，立刻停止调用工具并直接回答。
+""".strip()
+
+
+def _message_has_tool_calls(choice) -> bool:
+    finish_reason = getattr(choice, "finish_reason", None)
+    tool_calls = getattr(choice.message, "tool_calls", None) or []
+    return finish_reason == "tool_calls" or bool(tool_calls)
+
+
+def _serialize_tool_call(tool_call) -> dict:
+    return {
+        "id": tool_call.id,
+        "type": "function",
+        "function": {
+            "name": tool_call.function.name,
+            "arguments": tool_call.function.arguments,
+        },
+    }
+
+
+def _execute_tool_call(tool_call) -> str:
+    tool_name = getattr(tool_call.function, "name", "")
+    raw_arguments = getattr(tool_call.function, "arguments", "") or "{}"
+
+    try:
+        arguments = json.loads(raw_arguments)
+    except json.JSONDecodeError as exc:
+        return f"工具调用失败：参数 JSON 解析失败。错误信息：{exc}"
+
+    if tool_name != "read_textbook_chapter":
+        return f"工具调用失败：未知工具 {tool_name}。"
+
+    file_name = arguments.get("file_name")
+    if not isinstance(file_name, str) or not file_name.strip():
+        return "工具调用失败：`file_name` 必须是非空字符串。"
+
+    return read_textbook_chapter(file_name.strip())
+
+
+def _resolve_textbook_tool_messages(
+    messages: list[dict],
+    temperature: float,
+) -> tuple[list[dict], str]:
+    working_messages = list(messages)
+
+    for round_index in range(MAX_TOOL_CALL_ROUNDS):
+        response = _create_chat_completion(
+            working_messages,
+            temperature=temperature,
+            tools=TEXTBOOK_TOOLS_SCHEMA,
+        )
+        choice = response.choices[0]
+        message = choice.message
+        tool_calls = list(getattr(message, "tool_calls", None) or [])
+
+        if not _message_has_tool_calls(choice):
+            return working_messages, (message.content or "").strip()
+
+        print(f"正在执行教材工具调用，第 {round_index + 1} 轮，共 {len(tool_calls)} 个工具请求。")
+
+        working_messages.append(
+            {
+                "role": "assistant",
+                "content": message.content or "",
+                "tool_calls": [_serialize_tool_call(tool_call) for tool_call in tool_calls],
+            }
+        )
+
+        for tool_call in tool_calls:
+            tool_result = _execute_tool_call(tool_call)
+            working_messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": tool_result,
+                }
+            )
+
+    print("教材工具调用达到上限，改为基于已获取内容直接生成回答。")
+    working_messages.append(
+        {
+            "role": "system",
+            "content": "你已经达到本轮教材工具调用上限。请基于当前上下文中已有的教材内容，谨慎且直接地完成回答，不要再请求工具。",
+        }
     )
+    fallback_response = _create_chat_completion(working_messages, temperature=temperature)
+    return working_messages, (fallback_response.choices[0].message.content or "").strip()
+
+
+def _stream_final_answer(messages: list[dict], temperature: float):
+    response = _create_chat_completion(messages, temperature=temperature, stream=True)
+    for chunk in response:
+        if not chunk.choices:
+            continue
+        delta = chunk.choices[0].delta.content
+        if delta is not None:
+            yield delta
 
 
 def classify_user_intent(user_input: str) -> str:
@@ -105,111 +244,130 @@ def classify_user_intent(user_input: str) -> str:
         if "QUESTION" in raw_result:
             return "QUESTION"
     except Exception as exc:
-        print(f"⚠️ 意图分类失败，回退到 QUESTION: {exc}")
+        print(f"意图分类失败，回退到 QUESTION：{exc}")
 
     return "QUESTION"
 
 
-def _build_analysis_system_prompt(
-    textbook_content: str,
-    report_json_str: str,
-    memory_context: str,
-) -> str:
+def _build_analysis_system_prompt(report_json_str: str, memory_context: str) -> str:
     memory_block = memory_context or "暂无可用历史记忆。"
     return _compose_system_prompt(
+        _build_textbook_tool_guidance(),
         f"""
 # 当前业务：句子诊断与讲解
 你正在直接批改学生提交的英文句子，需要以最终主考官的身份独立裁决，而不是转述任何中间材料。
 
-# 官方教材（必须结合使用）
-{textbook_content}
-
 # 内部分析数据（只供内化，禁止外显）
-下面这份 JSON 只供你在脑中完成定位、校验和裁决。你必须把它彻底内化为自己的判断，最终回复时要像你亲眼看完句子后直接开口点评，而不是像在转述后台材料：
+下面这份 JSON 只供你在脑中完成定位、校验和裁决。你必须把它彻底内化成自己的判断，最终回复时要像你亲眼看完句子后直接开口点评，而不是像在转述后台材料：
 {report_json_str}
 
-# 底层系统架构声明（必须遵守）
-- 这份内部句法分析数据来自底层的 spaCy / NLP 句法引擎，它只负责词性识别、依存关系划分和句子成分定位，本质上只是结构扫描仪。
-- 它绝对不负责判断语法是否正确，也不负责校验语义是否合理、时态是否恰当、拼写是否错误、单复数是否得体。
-- 所以，即使学生写出错误句子，这份内部分析数据依然可能顺利标出 **主语（S）/ 谓语（V）/ 宾语（O）/ 表语（P）** 等成分；这只说明结构被切出来了，不代表句子合格。
-- 严禁吐槽、质疑、嘲讽或点评这份内部分析数据本身。NLP 引擎能给错句划分成分，是它的正常职责，不是笑点。
-- 你的全部纠错、批评、反讽和毒舌，都必须 100% 指向学生原句本身。这份内部分析数据只是辅助定位错误的草图，不是正确性背书。
+# 底层系统声明（必须遵守）
+- 这份内部句法分析数据只是辅助定位错误的草图，不是正确性背书。
+- 即使底层结构识别看起来完整，你仍然必须亲自判断语法、语义、搭配、时态、拼写与数的一致性。
+- 你的全部纠错和批评都必须 100% 指向学生原句本身，不要点评系统、JSON、分析流程或模型判定。
 
 # 隐蔽规则（极其严格）
-- 你必须把收到的句法分析数据视为自己的潜意识和判断，绝对不允许在回复里暴露“我看到了某份分析材料”这件事。
-- 在最终回复文本中，绝对禁止出现或变相出现以下词语：`报告`、`系统`、`底层引擎`、`NLP`、`高亮结果`、`分析数据`、`JSON`、`后台`、`模型判定`、`结构扫描`。
-- 严禁使用“报告显示……”“系统认为……”“分析结果表明……”“从结构上看……”这类打破第四面墙的句式。
-- 不要先交代依据，再给结论。直接以毒舌导师口吻对学生开炮，仿佛这些判断本来就是你一眼看出来的。
-- 如果要引用句法信息，也只能自然地融入点评，例如直接说“你的**主语**和**表语**搭在一起逻辑崩了”，而不是解释这些信息来自哪里。
-- 上述禁词规则只针对面向学生的点评正文；若句子有错，你仍然必须保留文末的 `===DB_START=== ... ===DB_END===` 静默写库块。
+- 严禁向学生泄露“报告、系统、JSON、后台、模型判定、分析数据、NLP、引擎”等来源词。
+- 不要先交代依据，再给结论。直接像你自己一眼看出来的一样点评。
+- 若句子有明确语法错误，回复正文结束后必须在最末尾附加 `===DB_START=== ... ===DB_END===` 包裹的单个 JSON 对象。
+- JSON 只能包含 `grammar_point` 和 `error_tag` 两个字段，不能使用 Markdown 代码块。
+- 如果句子整体正确，绝对不要输出任何 DB 标记。
 
 # 你的任务
-1. 亲自审查学生原句。如果内部分析数据没有指出错误，但你发现明显语病，例如主谓不一致、介词搭配错误、时态逻辑混乱，直接按你的专业判断纠正。
-2. 分析时必须使用专业术语，例如 **主语（S）/ 谓语（V）/ 宾语（O）/ 表语（P）**、时态、从句类型，并尽量结合教材里的说法。
-3. 评价风格要保持冷淡、锋利、有轻微讽刺感，但不能为了毒舌牺牲专业性；如果句子里有拼写、时态、单复数、搭配或逻辑上的荒谬错误，直接针对学生句子开刀，不要拐去谈任何后台依据。
-4. 对每个重要错误都要点名指出具体成分、简要解释为什么错，并给出至少一个修正后的正确示例句。
-5. 如果句子整体不错，只是小毛病，可以给一点克制的赞许，但别突然变成热情拉拉队。
-6. 输出长度控制在约 150-250 字，可使用 Markdown 加粗核心语法名词。
-7. 当且仅当你判定学生的句子存在语法错误时，在输出完所有点评文本后，必须在回复最末尾追加一段用于写入数据库的 JSON 数据。
-8. 这段 JSON 必须被严格包裹在 ===DB_START=== 和 ===DB_END=== 之间。
-9. 输出格式示例：===DB_START=== {{"grammar_point": "时态/从句等核心考点", "error_tag": "具体的错误类型，如主谓不一致"}} ===DB_END===
-10. JSON 必须是单个合法对象，只包含 grammar_point 和 error_tag 两个键，不要使用 Markdown 代码块，不要添加额外解释，不要在 ===DB_END=== 后继续输出任何内容。
-11. 如果句子整体正确，或你最终判断不存在明确语法错误，则绝对不要输出任何 DB 标记或 JSON。
+1. 亲自审查学生原句。若内部分析漏掉了明显错误，你必须直接纠正。
+2. 分析时尽量使用专业术语，如 **主语(S)**、**谓语(V)**、**宾语(O)**、**表语(C)**、时态、从句类型等。
+3. 每个重要错误都要指出具体成分、简明解释原因，并给出至少一个修正后的正确示例句。
+4. 如果教材目录不足以支撑严谨判断，应先调用工具读取最相关章节，再作答。
+5. 输出长度控制在约 150-250 字，可适度使用 Markdown 加粗关键术语。
 
 # 历史记忆
 {memory_block}
-- 如果历史记忆显示学生反复跌进同一类坑，可以顺手冷嘲一句，但要让学生看得懂问题的连续性。
-"""
+- 如果历史记忆显示学生反复跌进同一类坑，可以顺手冷嘲一句，但重点仍然是把问题讲清楚。
+""",
     )
 
 
 def _build_analysis_messages(
     report: SentenceAnalysisReport,
     student_id: str = DEFAULT_STUDENT_ID,
-) -> list:
+    history: list[dict] | None = None,
+) -> list[dict]:
     memory_context = recall_mistakes(student_id, report.original_sentence)
     if memory_context:
-        print(f"📚 成功提取到历史记忆，正在注入提示词：\n{memory_context}")
+        print(f"成功提取到历史记忆，正在注入提示词：\n{memory_context}")
     else:
-        print("📚 该句型没有发现历史错误记忆。")
+        print("该句型没有发现历史错误记忆。")
 
-    textbook_content = _load_textbook_content()
     report_json_str = report.model_dump_json(indent=2)
-    system_prompt = _build_analysis_system_prompt(textbook_content, report_json_str, memory_context)
+    system_prompt = _build_analysis_system_prompt(report_json_str, memory_context)
     user_prompt = (
         f"以下是学生原句及供你内化判断的辅助数据：\n{report_json_str}\n"
         "请你彻底内化这些信息，忽略其来源，直接像亲自批改一样对学生说话。"
     )
-    return _build_messages(system_prompt, user_prompt)
+    return _build_messages(system_prompt, user_prompt, history)
 
 
-def _build_rag_system_prompt(textbook_content: str) -> str:
+def _build_rag_system_prompt() -> str:
     return _compose_system_prompt(
-        f"""
+        _build_textbook_tool_guidance(),
+        """
 # 当前业务：自由语法问答
-你正在回答学生的自由提问，但仍然必须维持同一套高冷毒舌导师人设，而不是退化成温柔助手。
+你正在回答学生的自由提问，但仍然必须维持同一套傲娇、毒舌、英式冷幽默导师人设，而不是退化成温柔助手。
 
 # 回答边界
-- 只允许基于下面的【官方教材】作答，不要编造教材外知识。
-- 如果学生的问题在教材里完全找不到关联线索，直接冷淡地指出这是超纲内容，并把话题拉回当前课程范围。
-- 即使拒答，也要保持专业、简洁，并保留动作标签。
+- 以教材目录和你主动查阅到的教材章节为核心依据作答，不要编造教材外知识。
+- 如果学生的问题超出当前教材范围，要直接指出并把话题拉回课程范围。
+- 若目录不足以支撑严谨回答，必须先调用工具读取具体章节，再给出答案。
 
 # 回答要求
 - 回答要直接，不要客服腔。
-- 可以适度使用比喻帮助理解，但不要胡乱发散。
-- 如果教材里存在明确概念、术语或例句，优先引用其逻辑来解释。
-
-# 官方教材
-{textbook_content}
-"""
+- 可以适度用类比帮助理解，但不要发散。
+- 如果你已经拿到足够的教材原文，就停止继续调用工具，直接作答。
+""",
     )
 
 
-def _build_class_system_prompt(task_info: dict) -> str:
+def _suggest_textbook_chapter_for_weakness(weakness_summary: str | None) -> str:
+    summary = (weakness_summary or "").lower()
+    if any(keyword in summary for keyword in ("从句", "subordinate", "定语从句", "名词性从句", "状语从句")):
+        return "02_Subordinate_Clause.md"
+    if any(keyword in summary for keyword in ("动词", "时态", "主谓一致", "语态", "非谓语", "谓语", "完成时", "进行时")):
+        return "01_Verb.md"
+    return "00_Grammar_Overview.md"
+
+
+def _build_class_opening_directive(task_info: dict, weakness_summary: str | None = None) -> str:
+    if task_info.get("task_name") != "课程导读与开场白":
+        return ""
+
+    textbook_index = get_textbook_index()
+    recommended_chapter = _suggest_textbook_chapter_for_weakness(weakness_summary)
+    weakness_text = weakness_summary or "目前还没有足够的错题记录。你可以嘲讽他连像样的黑历史都没攒够，但依旧要给出学习起点。"
+    return f"""
+# 微课开场强制流程
+学生现在刚刚点击了“开启微课”。这一轮是微课的开场白，你必须严格执行以下顺序：
+1. 先用傲娇、毒舌、带英式冷幽默的语气，对学生“终于肯来上课”进行阴阳怪气的欢迎。要明确表达出“教你是我的灾难，但我还是得教”的傲娇感。
+2. 学生最近最显眼的薄弱点是：{weakness_text}
+   你要围绕这个薄弱点进行无情但幽默的嘲讽。只能嘲讽学习表现和语法漏洞，不能进行真正的人身攻击。
+3. 强烈推荐他优先学习最相关的教材章节：`{recommended_chapter}`。语气要像“如果这个都不学，出去别说是我教的”。
+4. 系统已经替你调用 `get_textbook_index()` 读取了教材总目录。请把目录里其他可用章节包装成“备选刑具”或“其他作死选项”，傲慢地丢给学生自己选。
+
+# 可用教材目录（由系统调用 get_textbook_index() 提供）
+{textbook_index}
+
+# 风格红线
+- 保持毒舌、傲娇、英式冷幽默。
+- 绝不能做真正的人身攻击、羞辱、歧视或恶意贬损。
+- 整体效果应像“恨铁不成钢的戏剧化名师”，而不是刻薄网民。
+""".strip()
+
+
+def _build_class_system_prompt(task_info: dict, weakness_summary: str | None = None) -> str:
     return _compose_system_prompt(
+        _build_class_opening_directive(task_info, weakness_summary),
         f"""
 # 当前业务：一对一语法微课
-你正在给学生上一对一的语法微课，请严格围绕当前任务推进，不要离题。
+你正在给学生上一对一的语法微课，请严格围绕当前任务推进，不要离题。整节课都要维持傲娇、毒舌、英式冷幽默的名师口吻，不要忽然变温柔。
 
 # 当前教学任务与教材
 - 【当前教学任务】：{task_info['goal']}
@@ -238,15 +396,16 @@ def _build_class_system_prompt(task_info: dict) -> str:
 def generate_teacher_message(
     report: SentenceAnalysisReport,
     student_id: str = DEFAULT_STUDENT_ID,
+    history: list[dict] | None = None,
 ) -> SentenceAnalysisReport:
-    print("🧠 正在跨海呼叫 DeepSeek 引擎...")
-    messages = _build_analysis_messages(report, student_id)
+    print("正在调用 DeepSeek 引擎进行句子分析回答...")
+    messages = _build_analysis_messages(report, student_id, history)
 
     try:
-        response = _create_chat_completion(messages, temperature=0.6)
-        report.teacher_message = response.choices[0].message.content
+        _, final_content = _resolve_textbook_tool_messages(messages, temperature=0.6)
+        report.teacher_message = final_content
     except Exception as exc:
-        report.teacher_message = f"老师的脑电波暂时短路啦，没能连上 DeepSeek 总部~ (错误代码: {exc})"
+        report.teacher_message = f"老师的脑电波暂时短路，没能连上 DeepSeek 总部。({exc})"
 
     return report
 
@@ -254,76 +413,86 @@ def generate_teacher_message(
 def generate_teacher_message_stream(
     report: SentenceAnalysisReport,
     student_id: str = DEFAULT_STUDENT_ID,
+    history: list[dict] | None = None,
 ):
-    print("🧠 正在跨海呼叫 DeepSeek 引擎（流式讲评）...")
-    messages = _build_analysis_messages(report, student_id)
+    print("正在调用 DeepSeek 引擎进行流式句子分析回答...")
+    messages = _build_analysis_messages(report, student_id, history)
 
     try:
-        response = _create_chat_completion(messages, temperature=0.6, stream=True)
-        for chunk in response:
-            if chunk.choices[0].delta.content is not None:
-                yield chunk.choices[0].delta.content
+        prepared_messages, _ = _resolve_textbook_tool_messages(messages, temperature=0.6)
+        yield from _stream_final_answer(prepared_messages, temperature=0.6)
     except Exception as exc:
-        yield f"老师的脑电波暂时短路啦，没能连上 DeepSeek 总部~ (错误代码: {exc})"
+        yield f"老师的脑电波暂时短路，没能连上 DeepSeek 总部。({exc})"
 
 
-def ask_teacher_with_rag(question: str) -> str:
-    print(f"📓 收到提问: '{question}'，AI 老师正在翻阅教材...")
-    textbook_content = _load_textbook_content()
-    if not textbook_content:
-        return "老师把教材忘在办公室啦。(找不到教材文件)"
-
-    system_prompt = _build_rag_system_prompt(textbook_content)
-    messages = _build_messages(system_prompt, question)
+def ask_teacher_with_rag(question: str, history: list[dict] | None = None) -> str:
+    print(f"收到提问：'{question}'，AI 老师正在按需查阅教材。")
+    system_prompt = _build_rag_system_prompt()
+    messages = _build_messages(system_prompt, question, history)
 
     try:
-        response = _create_chat_completion(messages, temperature=0.3)
-        return response.choices[0].message.content
+        _, final_content = _resolve_textbook_tool_messages(messages, temperature=0.3)
+        return final_content
     except Exception as exc:
-        return f"老师的脑电波暂时短路啦。 (错误代码: {exc})"
+        return f"老师的脑电波暂时短路。({exc})"
 
 
-def ask_teacher_with_rag_stream(question: str):
-    print(f"📓 收到提问: '{question}'，AI 老师正在翻阅教材并准备流式输出...")
-    textbook_content = _load_textbook_content()
-    if not textbook_content:
-        yield "老师的教材库不见啦。"
-        return
-
-    system_prompt = _build_rag_system_prompt(textbook_content)
-    messages = _build_messages(system_prompt, question)
+def ask_teacher_with_rag_stream(question: str, history: list[dict] | None = None):
+    print(f"收到提问：'{question}'，AI 老师正在按需查阅教材并准备流式输出。")
+    system_prompt = _build_rag_system_prompt()
+    messages = _build_messages(system_prompt, question, history)
 
     try:
-        response = _create_chat_completion(messages, temperature=0.3, stream=True)
-        for chunk in response:
-            if chunk.choices[0].delta.content is not None:
-                yield chunk.choices[0].delta.content
+        prepared_messages, _ = _resolve_textbook_tool_messages(messages, temperature=0.3)
+        yield from _stream_final_answer(prepared_messages, temperature=0.3)
     except Exception as exc:
-        yield f"老师的脑电波暂时短路啦。 (错误代码: {exc})"
+        yield f"老师的脑电波暂时短路。({exc})"
 
 
-def _build_agent_class_messages(task_info: dict, chat_history: list, user_message: str) -> list:
-    system_prompt = _build_class_system_prompt(task_info)
-    return _build_messages(system_prompt, user_message, chat_history)
+def _build_agent_class_messages(
+    task_info: dict,
+    chat_history: list,
+    user_message: str,
+    history: list[dict] | None = None,
+    weakness_summary: str | None = None,
+) -> list[dict]:
+    system_prompt = _build_class_system_prompt(task_info, weakness_summary)
+    effective_history = history if history else chat_history
+    return _build_messages(system_prompt, user_message, effective_history)
 
 
-def generate_agent_class_reply(task_info: dict, chat_history: list, user_message: str) -> str:
-    messages = _build_agent_class_messages(task_info, chat_history, user_message)
+def generate_agent_class_reply(
+    task_info: dict,
+    chat_history: list,
+    user_message: str,
+    history: list[dict] | None = None,
+    weakness_summary: str | None = None,
+) -> str:
+    messages = _build_agent_class_messages(task_info, chat_history, user_message, history, weakness_summary)
 
     try:
         response = _create_chat_completion(messages, temperature=0.7)
-        return response.choices[0].message.content
+        return response.choices[0].message.content or ""
     except Exception:
         return "老师的麦克风好像坏了，稍等。"
 
 
-def generate_agent_class_reply_stream(task_info: dict, chat_history: list, user_message: str):
-    messages = _build_agent_class_messages(task_info, chat_history, user_message)
+def generate_agent_class_reply_stream(
+    task_info: dict,
+    chat_history: list,
+    user_message: str,
+    history: list[dict] | None = None,
+    weakness_summary: str | None = None,
+):
+    messages = _build_agent_class_messages(task_info, chat_history, user_message, history, weakness_summary)
 
     try:
         response = _create_chat_completion(messages, temperature=0.7, stream=True)
         for chunk in response:
-            if chunk.choices[0].delta.content is not None:
-                yield chunk.choices[0].delta.content
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta.content
+            if delta is not None:
+                yield delta
     except Exception:
         yield "老师的麦克风好像坏了，稍等。"

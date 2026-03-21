@@ -342,6 +342,42 @@
                         </div>
                     </div>
                 </section>
+
+                <section class="dashboard-list-panel rounded-[24px] p-5 md:p-6">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800">最近提出的疑问</h3>
+                            <p class="text-sm text-slate-500 mt-1">这些问题比错题更诚实，说明你至少知道自己卡在哪儿。</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-amber-50 text-amber-700 px-3 py-1 text-xs font-semibold">提问记录</span>
+                    </div>
+
+                    <div v-if="dashboardError" class="dashboard-empty rounded-2xl p-6 text-sm text-slate-600">
+                        {{ dashboardError }}
+                    </div>
+
+                    <div v-else-if="!dashboardLoading && dashboardData.recent_questions.length === 0" class="dashboard-empty rounded-2xl p-6 text-sm text-slate-600">
+                        暂时还没有记录到你的提问。等你多问几句“这玩意到底什么意思”，这里就不会这么空了。
+                    </div>
+
+                    <div v-else class="space-y-4">
+                        <div v-for="(item, idx) in dashboardData.recent_questions" :key="`question-${idx}`" class="rounded-[22px] border border-slate-100 bg-white p-4 md:p-5 shadow-sm">
+                            <div class="flex items-center justify-between gap-3 mb-3">
+                                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+                                      :class="item.source === 'class' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'">
+                                    <i class="fa-solid fa-circle-question mr-2 text-[10px]"></i>{{ item.source === 'class' ? '微课提问' : '自由练习' }}
+                                </span>
+                                <span class="text-xs text-slate-400">{{ formatDashboardTime(item.created_at) }}</span>
+                            </div>
+
+                            <div class="flex justify-end">
+                                <div class="dashboard-user-bubble max-w-[92%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap">
+                                    {{ item.question_text }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
             </div>
         </div>
     </div>
@@ -389,7 +425,8 @@
             const dashboardData = ref({
                 total_errors: 0,
                 radar_data: [],
-                recent_errors: []
+                recent_errors: [],
+                recent_questions: []
             });
             const latestDashboardTime = ref('暂无记录');
             let radarChart = null;
@@ -498,17 +535,33 @@
                 });
             };
 
+            const getLatestTimestamp = (...groups) => {
+                const candidates = groups
+                    .flat()
+                    .map(item => item?.created_at)
+                    .filter(Boolean)
+                    .map(value => new Date(value))
+                    .filter(date => !Number.isNaN(date.getTime()))
+                    .sort((a, b) => b.getTime() - a.getTime());
+
+                return candidates.length > 0 ? candidates[0].toISOString() : null;
+            };
+
             const syncDashboardMeta = () => {
-                const recent = dashboardData.value.recent_errors || [];
-                latestDashboardTime.value = recent.length > 0
-                    ? formatDashboardTime(recent[0].created_at)
+                const latestTimestamp = getLatestTimestamp(
+                    dashboardData.value.recent_errors || [],
+                    dashboardData.value.recent_questions || []
+                );
+                latestDashboardTime.value = latestTimestamp
+                    ? formatDashboardTime(latestTimestamp)
                     : '暂无记录';
             };
 
             const normalizeDashboardPayload = (payload) => ({
                 total_errors: Number(payload?.total_errors || 0),
                 radar_data: Array.isArray(payload?.radar_data) ? payload.radar_data : [],
-                recent_errors: Array.isArray(payload?.recent_errors) ? payload.recent_errors : []
+                recent_errors: Array.isArray(payload?.recent_errors) ? payload.recent_errors : [],
+                recent_questions: Array.isArray(payload?.recent_questions) ? payload.recent_questions : []
             });
 
             const applyDashboardData = (payload) => {
@@ -670,7 +723,8 @@
                     dashboardData.value = {
                         total_errors: 0,
                         radar_data: [],
-                        recent_errors: []
+                        recent_errors: [],
+                        recent_questions: []
                     };
                 }
 
@@ -727,6 +781,35 @@
                 });
             };
 
+            const extractMessageContent = (message) => {
+                if (!message) return '';
+                if (typeof message.content === 'string' && message.content.trim()) {
+                    return message.content.trim();
+                }
+                if (message.isAnalysis && message.report?.teacher_message) {
+                    return String(message.report.teacher_message).trim();
+                }
+                return '';
+            };
+
+            const buildRecentHistory = (excludeCount = 0, limit = 6) => {
+                const sourceMessages = excludeCount > 0
+                    ? messages.value.slice(0, Math.max(0, messages.value.length - excludeCount))
+                    : messages.value.slice();
+
+                return sourceMessages
+                    .map((message) => {
+                        const role = message?.role === 'user' ? 'user' : (message?.role === 'ai' ? 'assistant' : '');
+                        const content = extractMessageContent(message);
+                        if (!role || !content) {
+                            return null;
+                        }
+                        return { role, content };
+                    })
+                    .filter(Boolean)
+                    .slice(-limit);
+            };
+
             const readStreamIntoMessage = async (url, payload, messageIndex) => {
                 const response = await fetch(url, {
                     method: 'POST',
@@ -764,9 +847,10 @@
                 const aiMessage = { role: 'ai', isClass: true, content: '' };
                 messages.value.push(aiMessage);
                 const aiMessageIndex = messages.value.length - 1;
+                const history = action === 'start' ? [] : buildRecentHistory(2, 6);
 
                 isThinking.value = false;
-                await readStreamIntoMessage(API_BASE_URL + '/class_chat_stream', { text, action }, aiMessageIndex);
+                await readStreamIntoMessage(API_BASE_URL + '/class_chat_stream', { text, action, history }, aiMessageIndex);
 
                 if (messages.value[aiMessageIndex].content.includes(CLASS_COMPLETED_HINT)) {
                     isInClass.value = false;
@@ -776,10 +860,11 @@
             };
 
             const readPracticeStreamIntoMessage = async (text, messageIndex) => {
+                const history = buildRecentHistory(2, 6);
                 const response = await fetch(API_BASE_URL + '/practice_chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text })
+                    body: JSON.stringify({ text, history })
                 });
 
                 if (!response.ok) {

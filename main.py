@@ -1,10 +1,11 @@
 import json
 import os
+import re
 
 from fastapi import BackgroundTasks, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 import uvicorn
@@ -12,7 +13,7 @@ import uvicorn
 import database.models
 from config import DEFAULT_STUDENT_ID
 from database.database import Base, engine, get_db
-from database.models import ErrorBook
+from database.models import ErrorBook, StudentQuestion
 from diagnostician import analyze_sentence
 # 🌟 优化点：把所有的 import 都统一整齐地放在最上面
 from llm_wrapper import (
@@ -104,6 +105,30 @@ ANALYZE_META_START = "===META_START==="
 ANALYZE_META_END = "===META_END==="
 DB_LOG_START = "===DB_START==="
 DB_LOG_END = "===DB_END==="
+QUESTION_PREFIX_PATTERN = re.compile(r"^(什么是|什么叫|什么意思|为什么|为啥|怎么|如何|请问|想问|能否|可不可以|有没有|是不是|主将从现)")
+CHINESE_CHAR_PATTERN = re.compile(r"[\u4e00-\u9fff]")
+GRAMMAR_QUESTION_KEYWORDS = (
+    "语法",
+    "时态",
+    "从句",
+    "主将从现",
+    "主谓一致",
+    "表语",
+    "宾语",
+    "主语",
+    "谓语",
+    "定语",
+    "状语",
+    "同位语",
+    "非谓语",
+    "虚拟语气",
+    "被动语态",
+    "情态动词",
+    "语态",
+    "句型",
+    "现在完成时",
+    "过去完成时",
+)
 
 class TaskCompletedBuffer:
     """
@@ -250,6 +275,88 @@ def _save_error_book_entry(db: Session, user_input: str, ai_comment: str, db_jso
         print(f"⚠️ ErrorBook 写入失败: {exc}")
 
 
+def _normalize_history(history: list[dict] | None, limit: int = 6) -> list[dict]:
+    if not history:
+        return []
+
+    normalized_history: list[dict] = []
+    for item in history[-limit:]:
+        if not isinstance(item, dict):
+            continue
+
+        raw_role = str(item.get("role", "")).strip().lower()
+        content = str(item.get("content", "")).strip()
+        if not content:
+            continue
+
+        if raw_role == "ai":
+            raw_role = "assistant"
+        if raw_role not in {"user", "assistant"}:
+            continue
+
+        normalized_history.append({"role": raw_role, "content": content})
+
+    return normalized_history
+
+
+def _pick_prompt_history(request_history: list[dict] | None, fallback_history: list[dict] | None = None) -> list[dict]:
+    normalized_request_history = _normalize_history(request_history)
+    if normalized_request_history:
+        return normalized_request_history
+    return _normalize_history(fallback_history)
+
+
+def _should_log_student_question(text: str, intent: str | None = None) -> bool:
+    normalized_text = re.sub(r"\s+", " ", text or "").strip()
+    if not normalized_text:
+        return False
+
+    has_question_punctuation = "?" in normalized_text or "？" in normalized_text
+    has_chinese = bool(CHINESE_CHAR_PATTERN.search(normalized_text))
+    starts_like_question = bool(QUESTION_PREFIX_PATTERN.match(normalized_text))
+    has_grammar_keyword = any(keyword in normalized_text for keyword in GRAMMAR_QUESTION_KEYWORDS)
+
+    if intent == "QUESTION":
+        return True
+
+    return (
+        (has_question_punctuation and has_chinese)
+        or starts_like_question
+        or (has_grammar_keyword and (has_question_punctuation or has_chinese))
+    )
+
+
+def _save_student_question(db: Session, question_text: str, source: str) -> None:
+    normalized_text = re.sub(r"\s+", " ", question_text or "").strip()
+    if not normalized_text:
+        return
+
+    try:
+        db.add(StudentQuestion(question_text=normalized_text, source=source))
+        db.commit()
+        print(f"StudentQuestion saved: source={source}, question={normalized_text}")
+    except Exception as exc:
+        db.rollback()
+        print(f"StudentQuestion save failed: {exc}")
+
+
+def _get_top_weakness_summary(db: Session) -> str:
+    top_row = (
+        db.query(
+            ErrorBook.grammar_point.label("grammar_point"),
+            func.count(ErrorBook.id).label("error_count"),
+        )
+        .group_by(ErrorBook.grammar_point)
+        .order_by(func.count(ErrorBook.id).desc(), ErrorBook.grammar_point.asc())
+        .first()
+    )
+
+    if not top_row or not top_row.grammar_point:
+        return "暂时没有可供嘲讽的错题雷达峰值。你可以挖苦他连稳定犯错都还没形成规模，但仍要把他引向教材总览。"
+
+    return f"雷达图最高错误项是「{top_row.grammar_point}」，累计翻车 {top_row.error_count} 次。"
+
+
 def _trim_class_history():
     if len(student_state["class_history"]) > 12:
         student_state["class_history"] = student_state["class_history"][-12:]
@@ -268,6 +375,7 @@ def _build_analyze_stream_response(
     text: str,
     background_tasks: BackgroundTasks,
     db: Session,
+    history: list[dict] | None = None,
 ) -> StreamingResponse:
     print(f"\n📩 收到前端发来的学生句子: {text}")
     raw_report = analyze_sentence(text)
@@ -293,7 +401,11 @@ def _build_analyze_stream_response(
         yield _build_meta_chunk(meta_payload)
 
         db_log_buffer = AnalyzeDBLogBuffer(DB_LOG_START, DB_LOG_END)
-        for chunk in generate_teacher_message_stream(raw_report, student_id=CURRENT_STUDENT_ID):
+        for chunk in generate_teacher_message_stream(
+            raw_report,
+            student_id=CURRENT_STUDENT_ID,
+            history=_normalize_history(history),
+        ):
             visible_chunk = db_log_buffer.push(chunk)
             if visible_chunk:
                 yield visible_chunk
@@ -326,14 +438,18 @@ def _build_analyze_stream_response(
 )
 
 
-def _build_question_stream_response(text: str, include_meta: bool = False) -> StreamingResponse:
+def _build_question_stream_response(
+    text: str,
+    include_meta: bool = False,
+    history: list[dict] | None = None,
+) -> StreamingResponse:
     print(f"\n🙋‍♂️ 收到学生流式提问: {text}")
 
     def generate():
         if include_meta:
             yield _build_meta_chunk({"intent": "QUESTION"})
 
-        for chunk in ask_teacher_with_rag_stream(text):
+        for chunk in ask_teacher_with_rag_stream(text, history=_normalize_history(history)):
             yield chunk
 
     return StreamingResponse(
@@ -386,6 +502,7 @@ app.add_middleware(
 
 class UserInput(BaseModel):
     text: str
+    history: list[dict] = Field(default_factory=list)
 
 CURRENT_STUDENT_ID = DEFAULT_STUDENT_ID
 
@@ -395,14 +512,15 @@ async def analyze_student_sentence(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    return _build_analyze_stream_response(request.text, background_tasks, db)
+    return _build_analyze_stream_response(request.text, background_tasks, db, history=request.history)
 
 class QuestionInput(BaseModel):
     question: str
+    history: list[dict] = Field(default_factory=list)
 
 @app.post("/ask")
 async def ask_question(request: QuestionInput):
-    return _build_question_stream_response(request.question, include_meta=False)
+    return _build_question_stream_response(request.question, include_meta=False, history=request.history)
 
 
 @app.get("/api/dashboard/data")
@@ -436,10 +554,26 @@ async def get_dashboard_data(db: Session = Depends(get_db)):
         for row in recent_rows
     ]
 
+    recent_question_rows = (
+        db.query(StudentQuestion)
+        .order_by(StudentQuestion.created_at.desc(), StudentQuestion.id.desc())
+        .limit(5)
+        .all()
+    )
+    recent_questions = [
+        {
+            "question_text": row.question_text,
+            "source": row.source,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in recent_question_rows
+    ]
+
     return {
         "total_errors": total_errors,
         "radar_data": radar_data,
         "recent_errors": recent_errors,
+        "recent_questions": recent_questions,
     }
 
 
@@ -453,14 +587,18 @@ async def practice_chat(
     intent = classify_user_intent(request.text)
     print(f"🧠 LLM 语义路由判定结果: {intent}")
 
-    if intent == "ANALYZE":
-        return _build_analyze_stream_response(request.text, background_tasks, db)
+    if _should_log_student_question(request.text, intent=intent):
+        _save_student_question(db, request.text, source="practice")
 
-    return _build_question_stream_response(request.text, include_meta=True)
+    if intent == "ANALYZE":
+        return _build_analyze_stream_response(request.text, background_tasks, db, history=request.history)
+
+    return _build_question_stream_response(request.text, include_meta=True, history=request.history)
 
 class ClassInput(BaseModel):
     text: str
     action: str = "chat"
+    history: list[dict] = Field(default_factory=list)
 
 @app.post("/course/exit")
 async def exit_course():
@@ -473,10 +611,13 @@ async def exit_course():
     return {"status": "success", "message": "已成功重置微课状态"}
 
 @app.post("/class_chat")
-async def handle_class_interaction(request: ClassInput):
+async def handle_class_interaction(request: ClassInput, db: Session = Depends(get_db)):
     global student_state
     print(f"\n👩‍🏫 收到微课互动: action={request.action}, text='{request.text}'")
     
+    prompt_history = [] if request.action == "start" else _pick_prompt_history(request.history, student_state["class_history"])
+    weakness_summary = _get_top_weakness_summary(db) if request.action == "start" else None
+
     if request.action == "start":
         print("🎬 正在初始化全新 Agent 微课状态...")
         student_state["is_in_class"] = True
@@ -485,6 +626,9 @@ async def handle_class_interaction(request: ClassInput):
         user_msg = "老师好，我准备好上课了！"
     else:
         user_msg = request.text
+
+    if request.action != "start" and _should_log_student_question(user_msg):
+        _save_student_question(db, user_msg, source="class")
         
     if student_state["current_task_index"] >= len(COURSE_TASKS):
         print("🎉 所有任务已通关，下课！")
@@ -494,7 +638,13 @@ async def handle_class_interaction(request: ClassInput):
     current_task = COURSE_TASKS[student_state["current_task_index"]]
     print(f"🎯 正在派发当前教学任务: {current_task['task_name']}")
     
-    raw_reply = generate_agent_class_reply(current_task, student_state["class_history"], user_msg)
+    raw_reply = generate_agent_class_reply(
+        current_task,
+        student_state["class_history"],
+        user_msg,
+        history=prompt_history,
+        weakness_summary=weakness_summary,
+    )
     print(f"🤖 Agent 原始回复生成完毕。")
     
     clean_reply, is_task_completed = _strip_task_completed(raw_reply)
@@ -529,8 +679,13 @@ async def handle_class_interaction(request: ClassInput):
     return {"teacher_reply": clean_reply, "status": "TEACHING"}
 
 @app.post("/class_chat_stream")
-async def handle_class_interaction_stream(request: ClassInput):
+async def handle_class_interaction_stream(request: ClassInput, db: Session = Depends(get_db)):
     global student_state
+    prompt_history = [] if request.action == "start" else _pick_prompt_history(request.history, student_state["class_history"])
+    weakness_summary = _get_top_weakness_summary(db) if request.action == "start" else None
+
+    if request.action != "start" and _should_log_student_question(request.text):
+        _save_student_question(db, request.text, source="class")
 
     def generate():
         global student_state
@@ -555,7 +710,13 @@ async def handle_class_interaction_stream(request: ClassInput):
         print(f"🎯 正在流式派发当前教学任务: {current_task['task_name']}")
 
         current_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
-        for chunk in generate_agent_class_reply_stream(current_task, student_state["class_history"], user_msg):
+        for chunk in generate_agent_class_reply_stream(
+            current_task,
+            student_state["class_history"],
+            user_msg,
+            history=prompt_history,
+            weakness_summary=weakness_summary,
+        ):
             visible_chunk = current_filter.push(chunk)
             if visible_chunk:
                 yield visible_chunk
