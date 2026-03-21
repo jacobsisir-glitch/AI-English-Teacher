@@ -348,6 +348,7 @@ def _build_cors_origins() -> list[str]:
         "http://127.0.0.1:5500",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
+        "https://ai-english-teacher-2psn.vercel.app",
         "https://ai-english-teacher-77da-6bwzywihd-jacobsisir-glitchs-projects.vercel.app",
     }
     extra_origins = {
