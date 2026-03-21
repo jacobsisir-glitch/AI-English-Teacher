@@ -316,7 +316,7 @@ def _build_analyze_stream_response(
     print("📤 句法分析已完成，正在以 Meta + 文本流的形式返回前端...")
     return StreamingResponse(
     generate(),
-    media_type="text/plain; charset=utf-8",
+    media_type="text/event-stream",
     background=background_tasks,
     headers={
         "X-Accel-Buffering": "no",
@@ -338,7 +338,7 @@ def _build_question_stream_response(text: str, include_meta: bool = False) -> St
 
     return StreamingResponse(
     generate(), 
-    media_type="text/plain; charset=utf-8",
+   media_type="text/event-stream",
     headers={
         "X-Accel-Buffering": "no",
         "Cache-Control": "no-cache",
@@ -604,7 +604,7 @@ async def handle_class_interaction_stream(request: ClassInput):
 
     return StreamingResponse(
     generate(), 
-    media_type="text/plain; charset=utf-8",
+    media_type="text/event-stream",
     headers={
         "X-Accel-Buffering": "no",
         "Cache-Control": "no-cache",
