@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 鑻辫璇硶鑰佸笀 - 鏋侀€熻妭鐐圭増</title>
+    <title>AI 英语语法老师 - 极速节点版</title>
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="https://cdn.staticfile.net/vue/3.3.4/vue.global.min.js"></script>
     <script src="https://cdn.staticfile.net/axios/1.6.2/axios.min.js"></script>
@@ -24,7 +24,7 @@
             --line-soft: #e2e8f0;
             --panel-shadow: 0 28px 90px rgba(79, 70, 229, 0.18), 0 10px 35px rgba(15, 23, 42, 0.10);
         }
-        /* 闃叉 Vue 鍔犺浇鍓嶉棯鐑佷唬鐮佺殑淇濇姢缃?*/
+        /* 防止 Vue 加载前闪烁代码的保护罩 */
         [v-cloak] { display: none !important; }
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -103,23 +103,23 @@
     <aside class="hidden md:flex flex-col w-64 bg-slate-50 border-r border-slate-200 h-full flex-shrink-0">
         <div class="p-4 space-y-3">
             <button @click="startNewChat" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border border-slate-200 shadow-sm rounded-xl text-slate-700 hover:bg-slate-100 transition-colors font-medium">
-                <i class="fa-solid fa-pen-to-square"></i> 鏂板缓鑷敱缁冧範
+                <i class="fa-solid fa-pen-to-square"></i> 新建自由练习
             </button>
             <button @click="startClass" :disabled="isInClass || isInputLocked" :class="isInClass || isInputLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 shadow-sm rounded-xl text-white transition-colors font-medium">
-                <i class="fa-solid fa-graduation-cap"></i> 寮€鍚井璇?(绯荤粺璇?
+                <i class="fa-solid fa-graduation-cap"></i> 开启微课 (系统课)
             </button>
             <button @click="openDashboard" :disabled="dashboardLoading" :class="dashboardLoading ? 'opacity-60 cursor-wait' : ''" class="report-trigger w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-white transition-all font-medium">
-                <i class="fa-solid fa-chart-column"></i> 涓汉瀛︿範鎶ュ憡
+                <i class="fa-solid fa-chart-column"></i> 个人学习报告
             </button>
             <button v-if="isInClass" @click="exitClass" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-500 shadow-sm rounded-xl text-white hover:bg-red-600 transition-colors font-medium">
-                <i class="fa-solid fa-door-open"></i> 閫€鍑哄井璇?
+                <i class="fa-solid fa-door-open"></i> 退出微课
             </button>
         </div>
         <div class="flex-1 overflow-y-auto px-3">
-            <div class="text-xs font-semibold text-slate-400 mb-2 px-2 mt-2">褰撳墠鐘舵€?/div>
+            <div class="text-xs font-semibold text-slate-400 mb-2 px-2 mt-2">当前状态</div>
             <div class="w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors" :class="isInClass ? 'text-amber-600 bg-amber-50' : 'text-emerald-600 bg-emerald-50'">
                 <i class="fa-solid" :class="isInClass ? 'fa-chalkboard-user mr-2' : 'fa-link mr-2'"></i> 
-                {{ isInClass ? '寰杩涜涓?..' : '鑷敱缁冧範妯″紡' }}
+                {{ isInClass ? '微课进行中...' : '自由练习模式' }}
             </div>
         </div>
     </aside>
@@ -127,16 +127,16 @@
     <main class="flex-1 flex flex-col h-full min-w-0 bg-white">
         <div class="md:hidden flex items-center gap-2 px-4 pt-4 pb-2 bg-white/90 backdrop-blur-sm border-b border-slate-100 flex-shrink-0">
             <button @click="startNewChat" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 shadow-sm rounded-xl text-slate-700 text-sm font-medium">
-                <i class="fa-solid fa-pen-to-square"></i> 鏂板缓
+                <i class="fa-solid fa-pen-to-square"></i> 新建
             </button>
             <button @click="openDashboard" :disabled="dashboardLoading" :class="dashboardLoading ? 'opacity-60 cursor-wait' : ''" class="report-trigger flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-white text-sm font-medium">
-                <i class="fa-solid fa-chart-column"></i> 鎶ュ憡
+                <i class="fa-solid fa-chart-column"></i> 报告
             </button>
             <button v-if="!isInClass" @click="startClass" :disabled="isInputLocked" :class="isInputLocked ? 'opacity-50 cursor-not-allowed' : 'bg-indigo-600'" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-white text-sm font-medium">
-                <i class="fa-solid fa-graduation-cap"></i> 寰
+                <i class="fa-solid fa-graduation-cap"></i> 微课
             </button>
             <button v-else @click="exitClass" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-red-500 rounded-xl text-white text-sm font-medium">
-                <i class="fa-solid fa-door-open"></i> 閫€鍑?
+                <i class="fa-solid fa-door-open"></i> 退出
             </button>
         </div>
         
@@ -146,8 +146,8 @@
                 <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500 text-2xl rotate-12">
                     <i class="fa-solid fa-bolt"></i>
                 </div>
-                <h2 class="text-2xl font-bold text-slate-700">鍓嶅悗绔凡杩為€氾紒</h2>
-                <p class="text-slate-500 max-w-md">鐜板湪鍙戦€佺殑姣忎竴鍙ヨ瘽锛岄兘浼氬疄鏃跺彂寰€鍚庡彴鎺ュ彛杩涜澶勭悊銆?/p>
+                <h2 class="text-2xl font-bold text-slate-700">前后端已连通！</h2>
+                <p class="text-slate-500 max-w-md">现在发送的每一句话，都会实时发往后台接口进行处理。</p>
             </div>
 
             <div v-for="(msg, index) in messages" :key="index" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
@@ -176,7 +176,7 @@
 
                         <div class="bg-indigo-50/50 p-4 rounded-xl border-l-4 border-indigo-400">
                             <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
-                                <i class="fa-solid fa-lightbulb text-amber-500"></i> AI 鍚嶅笀瑙ｆ瀽
+                                <i class="fa-solid fa-lightbulb text-amber-500"></i> AI 名师解析
                             </h4>
                             <div class="prose prose-sm prose-indigo max-w-none text-slate-700" v-html="renderMarkdown(msg.report.teacher_message)"></div>
                         </div>
@@ -184,7 +184,7 @@
                     <div v-else-if="msg.isQA" class="space-y-4">
                         <div class="bg-indigo-50/50 p-4 rounded-xl border-l-4 border-indigo-400">
                             <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
-                                <i class="fa-solid fa-book-open text-indigo-500"></i> 鏁欐潗瑙ｇ瓟
+                                <i class="fa-solid fa-book-open text-indigo-500"></i> 教材解答
                             </h4>
                             <div class="prose prose-sm prose-indigo max-w-none text-slate-700" v-html="renderMarkdown(msg.content)"></div>
                         </div>
@@ -193,7 +193,7 @@
                     <div v-else-if="msg.isClass" class="space-y-4">
                         <div class="bg-amber-50/80 p-4 rounded-xl border-l-4 border-amber-400">
                             <h4 class="font-bold text-amber-900 text-sm mb-2 flex items-center gap-2">
-                                <i class="fa-solid fa-chalkboard-user text-amber-500"></i> AI 璇惧爞
+                                <i class="fa-solid fa-chalkboard-user text-amber-500"></i> AI 课堂
                             </h4>
                             <div class="prose prose-sm prose-amber max-w-none text-slate-800" v-html="renderMarkdown(msg.content)"></div>
                         </div>
@@ -211,7 +211,7 @@
                     <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
                     <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
                     <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                    <span class="text-xs text-slate-500 ml-2">姝ｅ湪璇锋眰鍚庣 FastAPI锛岃绋嶅€?..</span>
+                    <span class="text-xs text-slate-500 ml-2">正在请求后端 FastAPI，请稍候...</span>
                 </div>
             </div>
             
@@ -227,7 +227,7 @@
                     @input="autoResize"
                     @keydown.enter.prevent="handleEnter"
                     rows="1"
-                    placeholder="杈撳叆鑻辨枃杩涜璇硶璇婃柇锛屾垨杈撳叆涓枃鍚戣€佸笀鎻愰棶 (濡? 浠€涔堟槸琛ㄨ锛?"
+                    placeholder="输入英文进行语法诊断，或输入中文向老师提问 (如: 什么是表语？)"
                     class="flex-1 max-h-[150px] min-h-[40px] bg-transparent py-2.5 px-3 text-slate-800 placeholder-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                 ></textarea>
                 <button 
@@ -246,8 +246,8 @@
             <div class="flex items-center justify-between px-6 md:px-8 py-5 border-b border-slate-100">
                 <div>
                     <p class="text-xs uppercase tracking-[0.28em] text-indigo-500 font-semibold">Dashboard</p>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">涓汉瀛︿範鎶ュ憡</h2>
-                    <p class="text-sm text-slate-500 mt-1">鎶婃渶杩戠Н绱殑閿欓锛屾暣鐞嗘垚涓€鍧楃湅寰楅『鐪肩殑鎴樻崯闈㈡澘銆?/p>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">个人学习报告</h2>
+                    <p class="text-sm text-slate-500 mt-1">把最近积累的错题，整理成一块看得顺眼的战损面板。</p>
                 </div>
                 <button @click="closeDashboard" class="dashboard-close-btn w-11 h-11 rounded-full flex items-center justify-center text-lg">
                     <i class="fa-solid fa-xmark"></i>
@@ -258,20 +258,20 @@
                 <section class="dashboard-total-card rounded-[24px] p-6 md:p-7">
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                         <div>
-                            <p class="text-sm font-medium text-indigo-700">閿欓鎬昏</p>
+                            <p class="text-sm font-medium text-indigo-700">错题总览</p>
                             <div class="flex items-end gap-3 mt-3">
                                 <span class="text-5xl md:text-6xl font-black tracking-tight text-slate-800">{{ dashboardLoading ? '--' : dashboardData.total_errors }}</span>
-                                <span class="text-sm text-slate-500 pb-2">绱璁板綍</span>
+                                <span class="text-sm text-slate-500 pb-2">累计记录</span>
                             </div>
-                            <p class="text-sm text-slate-600 mt-3">杩欎簺涓嶆槸榛戝巻鍙诧紝鏄綘鎶婅娉曞潙涓€涓釜濉钩涔嬪墠鐣欎笅鐨勫潗鏍囥€?/p>
+                            <p class="text-sm text-slate-600 mt-3">这些不是黑历史，是你把语法坑一个个填平之前留下的坐标。</p>
                         </div>
                         <div class="grid grid-cols-2 gap-3 min-w-[220px]">
                             <div class="bg-white/80 rounded-2xl p-4 border border-white/80 shadow-sm">
-                                <p class="text-xs uppercase tracking-[0.22em] text-slate-400">璇硶鐐?/p>
+                                <p class="text-xs uppercase tracking-[0.22em] text-slate-400">语法点</p>
                                 <p class="text-2xl font-bold text-slate-800 mt-2">{{ dashboardLoading ? '--' : dashboardData.radar_data.length }}</p>
                             </div>
                             <div class="bg-white/80 rounded-2xl p-4 border border-white/80 shadow-sm">
-                                <p class="text-xs uppercase tracking-[0.22em] text-slate-400">鏈€杩戞洿鏂?/p>
+                                <p class="text-xs uppercase tracking-[0.22em] text-slate-400">最近更新</p>
                                 <p class="text-sm font-semibold text-slate-700 mt-2 leading-6">{{ latestDashboardTime }}</p>
                             </div>
                         </div>
@@ -281,8 +281,8 @@
                 <section class="dashboard-chart-panel rounded-[24px] p-5 md:p-6">
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
-                            <h3 class="text-lg font-bold text-slate-800">璇硶钖勫急椤归浄杈惧浘</h3>
-                            <p class="text-sm text-slate-500 mt-1">閰嶈壊宸茬粡鏀跺洖涓婚〉闈㈢殑绱摑浣撶郴锛屼笉璁╁浘琛ㄨ嚜宸变贡寮€褰╄櫣銆?/p>
+                            <h3 class="text-lg font-bold text-slate-800">语法薄弱项雷达图</h3>
+                            <p class="text-sm text-slate-500 mt-1">配色已经收回主页面的紫蓝体系，不让图表自己乱开彩虹。</p>
                         </div>
                         <span class="inline-flex items-center rounded-full bg-indigo-50 text-indigo-700 px-3 py-1 text-xs font-semibold">ECharts</span>
                     </div>
@@ -294,7 +294,7 @@
                                 <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce" style="animation-delay: 0.1s"></span>
                                 <span class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-bounce" style="animation-delay: 0.2s"></span>
                             </div>
-                            <p class="text-sm">姝ｅ湪鏁寸悊浣犵殑閿欓杞ㄨ抗...</p>
+                            <p class="text-sm">正在整理你的错题轨迹...</p>
                         </div>
                     </div>
                 </section>
@@ -302,10 +302,10 @@
                 <section class="dashboard-list-panel rounded-[24px] p-5 md:p-6">
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
-                            <h3 class="text-lg font-bold text-slate-800">鏈€杩?3 鏉￠敊棰?/h3>
-                            <p class="text-sm text-slate-500 mt-1">搴曚笅杩欓儴鍒嗙洿鎺ユ部鐢ㄨ亰澶╂皵娉￠€昏緫锛岀渷寰楀畠闀垮緱鍍忓彟涓€涓骇鍝併€?/p>
+                            <h3 class="text-lg font-bold text-slate-800">最近 3 条错题</h3>
+                            <p class="text-sm text-slate-500 mt-1">底下这部分直接沿用聊天气泡逻辑，省得它长得像另一个产品。</p>
                         </div>
-                        <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-semibold">鏈€杩戞洿鏂?/span>
+                        <span class="inline-flex items-center rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-semibold">最近更新</span>
                     </div>
 
                     <div v-if="dashboardError" class="dashboard-empty rounded-2xl p-6 text-sm text-slate-600">
@@ -313,7 +313,7 @@
                     </div>
 
                     <div v-else-if="!dashboardLoading && dashboardData.recent_errors.length === 0" class="dashboard-empty rounded-2xl p-6 text-sm text-slate-600">
-                        鐩墠杩樻病鏈夐敊棰樻暟鎹€傚厛鍘诲啓鐐瑰彞瀛愶紝璁╃郴缁熸湁鏈轰細鎶撲綇浣犵殑璇硶鐮寸唤銆?
+                        目前还没有错题数据。先去写点句子，让系统有机会抓住你的语法破绽。
                     </div>
 
                     <div v-else class="space-y-5">
@@ -351,7 +351,7 @@
     // 环境路由：
     // 1. 本地开发：localhost / 127.0.0.1 / file:// 直连本地 FastAPI
     // 2. 生产环境：统一指向 Render 后端
-    const CLASS_COMPLETED_HINT = "鐜板湪閫€鍑哄井璇炬ā寮忓挴~";
+    const CLASS_COMPLETED_HINT = "现在退出微课模式咯~";
     const LOCAL_API_BASE_URL = "http://127.0.0.1:8000";
     const PROD_API_BASE_URL = "https://ai-english-teacher-o63p.onrender.com";
 
@@ -391,19 +391,19 @@
                 radar_data: [],
                 recent_errors: []
             });
-            const latestDashboardTime = ref('鏆傛棤璁板綍');
+            const latestDashboardTime = ref('暂无记录');
             let radarChart = null;
             let radarResizeFrame = null;
             let radarResizeObserver = null;
-            // 馃専 璇诲彇鏈湴灏忎粨搴擄細濡傛灉鏈夊巻鍙茶褰曞氨鍔犺浇锛屾病鏈夊氨涓虹┖鏁扮粍
+            // 🌟 读取本地小仓库：如果有历史记录就加载，没有就为空数组
             const savedHistory = localStorage.getItem('aiTeacherChatHistory');
             const messages = ref(savedHistory ? JSON.parse(savedHistory) : []);
-            // 馃専 寮€鍚嚜鍔ㄥ瓨妗ｉ浄杈撅細鍙 messages 鍙戠敓浠讳綍鍙樺寲锛岀珛鍒诲啓杩涚‖鐩橈紒
+            // 🌟 开启自动存档雷达：只要 messages 发生任何变化，立刻写进硬盘！
             watch(messages, (newVal) => {
                 localStorage.setItem('aiTeacherChatHistory', JSON.stringify(newVal));
-            }, { deep: true }); // deep: true 鎰忔€濇槸娣卞害鐩戝惉锛岃繛鏁扮粍閲岄潰鏌愪釜灞炴€у彉浜嗕篃鑳藉療瑙夊埌
+            }, { deep: true }); // deep: true 意思是深度监听，连数组里面某个属性变了也能察觉到
             
-            // 馃専 缃戦〉鍒氬姞杞藉畬鏃讹紝濡傛灉鍙戠幇鏈夊巻鍙茶褰曪紝鑷姩婊氬姩鍒版渶搴曢儴
+            // 🌟 网页刚加载完时，如果发现有历史记录，自动滚动到最底部
             const scheduleRadarResize = () => {
                 if (!radarChart) return;
 
@@ -444,7 +444,7 @@
                     if (!raw) return null;
                     return JSON.parse(raw);
                 } catch (error) {
-                    console.warn('鈿狅笍 Dashboard 缂撳瓨璇诲彇澶辫触锛屽凡蹇界暐锛?, error);
+                    console.warn('⚠️ Dashboard 缓存读取失败，已忽略：', error);
                     return null;
                 }
             };
@@ -453,7 +453,7 @@
                 try {
                     localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(payload));
                 } catch (error) {
-                    console.warn('鈿狅笍 Dashboard 缂撳瓨鍐欏叆澶辫触锛屽凡蹇界暐锛?, error);
+                    console.warn('⚠️ Dashboard 缓存写入失败，已忽略：', error);
                 }
             };
 
@@ -480,16 +480,16 @@
                 }
             });
             const isInClass = ref(false); 
-            // 馃専 鏂板锛歁arkdown 缈昏瘧鍣?
+            // 🌟 新增：Markdown 翻译器
             const renderMarkdown = (text) => {
                 if (!text) return '';
                 return marked.parse(text);
             };
 
             const formatDashboardTime = (isoString) => {
-                if (!isoString) return '鏆傛棤璁板綍';
+                if (!isoString) return '暂无记录';
                 const parsed = new Date(isoString);
-                if (Number.isNaN(parsed.getTime())) return '鏃堕棿鏈煡';
+                if (Number.isNaN(parsed.getTime())) return '时间未知';
                 return parsed.toLocaleString('zh-CN', {
                     month: '2-digit',
                     day: '2-digit',
@@ -502,7 +502,7 @@
                 const recent = dashboardData.value.recent_errors || [];
                 latestDashboardTime.value = recent.length > 0
                     ? formatDashboardTime(recent[0].created_at)
-                    : '鏆傛棤璁板綍';
+                    : '暂无记录';
             };
 
             const normalizeDashboardPayload = (payload) => ({
@@ -548,7 +548,7 @@
                                 left: 'center',
                                 top: '42%',
                                 style: {
-                                    text: '杩樻病鏈夊彲瑙嗗寲鏁版嵁',
+                                    text: '还没有可视化数据',
                                     fill: DASHBOARD_PALETTE.ink,
                                     fontSize: 18,
                                     fontWeight: 700
@@ -559,7 +559,7 @@
                                 left: 'center',
                                 top: '52%',
                                 style: {
-                                    text: '鍏堝幓鍐欏嚑鍙ヨ嫳璇紝璁╅敊棰樻湰鏈変笢瑗垮彲鐢汇€?,
+                                    text: '先去写几句英语，让错题本有东西可画。',
                                     fill: DASHBOARD_PALETTE.muted,
                                     fontSize: 13
                                 }
@@ -589,7 +589,7 @@
                             color: DASHBOARD_PALETTE.ink
                         },
                         extraCssText: 'box-shadow: 0 16px 40px rgba(15,23,42,0.12); border-radius: 14px;',
-                        formatter: () => radarItems.map(item => `${item.name}锛?{item.value}`).join('<br>')
+                        formatter: () => radarItems.map(item => `${item.name}：${item.value}`).join('<br>')
                     },
                     radar: {
                         radius: '60%',
@@ -628,7 +628,7 @@
                     },
                     series: [
                         {
-                            name: '閿欓鍒嗗竷',
+                            name: '错题分布',
                             type: 'radar',
                             symbol: 'circle',
                             symbolSize: 8,
@@ -647,7 +647,7 @@
                             data: [
                                 {
                                     value: radarItems.map(item => Number(item.value) || 0),
-                                    name: '閿欓鍒嗗竷'
+                                    name: '错题分布'
                                 }
                             ]
                         }
@@ -660,7 +660,7 @@
                 isDashboardOpen.value = true;
                 dashboardLoading.value = true;
                 dashboardError.value = '';
-                latestDashboardTime.value = '鍔犺浇涓?..';
+                latestDashboardTime.value = '加载中...';
 
                 const cachedPayload = loadDashboardCache();
                 if (cachedPayload) {
@@ -680,9 +680,9 @@
                     applyDashboardData(freshPayload);
                     saveDashboardCache(freshPayload);
                 } catch (error) {
-                    console.error('鉂?Dashboard 鏁版嵁鍔犺浇澶辫触锛?, error);
+                    console.error('❌ Dashboard 数据加载失败：', error);
                     if (!cachedPayload) {
-                        dashboardError.value = '瀛︿範鎶ュ憡鍔犺浇澶辫触锛岃妫€鏌ュ悗绔帴鍙ｆ垨鏁版嵁搴撹繛鎺ャ€?;
+                        dashboardError.value = '学习报告加载失败，请检查后端接口或数据库连接。';
                         syncDashboardMeta();
                     }
                 } finally {
@@ -739,7 +739,7 @@
                 }
 
                 if (!response.body) {
-                    throw new Error('鍝嶅簲浣撲负绌猴紝鏃犳硶璇诲彇娴佸紡鍐呭');
+                    throw new Error('响应体为空，无法读取流式内容');
                 }
 
                 const reader = response.body.getReader();
@@ -787,7 +787,7 @@
                 }
 
                 if (!response.body) {
-                    throw new Error('鍝嶅簲浣撲负绌猴紝鏃犳硶璇诲彇鍒嗘瀽娴?);
+                    throw new Error('响应体为空，无法读取分析流');
                 }
 
                 const reader = response.body.getReader();
@@ -814,7 +814,7 @@
 
                     const startIndex = buffer.indexOf(ANALYZE_META_START);
                     if (startIndex === -1 || startIndex > endIndex) {
-                        throw new Error('鍒嗘瀽娴?Meta 鍒嗛殧绗﹀紓甯?);
+                        throw new Error('分析流 Meta 分隔符异常');
                     }
 
                     const metaJson = buffer.slice(startIndex + ANALYZE_META_START.length, endIndex);
@@ -859,7 +859,7 @@
                 tryResolveMeta();
 
                 if (!metaResolved) {
-                    throw new Error('鍒嗘瀽娴佹湭杩斿洖瀹屾暣 Meta 鏁版嵁');
+                    throw new Error('分析流未返回完整 Meta 数据');
                 }
 
                 flushBuffer();
@@ -876,8 +876,8 @@
                 const sortedMarkers = Array.from(markers).sort((a, b) => a - b);
                 const chunks = [];
                 
-                const basicColors = { "涓昏": "bg-red-100 text-red-800", "鏍稿績璋撹": "bg-blue-100 text-blue-800", "瀹捐": "bg-green-100 text-green-800", "瀹氳": "bg-yellow-100 text-yellow-800", "鐘惰": "bg-purple-100 text-purple-800" };
-                const structColors = { "浠嬭瘝鐭": "underline decoration-slate-400 decoration-solid decoration-2 underline-offset-4", "瀹氳浠庡彞": "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "鍚嶈瘝鎬т粠鍙?: "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "闈炶皳璇?涓嶅畾寮?: "underline decoration-teal-400 decoration-wavy decoration-2 underline-offset-4" };
+                const basicColors = { "主语": "bg-red-100 text-red-800", "核心谓语": "bg-blue-100 text-blue-800", "宾语": "bg-green-100 text-green-800", "定语": "bg-yellow-100 text-yellow-800", "状语": "bg-purple-100 text-purple-800" };
+                const structColors = { "介词短语": "underline decoration-slate-400 decoration-solid decoration-2 underline-offset-4", "定语从句": "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "名词性从句": "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "非谓语/不定式": "underline decoration-teal-400 decoration-wavy decoration-2 underline-offset-4" };
 
                 for (let i = 0; i < sortedMarkers.length - 1; i++) {
                     const start = sortedMarkers[i];
@@ -894,15 +894,15 @@
 
                     if (errorMatch) {
                         classList += "bg-red-200 text-red-900 font-bold border-b-2 border-red-500 rounded-sm ";
-                        tooltipLines.push(`鉂?${errorMatch.correction_suggestion}`);
+                        tooltipLines.push(`❌ ${errorMatch.correction_suggestion}`);
                     } else if (basicMatch) {
                         classList += (basicColors[basicMatch.component_type] || "bg-slate-100 text-slate-700") + " rounded px-0.5 mx-[1px] ";
-                        tooltipLines.push(`馃搶 ${basicMatch.component_type}`);
+                        tooltipLines.push(`📌 ${basicMatch.component_type}`);
                     }
 
                     if (structMatch) {
                         classList += (structColors[structMatch.component_type] || "underline") + " ";
-                        tooltipLines.push(`馃摝 ${structMatch.component_type}`);
+                        tooltipLines.push(`📦 ${structMatch.component_type}`);
                     }
 
                     chunks.push({
@@ -918,14 +918,14 @@
             const startClass = async () => {
                 if (isInputLocked.value) return;
 
-                messages.value.push({ role: 'user', content: '馃懆鈥嶐煄?鑰佸笀濂斤紝鎴戝噯澶囧ソ涓婅浜嗭紒' });
+                messages.value.push({ role: 'user', content: '👨‍🎓 老师好，我准备好上课了！' });
                 isInputLocked.value = true;
                 isThinking.value = true;
                 scrollToBottom();
                 try {
                     await streamClassMessage("", "start");
                 } catch (error) {
-                    messages.value.push({ role: 'ai', content: "鉂?鍞ら啋鑰佸笀澶辫触锛岃妫€鏌ュ悗绔€? });
+                    messages.value.push({ role: 'ai', content: "❌ 唤醒老师失败，请检查后端。" });
                 } finally {
                     isInputLocked.value = false;
                     isThinking.value = false;
@@ -933,26 +933,26 @@
                 }
             };
 
-            // 馃憞 鍔犱簡鏄惧井闀滅殑閫€鍑哄嚱鏁?
+            // 👇 加了显微镜的退出函数
             const exitClass = async () => {
                 if (isInputLocked.value) return;
 
                 try {
-                    console.log("姝ｅ湪灏濊瘯鍚戝悗绔彂閫侀€€鍑鸿姹?..");
-                    // 纭繚杩欓噷鐨勬帴鍙ｈ矾寰勫拰 main.py 閲屽畬鍏ㄤ竴鑷达紝涓嶈甯︿换浣曞弬鏁?
+                    console.log("正在尝试向后端发送退出请求...");
+                    // 确保这里的接口路径和 main.py 里完全一致，不要带任何参数
                     await axios.post(API_BASE_URL + '/course/exit');
                     
-                    console.log("鍚庣宸叉垚鍔熷搷搴旈€€鍑鸿姹傦紒");
+                    console.log("后端已成功响应退出请求！");
                     isInClass.value = false;
                     messages.value.push({ 
                         role: 'ai', 
-                        content: '[鍔ㄤ綔锛氬喎绗慮 鎬庝箞锛屽彈涓嶄簡鎴戠殑娈嬮叿璁粌锛屾墦绠楁斁寮冧簡鍚楋紵寰堝ソ锛屽井璇炬ā寮忓叧闂€傜幇鍦ㄨ繘鍏ヨ嚜鐢辨暎婕殑缁冧範妯″紡锛岄殢渚挎墧鐐逛綘鍐欑殑鐮寸儌鍙ュ瓙杩囨潵璁╂垜鎸戝埡鍚с€? 
+                        content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算放弃了吗？很好，微课模式关闭。现在进入自由散漫的练习模式，随便扔点你写的破烂句子过来让我挑刺吧。' 
                     });
                     scrollToBottom();
                 } catch (error) {
-                    // 馃専 杩欎竴鍙ユ瀬鍏跺叧閿紝瀹冧細鍦ㄦ祻瑙堝櫒鐨勬帶鍒跺彴閲屾墦鍗板嚭鐪熸鐨勬鍥狅紒
-                    console.error("鉂?閫€鍑烘姤閿欒鎯咃細", error);
-                    messages.value.push({ role: 'ai', content: "鉂?閫€鍑鸿姹傚け璐ワ紝璇锋寜 F12 鎵撳紑寮€鍙戣€呭伐鍏锋煡鐪?Console 鏃ュ織銆? });
+                    // 🌟 这一句极其关键，它会在浏览器的控制台里打印出真正的死因！
+                    console.error("❌ 退出报错详情：", error);
+                    messages.value.push({ role: 'ai', content: "❌ 退出请求失败，请按 F12 打开开发者工具查看 Console 日志。" });
                 }
             };
 
@@ -992,7 +992,7 @@
                         await readPracticeStreamIntoMessage(text, aiMessageIndex);
                     }
                 } catch (error) {
-                    messages.value.push({ role: 'ai', content: "鉂?璇锋眰澶辫触锛佽妫€鏌ュ悗绔綉缁溿€? });
+                    messages.value.push({ role: 'ai', content: "❌ 请求失败！请检查后端网络。" });
                 } finally {
                     isInputLocked.value = false;
                     isThinking.value = false;
@@ -1005,7 +1005,7 @@
                 isInClass.value = false; 
                 isInputLocked.value = false;
                 isThinking.value = false;
-                localStorage.removeItem('aiTeacherChatHistory'); // 馃挘 褰诲簳娓呯┖鏈湴灏忎粨搴?
+                localStorage.removeItem('aiTeacherChatHistory'); // 💣 彻底清空本地小仓库
             };
 
             return {
@@ -1020,4 +1020,3 @@
 
 </body>
 </html>
-
