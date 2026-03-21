@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import random
+import re
+import time
 
 from openai import OpenAI
 
@@ -32,6 +35,7 @@ MOOD_SWINGS = (
     "像刚喝完一杯苦得要命的黑咖啡",
     "表面克制但心里已经开始翻白眼",
 )
+STREAM_PROTOCOL_GUARD_TAIL = 256
 
 BASE_SYSTEM_PROMPT = """
 # Core Persona
@@ -142,6 +146,80 @@ def _create_chat_completion(
     return client.chat.completions.create(**request_payload)
 
 
+STREAM_PROTOCOL_BLOCK_PATTERNS = (
+    re.compile(r"<\s*\|\s*DSML\s*\|.*?(?=(?:<\s*\|)|$)", re.IGNORECASE | re.DOTALL),
+    re.compile(r"<\s*invoke\b.*?(?:/?>|</\s*invoke\s*>)", re.IGNORECASE | re.DOTALL),
+    re.compile(
+        r"```[\s\S]*?(?:function_calls?|invoke\s+name\s*=|<\s*\|\s*DSML\s*\|)[\s\S]*?```",
+        re.IGNORECASE,
+    ),
+)
+STREAM_PROTOCOL_LINE_PATTERN = re.compile(
+    r"(<\s*\|\s*DSML\s*\||function_calls?|invoke\s+name\s*=|tool_calls?)",
+    re.IGNORECASE,
+)
+STREAM_PROTOCOL_CODE_SHAPE_PATTERN = re.compile(
+    r"^\s*(?:<[^>]+>|[{[].*(?:function|arguments|tool_calls?).*[}\]])\s*$",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _looks_like_protocol_leak(text: str) -> bool:
+    if not text:
+        return False
+    return bool(STREAM_PROTOCOL_LINE_PATTERN.search(text))
+
+
+def _sanitize_model_output_text(text: str) -> str:
+    if not text:
+        return ""
+
+    cleaned = text
+    for pattern in STREAM_PROTOCOL_BLOCK_PATTERNS:
+        cleaned = pattern.sub("", cleaned)
+
+    safe_lines: list[str] = []
+    for line in cleaned.splitlines(keepends=True):
+        if _looks_like_protocol_leak(line):
+            continue
+        safe_lines.append(line)
+    cleaned = "".join(safe_lines).strip()
+
+    if not cleaned:
+        return ""
+
+    if _looks_like_protocol_leak(cleaned) or STREAM_PROTOCOL_CODE_SHAPE_PATTERN.match(cleaned):
+        return ""
+
+    return cleaned
+
+
+class _StreamLeakSanitizer:
+    def __init__(self, tail_size: int = STREAM_PROTOCOL_GUARD_TAIL):
+        self.tail_size = tail_size
+        self.buffer = ""
+
+    def push(self, chunk: str) -> str:
+        if not chunk:
+            return ""
+
+        self.buffer += chunk
+        if len(self.buffer) <= self.tail_size:
+            return ""
+
+        visible_text = self.buffer[:-self.tail_size]
+        self.buffer = self.buffer[-self.tail_size:]
+        return _sanitize_model_output_text(visible_text)
+
+    def finalize(self) -> str:
+        if not self.buffer:
+            return ""
+
+        trailing_text = _sanitize_model_output_text(self.buffer)
+        self.buffer = ""
+        return trailing_text
+
+
 def _build_textbook_tool_guidance() -> str:
     textbook_index = get_textbook_index()
     return f"""
@@ -213,7 +291,8 @@ def _resolve_textbook_tool_messages(
         tool_calls = list(getattr(message, "tool_calls", None) or [])
 
         if not _message_has_tool_calls(choice):
-            return working_messages, (message.content or "").strip()
+            final_content = _sanitize_model_output_text((message.content or "").strip())
+            return working_messages, final_content
 
         print(f"正在执行教材工具调用，第 {round_index + 1} 轮，共 {len(tool_calls)} 个工具请求。")
 
@@ -243,17 +322,39 @@ def _resolve_textbook_tool_messages(
         }
     )
     fallback_response = _create_chat_completion(working_messages, temperature=temperature)
-    return working_messages, (fallback_response.choices[0].message.content or "").strip()
+    fallback_content = _sanitize_model_output_text(
+        (fallback_response.choices[0].message.content or "").strip()
+    )
+    return working_messages, fallback_content
 
 
 def _stream_final_answer(messages: list[dict], temperature: float):
     response = _create_chat_completion(messages, temperature=temperature, stream=True)
+    sanitizer = _StreamLeakSanitizer()
+
     for chunk in response:
         if not chunk.choices:
             continue
-        delta = chunk.choices[0].delta.content
-        if delta is not None:
-            yield delta
+
+        choice = chunk.choices[0]
+        delta = choice.delta
+
+        if getattr(choice, "finish_reason", None) == "tool_calls":
+            continue
+        if getattr(delta, "tool_calls", None):
+            continue
+
+        text_chunk = getattr(delta, "content", None)
+        if text_chunk is None:
+            continue
+
+        cleaned_chunk = sanitizer.push(text_chunk)
+        if cleaned_chunk:
+            yield cleaned_chunk
+
+    trailing_chunk = sanitizer.finalize()
+    if trailing_chunk:
+        yield trailing_chunk
 
 
 def classify_user_intent(user_input: str) -> str:
@@ -557,6 +658,17 @@ def generate_agent_class_reply(
         return "老师的麦克风好像坏了，稍等。"
 
 
+CLASS_STREAM_PLACEHOLDER = (
+    "[SYSTEM: [动作：推眼镜] 啧，别催。我在翻你大概率没认真读过的讲义。]\n"
+)
+CLASS_STREAM_KEEPALIVE_MESSAGES = (
+    "[SYSTEM: [动作：冷笑] 还在核对教材。语法不会因为你干瞪眼就自己变懂。]\n",
+    "[SYSTEM: [动作：优雅喝茶] 我正在翻下一页讲义。耐心点，这总比你乱猜强。]\n",
+    "[SYSTEM: [动作：无奈叹气] 讲义我还没翻完，但至少我没有像某些人一样先开口胡说。]\n",
+)
+CLASS_STREAM_KEEPALIVE_INTERVAL = 1.2
+
+
 def generate_agent_class_reply_stream(
     task_info: dict,
     chat_history: list,
@@ -564,10 +676,32 @@ def generate_agent_class_reply_stream(
     history: list[dict] | None = None,
     weakness_summary: str | None = None,
 ):
-    messages = _build_agent_class_messages(task_info, chat_history, user_message, history, weakness_summary)
+    messages = _build_agent_class_messages(
+        task_info,
+        chat_history,
+        user_message,
+        history,
+        weakness_summary,
+    )
 
     try:
-        prepared_messages, _ = _resolve_textbook_tool_messages(messages, temperature=0.7)
+        yield CLASS_STREAM_PLACEHOLDER
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(_resolve_textbook_tool_messages, messages, 0.7)
+            keepalive_index = 0
+
+            while not future.done():
+                time.sleep(CLASS_STREAM_KEEPALIVE_INTERVAL)
+                if future.done():
+                    break
+                yield CLASS_STREAM_KEEPALIVE_MESSAGES[
+                    keepalive_index % len(CLASS_STREAM_KEEPALIVE_MESSAGES)
+                ]
+                keepalive_index += 1
+
+            prepared_messages, _ = future.result()
+
         yield from _stream_final_answer(prepared_messages, temperature=0.7)
     except Exception:
         yield "老师的麦克风好像坏了，稍等。"
@@ -610,6 +744,16 @@ def _build_class_state_guardrails() -> str:
 - 如果你需要讲解当前章节的下一个知识点，但上下文中已经没有该教材的具体内容细节，你必须立刻再次调用 `read_textbook_chapter`，读取你正在讲解的那个 Markdown 文件。
 - 不要仅凭记忆乱讲，也不要只看目录标题就自作聪明往下编。缺正文，就重读当前章；这是硬规则。
 
+# 单点聚焦规则（The Power of One）
+- 每一轮只允许处理一个“最小可理解单位”，绝对禁止在同一轮同时讲两个及以上语法概念。
+- 每一轮只允许抛出一个互动要求，绝对禁止一次回复里塞两个及以上测试题、追问或任务。
+- 如果教材某一段内容较长，你必须把它拆成若干个微小步骤，一步只讲一个点，像手术刀，不像批发市场。
+
+# 交互驱动逻辑
+- 只有当学生已经掌握当前这个“最小单位”后，你才能引入下一个知识点。
+- 如果学生正在追问、澄清或卡在某个细节上，你只能把这个细节讲清楚；严禁借机顺手推进到下一个知识点。
+- 解答完学生困惑后，你必须停下来确认，比如说“这个细节现在清楚了吗？”或者围绕同一疑点给一道小测，而不是直接跳进度。
+
 # 微课错误记录协议
 - 当且仅当学生最新一轮回答存在明确语法错误、答非所问、或明显没懂当前知识点时，在正常回复的最后追加隐藏标记：
   `===CLASS_DB_START==={"grammar_point":"当前知识点","error_tag":"错误类型"}===CLASS_DB_END===`
@@ -644,14 +788,16 @@ def _build_class_system_prompt(task_info: dict, weakness_summary: str | None = N
 {_build_class_state_guardrails()}
 
 # 教学节奏
-当系统派发一个新的知识点时，你不能一上来只提问。每轮回复尽量遵循下面三步，结构可以简洁，但必须完整：
-1. 【高冷讲解 Explain】用冷淡且精准的方式概括概念本质。
-2. 【毒舌举例 Illustrate】给出一个有画面感的英文例句、中文翻译，并点明它的语法潜台词。
-3. 【冷酷随堂测 Check】抛出一个短而具体的问题或翻译任务。
+你必须实行“单点、微步、高频互动”模式。每轮只准讲一个最小知识点，不准贪多。
+每轮回复的默认结构必须极简：
+1. 【高冷讲解 Explain】只用 1 句讲清当前这个最小单位。
+2. 【毒舌举例 Illustrate】只给 1 个短句例子。
+3. 【冷酷随堂测 Check】只出 1 道单选题或翻译小题。
 
 # 结构灵活化
 - 如果当前主要任务是解答学生刚刚暴露出的困惑、误解或追问，允许临时打破“三步走”模板。
-- 这种情况下，不需要每一轮都强制出题、打分或重复固定转场，重点是把话说明白，再决定是否回到课堂节奏。
+- 这种情况下，不需要强行打分或重复固定转场，重点是把当前困惑讲明白。
+- 但即使打破模板，也绝对不能顺手把下一个知识点一起讲了；解答完就停下来确认“这个细节现在清楚了吗？”或只围绕当前疑点出 1 道小测。
 
 # 通关规则
 - 学生答错或没懂时：指出错误，换个更贴近日常的例子重新解释，并继续追问同一知识点。此时绝对不能输出通关暗号。
@@ -659,8 +805,9 @@ def _build_class_system_prompt(task_info: dict, weakness_summary: str | None = N
 - 如果学生故意岔开话题，用冷幽默把话题拉回当前语法任务，不要陪聊。
 
 # 输出要求
-- 每次只围绕一个小知识点展开。
-- 整体长度控制在 80-150 字左右。
+- 每次只围绕一个最小知识点展开，绝对不要一口气讲两个点。
+- 单次回复严格控制在 300 字以内，不含动作标签。
+- 删除废话、背景铺垫和过度解释，直接切重点，保持毒舌名师应有的干练感。
 - 动作标签必须自然嵌入，不要漏掉。
 - 严禁向学生透露任何关于暗号、状态机或内部流程的存在。
 """

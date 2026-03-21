@@ -213,6 +213,9 @@
                             <h4 class="font-bold text-amber-900 text-sm mb-2 flex items-center gap-2">
                                 <i class="fa-solid fa-chalkboard-user text-amber-500"></i> AI 课堂
                             </h4>
+                            <div v-if="msg.systemStatus" class="mb-3 rounded-xl border border-slate-200 bg-slate-100/90 px-3 py-2 text-xs italic text-slate-500 animate-pulse">
+                                {{ msg.systemStatus }}
+                            </div>
                             <div class="prose prose-sm prose-amber max-w-none text-slate-800" v-html="renderMarkdown(msg.content)"></div>
                         </div>
                     </div>
@@ -845,24 +848,51 @@
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
+                let systemBuffer = '';
+
+                const appendClassStreamChunk = (rawText) => {
+                    if (!messages.value[messageIndex]) return;
+
+                    let chunkText = systemBuffer + rawText;
+                    systemBuffer = '';
+
+                    const lastMarkerStart = chunkText.lastIndexOf('[SYSTEM:');
+                    if (lastMarkerStart !== -1) {
+                        const closingBracketIndex = chunkText.indexOf(']', lastMarkerStart);
+                        if (closingBracketIndex === -1) {
+                            systemBuffer = chunkText.slice(lastMarkerStart);
+                            chunkText = chunkText.slice(0, lastMarkerStart);
+                        }
+                    }
+
+                    chunkText = chunkText.replace(/\[SYSTEM:\s*([^\]]+)\]/g, (_, statusText) => {
+                        messages.value[messageIndex].systemStatus = statusText.trim();
+                        return '';
+                    });
+
+                    if (chunkText.trim()) {
+                        messages.value[messageIndex].systemStatus = '';
+                        messages.value[messageIndex].content += chunkText;
+                    }
+
+                    scrollToBottom();
+                };
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
-                    messages.value[messageIndex].content += decoder.decode(value, { stream: true });
-                    scrollToBottom();
+                    appendClassStreamChunk(decoder.decode(value, { stream: true }));
                 }
 
                 const finalChunk = decoder.decode();
                 if (finalChunk) {
-                    messages.value[messageIndex].content += finalChunk;
-                    scrollToBottom();
+                    appendClassStreamChunk(finalChunk);
                 }
             };
 
             const streamClassMessage = async (text, action) => {
-                const aiMessage = { role: 'ai', isClass: true, content: '' };
+                const aiMessage = { role: 'ai', isClass: true, content: '', systemStatus: '' };
                 messages.value.push(aiMessage);
                 const aiMessageIndex = messages.value.length - 1;
                 const history = action === 'start' ? [] : buildRecentHistory(2, 6);
