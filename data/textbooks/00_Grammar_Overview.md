@@ -1,135 +1,529 @@
-# 英语语法大纲：以动词为核心的底层逻辑
-为什么要学习英语语法呢？是为了正确的造句。绝大多数句子表达的含义其实只有一个：“什么+怎么样”。“什么”和“怎么样”分别对应了最基本的两个句子成分(Clause elements):主语(subject)、谓语(predicate), 即“主语+谓语”的形式，谓语有一个核心的动词，称为**谓语动词**， 具体分为5类：能够独立完成的动词、有一个动作的承受者的动词、有2个动作承受者的动词、有一个动作承受者（但需要补充）的动词、并非表示特定动作，而是将动词后的信息赋予动词前的动词,表示连接状态。
+# 英语语法总览：AI-Native Knowledge Base
 
-## 第一节：英语语法的引擎——动词 (Verb)
-英语语法的核心在于动词，可以说，理解了动词就理解了英语的大部分语法。英语具体有以下5类动词：
-### 1. 能够独立完成动作的动词 主谓结构(SV - Subject + Verb)
-- 经典例句：The birds fly. 鸟儿飞。
-- 概念说明: 没有动作承受者的动词，称为**不及物动词(intransitive verbs)**，对应的句子结构就是：主语 + 不及物动词。
+本文件是直播间英语语法总控台版本，不讲老派长篇说明，只保留 AI 老师最需要的三件事：板书公式、抓错火力点、人设触发台词。
 
-### 2. 有1个动作的承受者的动词 主谓宾结构(SVO - Subject + Verb + Object)
-- 经典例句：I love apples. 我喜欢苹果。
-- 概念说明: 如果只说"I love"，这个句子的句意是不完整的，对于"love“这样的动词，没有承受者就没有实际的意义，这类动词称为**及物动词(transitive verbs)**，对应的动作的承受者，称为**宾语(object)**。对应的句子结构就是：主语 + 及物动词 + 宾语。此外，相对于第3类动词，只有一个宾语的及物动词也可以称之为**单及物动词(monotransitive verbs)**，对应的句子结构也可以表达为：主语 + 单及物动词 + 宾语。
+## 第一节：五大基本句型
 
-### 3. 有2个动作承受者的动词 主谓双宾结构 (SVOO - Subject + Verb + Indirect Object + Direct Object)
-- 经典例句：Jack teaches me English. 杰克教我英语。
-- 概念说明: 这里teaches作为动词，教授的是英语，但是教授的对象是me, 在英语语法中，我们把这两个动词的承受者分别称为**直接宾语(direct object)**和**间接宾语(indirect object)**。 如果只说"Jack teaches English."句子事实上已经完整了，"English"在这个句子中作为直接宾语；但如果说"Jack teaches you."在没有上下文的情况下，读者会觉得这个句子缺了些什么，在这里"you”作为间接宾语。综上，"teach"在这里被称为**双及物动词(ditransitive verbs)**， 对应的句子结构：主语 + 双及物动词 + 间接宾语 + 直接宾语。
+### 主谓结构 (SV Pattern)
+**【白板核心公式】**
+- `[WHITEBOARD: 主谓结构 SV = Subject + Intransitive Verb]`
+- `[WHITEBOARD: 句子最低配 = 谁/什么 + 做什么]`
 
-### 4. 有1个动作承受者（但需要补充）的动词 主谓宾补结构 (SVOC - Subject + Verb + Object + Object Complement)
-- 经典例句：Mary considers Tom smart. 玛丽认为汤姆聪明。
-- 概念说明: 这句话虽然只有一个动作承受者"Tom", 但如果只说"Marry considers Tom."会觉得话没有说完，并且"smart"也不同于第3类中的作为双宾语中的一个宾语，因为"smart"没有承受"considers"这个动作。 事实上，对于句中的"considers"，必须要对动作的承受者"Tom"补充信息，这样句子才会完整，而对于这个补充的信息，在语法上称之为**补足语/补语(complement)**， 更准确的名称是**宾语补语(object complement)**。对于这类需要补语的动词，我们称为**复杂及物动词(complex-transitive Verbs)**, 对应的句子结构：主语 + 复杂及物动词 + 宾语 + 宾语补语。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The bird flies the sky.`
+- ✅ 正确标准答案：`The bird flies.`
+- 补充说明：`fly` 在这个句子里是不及物动词，不直接带宾语。
 
-### 5. 并非表示特定动作，而是将动词后的信息赋予动词前的动词,表示连接状态 主系表结构 (SVP / SVC - Subject + Linking Verb + Predicative / Subject Complement)
-- 经典例句：
-- Jacob is tall. 雅各布长得高。
-- Smith is in the room. 史密斯在房间里。
-- Jim looks very sad. 吉姆看起来很伤心。
-- 概念说明: 上述3个例句的含义是：把"is"后的"tall"的含义赋予给前面的"Jacob"; "in the room"的状态赋予给"Smith"；把"looks"后的"very sad"的状态赋予给"Jim"。也可以理解为"Jacob = tall"; "Smith = in the room"；"Jim = very sad"。对于这类赋予主语某种状态的动词，称为**连系动词(Linking Verbs)**或**系动词**， 系动词后的补充信息称为**主语补语(Subject Complement)**或**表语(predicative)**。 对应的句子结构：主语 + 系动词 +主语补语（表语）。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“你这句像给独居主播硬塞室友。`fly` 本来就能自己飞，别乱塞宾语，语法不是合租市场。”
 
-### 总结
-- 尽管上述是对英语动词的讨论，但是上述动词所对应的**简单句**的类型几乎覆盖了英语所有的句子，此后所有的句子只是在这5种基本句型上进行组合而已。事实上，以上5种句型的本质就是在分类讨论有哪几种动词，以及这些动作需要什么样的动作承受者才能表达完整的句意，也就是在表达"什么 + 怎么样"这个基本句型。
+### 主谓宾结构 (SVO Pattern)
+**【白板核心公式】**
+- `[WHITEBOARD: 主谓宾 SVO = Subject + Transitive Verb + Object]`
+- `[WHITEBOARD: 及物动词 = 动作必须落到对象上]`
 
-## 第二节：句子成分(Clause Elements)
-**句子成分(Clause Elements)**是构成句子的功能单位，它关注的不是这个词本身是什么（如名词、代词、形容词等等），而是这个词在具体的句子中承担了什么任务、发挥了什么作用。英语中在句子成分一般包括以下内容：
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I enjoy.`
+- ✅ 正确标准答案：`I enjoy the stream.`
+- 补充说明：`enjoy` 通常需要宾语，不能一句话说一半就跑。
 
-### 句子成分的介绍：
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`enjoy` 后面没有对象，就像你说‘我很喜欢’，然后人没了。喜欢什么，讲完整，别逼我替你脑补。”
 
-1. **主语(Subject)** : 动作的发出者，或被描述的对象;
+### 主谓双宾结构 (SVOO Pattern)
+**【白板核心公式】**
+- `[WHITEBOARD: 主谓双宾 SVOO = Subject + Verb + Indirect Object + Direct Object]`
+- `[WHITEBOARD: 双宾顺序 = 人在前，物在后]`
 
-2. **谓语动词/限定动词(Predicate Verb / Finite Verb)**: 句子的核心部分，表示主语的动作或状态;
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The teacher gave a book me.`
+- ✅ 正确标准答案：`The teacher gave me a book.`
+- 补充说明：间接宾语通常先放“人”，直接宾语后放“物”。
 
-3. **宾语(Object)**: 动作的直接或间接承受者;
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“双宾顺序都能排反，你是把作业直接砸人脸上了。英语默认先给‘谁’，再给‘什么’，别直播倒放。”
 
-4. **宾语补语(object complement)**: 补充说明宾语，使其意思完整；
+### 主谓宾补结构 (SVOC Pattern)
+**【白板核心公式】**
+- `[WHITEBOARD: 主谓宾补 SVOC = Subject + Verb + Object + Object Complement]`
+- `[WHITEBOARD: 宾补 = 对宾语状态/身份/结果的补充]`
 
-5. **主语补语(Subject Complement)**: 补充说明主语，使其意思完整；
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`We consider Tom.`
+- ✅ 正确标准答案：`We consider Tom smart.`
+- 补充说明：像 `call / make / find / consider` 这类结构里，很多时候宾语后还要补足身份、状态或结果。
 
-6. **定语(Attributive)**: 修饰主语或宾语 
-- 经典例句：The strong man ate a large hamburger. 这里"strong"是主语"man"的定语， "large"是"hamburger"的定语。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“你这句像话说一半就下播。`consider Tom` 之后不说他怎么样，观众只能干瞪眼，等你把判断补完。”
 
-7. **状语(Adverbial)**: 修饰动词、形容词、副词或整个句子（表示时间、地点、原因、方式等）；
-- 经典例句：The dog eats quickly. "quickly"修饰动词"eats";
-           The new AI model is incredibly smart. "incredibly"修饰"smart".
-           He solved the coding problem surprisingly quickly."surprisingly"修饰"quickly".
-           Because the server crashed, we lost all our chat history."Because the server crashed"作为原因状语从句.
+### 主系表结构 (SVC / SVP Pattern)
+**【白板核心公式】**
+- `[WHITEBOARD: 主系表 SVC = Subject + Linking Verb + Predicative]`
+- `[WHITEBOARD: 系动词 ≠ 做动作；系动词 = 连接主语和状态]`
 
-8. **同位语(Appositive)**: 相当于再重复一遍主语或宾语，有强调、解释的含义。
-- 经典例句：Mackle, a rocket scientist, is very famous. 这里的"a rocket scientist"
-           作为同位语，其实是对主语"Mackle"重复和解释。
-           I really enjoyed my trip to Kyoto, the ancient capital of Japan. 此处的"the ancient capital of Japan"作为同位语，其实是对宾语"Kyoto"重复和解释。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She is happily.`
+- ✅ 正确标准答案：`She is happy.`
+- 补充说明：表语位置通常需要名词、形容词、介词短语等，不要乱塞副词。
 
-以上涵盖了英语**简单句(Simple Sentences)**中所有可能出现的句子成分。需要注意的是，“插入语”和同位语的区别，如："This book, I think(插入语), is very interesting." 可以看到插入语"I think"是独立的，并不起到对主语或宾语强调、解释的作用，事实上，插入语不做句子成分。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`is` 后面接状态，不是接你随手乱丢的词。`happy` 是状态，`happily` 是方式，别把表语区当垃圾桶。”
 
-### 简单句、复合句（并列句）、复杂句
+### 五大句型总览 (Five Core Sentence Patterns)
+**【白板核心公式】**
+- `[WHITEBOARD: 五大句型 = SV / SVO / SVOO / SVOC / SVC]`
+- `[WHITEBOARD: 判断句型先看动词，再看后面缺谁]`
 
-1. **简单句(Simple Sentences)**： 句子里只有一套完整的主谓结构（即只有一个核心谓语动词）。上一节讨论的五大基本句型（SV, SVO, SVOO, SVOC, SVP）全部都属于简单句。
-- 经典例句：The cute bird flies fast in the sky. 这只可爱的小鸟在天空飞得很快。
-- 结构解析：虽然句子有点长，但只有一个动作发出者（bird）和一个核心动作（flies）。它是经典的 SV（主谓）结构，附加了定语（cute）和状语（fast, in the sky）。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I made him.` 
+- ✅ 正确标准答案：`I made him cry.`
+- 补充说明：先判断动词是不是需要宾语、双宾或补语，别闭眼拼词。
 
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“英语句型不是抽卡。先看动词胃口有多大，再决定后面喂几个成分，不然你每句都像在赌概率。”
 
-2. **复合句/并列句(Compound Sentences)**: 由两个或两个以上的简单句，通过并列连词（如 and, but, or, so）连接而成。这两个简单句地位完全平等，谁也不从属于谁。就像两个独立的单间，中间用一扇门（连词）打通了。
-- 经典例句：I love apples, but my brother loves bananas. 我喜欢苹果，但我弟弟喜欢香蕉。
-- 结构解析：简单句 A：I love apples (SVO)，连词：but (表示转折关系)，简单句 B：my brother loves bananas (SVO)，两套主谓结构完全独立，去掉 but 也能各自成为完整的句子。
+## 第二节：句子成分
 
-3. **复杂句 / 主从复合句 (Complex Sentence)**: 包含一个**主句（Main Clause）**和一个或多个**从句（Subordinate Clause）**。从句本质上说是将一个简单句进行修改，并用作另一个句子的句子成分（比如充当主句的宾语、定语或状语，谓语动词除外）。从句必须由从属连词（如 that, because, which, if）引导。
-- 经典例句：I know [that you love apples]. 我知道 "你喜欢苹果" 。
-- 结构解析：主句骨架：I (主语) + know (谓语动词) + "一整个从句" (宾语), 从属连词：that (把后面的句子降级为从句), 从句内部：you (从句的主语) + love (从句的谓语) + apples (从句的宾语), 这就是“宾语从句”, 一整个句子 "you love apples" 充当了主句动词 know 的宾语。
+### 主语 (Subject)
+**【白板核心公式】**
+- `[WHITEBOARD: 主语 = 动作发出者 / 被描述对象]`
+- `[WHITEBOARD: 找主语：先找谓语，再问“谁/什么”]`
 
-## 第三节：词性/词类(Part of speech)
-语法中的**词性(Part of speech)**包括：
-1. **名词(nouns)**: 表示人、事物、地点、现象或抽象概念的名称。它是句子中最常充当主语和宾语的词性；
-- 经典例句：Information is power. 信息就是力量。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`In the chat sends messages.`
+- ✅ 正确标准答案：`The viewers in the chat send messages.`
+- 补充说明：地点短语不能直接顶替主语，句子里要有真正的“谁/什么”。
 
-2. **冠词(articles)**: 常用于名词前，英语里只有三个（a, an, the）。用来限定名词是“泛指（随便一个）”还是“特指（特定的那个）；
-- 经典例句：I saw a cat; the cat was sleeping. 我看见了一只猫；那只猫在睡觉。
-- 语法解析：第一次提到用 a（泛指某一只猫），第二次提到这只特定的猫，就要用 the（特指）。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“地点不是人，`in the chat` 不会自己发弹幕。主语都找不到，你这句像直播间断网后的系统残响。”
 
-3. **代词(pronouns)**: 用于替代名词（或名词性短语），目的是为了避免在句子里啰嗦地重复同一个名词；
-- 经典例句：Tom is my friend, and he likes coding. 汤姆是我的朋友，他喜欢编程。
-- 语法解析：这里的 he 就是代词，完美替代了前面的名词 Tom。
+### 谓语动词 / 限定动词 (Predicate Verb / Finite Verb)
+**【白板核心公式】**
+- `[WHITEBOARD: 谓语动词 = 句子核心发动机]`
+- `[WHITEBOARD: 一个简单句核心通常只有一个限定动词]`
 
-4. **形容词(adjectives)**: 专门用来修饰名词或代词，说明人或事物的性质、特征或状态。（通常翻译为“...的”）；
-- 经典例句：It is a powerful model. 它是一个强大的模型。
-- 语法解析：powerful 紧紧贴在名词 model 前面，修饰它的特征。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She very strict.`
+- ✅ 正确标准答案：`She is very strict.`
+- 补充说明：英语句子通常不能裸摆状态词，限定动词必须到位。
 
-5. **数词(numerals)**: 表示数量的多少（基数词，如 one, two）或者顺序的先后（序数词，如 first, second）；
-- 经典例句：He won the first prize with two projects. 他用两个项目赢得了第一名。
-- 语法解析：first 表示顺序，two 表示绝对数量。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“没有谓语，你这句就只是几个单词站在路边发呆。英语不是词语拼盘，发动机得装上。”
 
-6. **副词(adverbs)**: 英语里的“万能修饰语”。它可以修饰动词、形容词、其他副词，甚至整个句子。通常用来表示时间、地点、程度、方式等。（通常翻译为“...地”）；
-- 经典例句：The system runs extremely fast. 系统运行得极其快。
-- 语法解析：extremely 修饰副词 fast（说明有多快），而 fast 修饰动词 runs（说明跑的方式）。
+### 宾语 (Object)
+**【白板核心公式】**
+- `[WHITEBOARD: 宾语 = 动作承受者 / 指向目标]`
+- `[WHITEBOARD: 及物动词后常问：做了什么？对谁？]`
 
-7. **介词(prepositions)**: 一种虚词，不能独立充当句子成分。它必须放在名词或代词前面，用来表示该词与句中其他词在时间、空间或逻辑上的关系；
-- 经典例句：We traveled to Japan in spring. 我们在春天去日本旅行了。
-- 语法解析：to 表示方向关系（去哪里），in 表示时间关系（在什么季节）。它们后面都紧跟着名词。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I discussed about the homework.`
+- ✅ 正确标准答案：`I discussed the homework.`
+- 补充说明：`discuss` 本身可直接带宾语，不要多加 `about`。
 
-8. **叹词(interjections)**: 表示说话时的强烈情感（如惊讶、喜悦、痛苦等）。它在结构上是完全独立的，不与其他句子成分发生语法关系；
-- 经典例句：Wow! That's amazing! 哇哦！那太惊人了！
-- 语法解析：Wow 纯粹是为了抒发情绪，拿掉它也不会影响后面句子的完整性。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“有些动词已经自带通道，你还额外挂个介词，像给高铁再绑一辆自行车，纯属拖慢句子。”
 
-9. **连词(conjunctions)**: 起“粘合剂”的作用，用来连接词与词、短语与短语，或者句子与句子；
-- 经典例句：I like apples, but she likes oranges. 我喜欢苹果，但是她喜欢橘子。
-- 语法解析：but 作为并列连词，完美连接了前后两个独立的简单句。
+### 宾语补语 (Object Complement)
+**【白板核心公式】**
+- `[WHITEBOARD: 宾语补语 = Object + 补充结果/身份/状态]`
+- `[WHITEBOARD: 常见结构：make/keep/find/call + O + C]`
 
-10. **动词(Verb)**：
-动词在句中作核心时叫**谓语动词/限定性动词(Predicate Verb/Finite Verb)**
- - 描述动作的时间（现在、过去、将来、过去将来）；
- - 描述动作的**状态(Aspect)**（ 一般、完成、进行、完成进行）上述两方面的作用合称为谓语动词的**时态(tense)**。理论上，时态的自由排列有16种组合；
- - 表示动作的假设、情感，语法上称为谓语动词的**语气(mood)** 包括虚拟语气、陈述语气、祈使语气。时间、状态、语气合称为**时体气(TAM)**；
- - 表明主语与动作之间的逻辑关系：**主动语态 (Active Voice)**主语是动作的发出者；被动语态 (Passive Voice)：主语是动作的承受者；
- - **主谓一致 (Subject-Verb Agreement)**：谓语动词的形态必须受到主语的“人称”和“数”的绝对限制（例如第三人称单数加 -s，或者 is/are 的变化）。这是英语动词有别于中文动词的根本特征。
- - **助动词(Auxiliary Verbs)** 英语谓语动词本身往往无法独立完成上述的功能, 需要助动词进行辅助。但是需要注意的是，助动词除了辅助谓语动词（在这个过程中助动词没有实际意义）以外，还可以作为实义动词，具备实际意义，容易导致混乱。助动词可以分为两类：**基本助动词 (Primary Auxiliaries)**：只有三个（be, do, have）。它们就是导致混乱的“罪魁祸首”。它们既可以做完全没有实际意义的助动词（如 I do not know，He has gone），也可以做有实际意义的实义动词（如 I do my homework，He has an apple）；**情态助动词 (Modal Auxiliaries)**：如 can, must, may, should。它们本身带有一定的实际词义（如“能够”、“必须”），用来辅助谓语动词表达语气 (Mood)，且它们永远不能单独作谓语，必须和动词原形连用。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The joke made me.`
+- ✅ 正确标准答案：`The joke made me laugh.`
+- 补充说明：某些动词后只写宾语还不够，要补出结果。
 
-这里需要格外注意的是：**句子成分(Clause Elements)**和**词性(Part of speech)**是两个不同的概念，词性是对词汇本身的分类。它关注的是这个词脱离句子独立存在时，它的词汇意义和形态特征，通常查阅词典即可确定。而句子成分是词汇在具体句子结构中所承担的语法任务。它关注的是这个词在这个特定的句子环境中，与其他词语形成了什么结构关系，必须放在具体的句子上下文中才能划定。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`made me` 后面没下文，像你弹幕发到一半突然撤回。宾补不补，意思就瘸着走。”
 
-## 第四节：非谓语动词/非限定动词(Non-finite Verb)
-动词除了充当句子中的谓语动词外，还可以充当主语、宾语、宾语补语、主语补语、定语等成分。此外，非谓语动词可以取代几乎所有的从句，从而简化句子，但这样的动词就失去了描述“时间 (Tense)”和受主语限制的“语气 (Mood)”能力，但它依然保留了描述状态/体 (Aspect) 和语态 (Voice) 的能力（比如 to be doing, having done, to be done）。非谓语动词会以动词不定式、现在分词、动名词、过去分词的形式出现。
-非谓语动词在外观上主要分为以下三种（四类）形式:
-1. **动词不定式 (Infinitive)**：to + 动词原形。常自带“目的”和“将来”的意味。
-2. **动名词 (Gerund)**：动词 + ing。完全把动词当名词用，常表示习惯性或抽象的动作。
-3. **分词 (Participle)**：具有强烈的形容词或副词特性。
-   - **现在分词 (Present Participle)**：动词 + ing。表示“主动”和“正在进行”。
-   - **过去分词 (Past Participle)**：动词的过去分词形式 (done)。表示“被动”和“已经完成”。
+### 主语补语 / 表语 (Subject Complement / Predicative)
+**【白板核心公式】**
+- `[WHITEBOARD: 表语 = 补充主语身份/状态/特征]`
+- `[WHITEBOARD: 主语 + 系动词 + 表语]`
 
-以上，是英语语法的主体框架。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The room is noisily.`
+- ✅ 正确标准答案：`The room is noisy.`
+- 补充说明：系动词后一般接形容词、名词、介词短语等，不接方式副词。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“房间是‘吵的’，不是‘吵闹地’。副词和形容词分不清，难怪你句子总像穿错了别人的皮。”
+
+### 定语 (Attributive)
+**【白板核心公式】**
+- `[WHITEBOARD: 定语 = 修饰名词/代词]`
+- `[WHITEBOARD: 定语回答：什么样的？哪一个？]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She bought a bag red.`
+- ✅ 正确标准答案：`She bought a red bag.`
+- 补充说明：单个形容词作前置定语时通常放在名词前。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“你把 `red` 扔到名词后面，像外卖到了才想起备注不要香菜。英语很多定语要提前排队，别临时插队。”
+
+### 状语 (Adverbial)
+**【白板核心公式】**
+- `[WHITEBOARD: 状语 = 修饰动词 / 形容词 / 副词 / 全句]`
+- `[WHITEBOARD: 状语常管 时间、地点、原因、方式、程度]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He speaks English fluent.`
+- ✅ 正确标准答案：`He speaks English fluently.`
+- 补充说明：修饰动词 `speaks` 要用副词 `fluently`。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“动词旁边该上副词，你却塞形容词。语法岗位都写错了，难怪词也在句子里迷路。”
+
+### 同位语 (Appositive)
+**【白板核心公式】**
+- `[WHITEBOARD: 同位语 = 名词(短语) = 再解释前面的名词]`
+- `[WHITEBOARD: A, B, ... 且 A = B]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Kyoto the ancient capital of Japan is beautiful.`
+- ✅ 正确标准答案：`Kyoto, the ancient capital of Japan, is beautiful.`
+- 补充说明：非限制性同位语通常要用逗号隔开。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“同位语是补充解释，不是贴脸硬撞。该加逗号就加，不然整句像主播连轴播到口条打结。”
+
+### 插入语不作句子成分 (Parenthetical vs Clause Element)
+**【白板核心公式】**
+- `[WHITEBOARD: 插入语 = 说话人态度补充，不算主干成分]`
+- `[WHITEBOARD: 删掉插入语，主干仍成立]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`This game, my opinion, is boring.`
+- ✅ 正确标准答案：`This game, in my opinion, is boring.`
+- 补充说明：插入语是附加说明，不要把它误当主语或表语去拼。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“插入语是旁白，不是主线任务。你把旁白写成句子骨架，剧情当然会塌。”
+
+## 第三节：句子类型
+
+### 简单句 (Simple Sentence)
+**【白板核心公式】**
+- `[WHITEBOARD: 简单句 = 一套主谓骨架 = 1 个核心限定动词]`
+- `[WHITEBOARD: 长句不一定复杂；先数核心谓语]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The cute bird in the tree near my window every morning sings.`
+- ✅ 正确标准答案：`The cute bird in the tree near my window sings every morning.`
+- 补充说明：简单句可以很长，但核心谓语位置不能乱。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“修饰语再多，也别把核心谓语流放到句尾。简单句不是绕口令，别把观众读到断气。”
+
+### 并列句 / 复合句 (Compound Sentence)
+**【白板核心公式】**
+- `[WHITEBOARD: 并列句 = 简单句 A + 并列连词 + 简单句 B]`
+- `[WHITEBOARD: and / but / or / so 两边都要能独立成句]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Because I was tired, but I kept studying.`
+- ✅ 正确标准答案：`I was tired, but I kept studying.`
+- 补充说明：`because` 和 `but` 不是这么乱叠的，一个是从属，一个是并列。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“你这句把两套连接逻辑绑一起，像同时点了加速和刹车。并列句左右平级，别让连词互殴。”
+
+### 主从复合句 / 复杂句 (Complex Sentence)
+**【白板核心公式】**
+- `[WHITEBOARD: 复杂句 = Main Clause + Subordinate Clause]`
+- `[WHITEBOARD: 从句 = 降级后的完整句子，充当主句成分]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I know that she likes apples is true.`
+- ✅ 正确标准答案：`I know that she likes apples.`
+- 补充说明：宾语从句已经完整时，不要再强行拼一个多余谓语。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“从句是嵌进去工作的，不是进来抢戏的。你多塞一个谓语，整句像两位主播抢同一支麦。”
+
+## 第四节：词性 / 词类
+
+### 名词 (Noun)
+**【白板核心公式】**
+- `[WHITEBOARD: 名词 = 人 / 事 / 物 / 地 / 抽象概念]`
+- `[WHITEBOARD: 名词常当主语、宾语、表语]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Beautiful is important in writing.`
+- ✅ 正确标准答案：`Beauty is important in writing.`
+- 补充说明：需要名词位置时，别拿形容词硬顶。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“词性站位都错了，还想句子体面？该上名词的位置请让名词本人来，不要找形容词替班。”
+
+### 冠词 (Article)
+**【白板核心公式】**
+- `[WHITEBOARD: a/an = 泛指一个；the = 特指那个]`
+- `[WHITEBOARD: 第一次提到常用 a/an；再次锁定常用 the]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I saw cat, and cat was sleeping.`
+- ✅ 正确标准答案：`I saw a cat, and the cat was sleeping.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“英语不喜欢裸名词乱跑。第一次出场不给冠词，第二次还不特指，你家猫连身份证都没有吗？”
+
+### 代词 (Pronoun)
+**【白板核心公式】**
+- `[WHITEBOARD: 代词 = 用来替代名词，避免重复]`
+- `[WHITEBOARD: 先有指代对象，再上代词]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`When Jack met Tom, he was nervous.` 
+- ✅ 正确标准答案：`When Jack met Tom, Jack was nervous.`
+- 补充说明：代词如果会造成指代不清，就不要省事省过头。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`he` 指谁？你心里知道，观众不知道。代词是为了省重复，不是为了制造悬疑片。”
+
+### 形容词 (Adjective)
+**【白板核心公式】**
+- `[WHITEBOARD: 形容词 = 修饰名词 / 代词；也可作表语]`
+- `[WHITEBOARD: 典型位置 = adj + n / be + adj]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`This explanation is clearly.`
+- ✅ 正确标准答案：`This explanation is clear.`
+- 补充说明：系动词后作表语要用形容词。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“表语区是形容词工位，不是副词临时停车场。看见 `is` 还乱塞副词，属实不清醒。”
+
+### 数词 (Numeral)
+**【白板核心公式】**
+- `[WHITEBOARD: 数词 = 基数词表数量；序数词表顺序]`
+- `[WHITEBOARD: two = 数量；second = 顺序]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He won the two prize.`
+- ✅ 正确标准答案：`He won the second prize.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“数量和顺序别混。`two` 是两个，`second` 是第二，你这句像把名次表和库存单粘一起了。”
+
+### 副词 (Adverb)
+**【白板核心公式】**
+- `[WHITEBOARD: 副词 = 修饰动词 / 形容词 / 副词 / 全句]`
+- `[WHITEBOARD: 典型问题：怎么做？多么？在何种程度上？]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She sings beautiful.`
+- ✅ 正确标准答案：`She sings beautifully.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“唱得‘美丽’不行，要唱得‘优美地’。副词负责修动作，形容词别跑来跨岗。”
+
+### 介词 (Preposition)
+**【白板核心公式】**
+- `[WHITEBOARD: 介词 + 名词/代词 = 介词短语]`
+- `[WHITEBOARD: 介词负责标关系：时间 / 地点 / 方向 / 逻辑]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`We arrived to the station.`
+- ✅ 正确标准答案：`We arrived at the station.`
+- 补充说明：`arrive` 常搭配 `at/in`，不要机械套 `to`。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“介词搭配不是抽盲盒。`arrive to` 这种错误，像导航都给你指到河里去了。”
+
+### 叹词 (Interjection)
+**【白板核心公式】**
+- `[WHITEBOARD: 叹词 = 情绪喷发词，不参与主干语法]`
+- `[WHITEBOARD: 删掉叹词，句子主干通常还在]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Wow amazing stream!`
+- ✅ 正确标准答案：`Wow! What an amazing stream!`
+- 补充说明：叹词能单独感叹，但后面的句子仍要有正常结构。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“情绪可以先上头，语法不能顺手去世。喊完 `Wow` 之后，后面那句也得像个人话。”
+
+### 连词 (Conjunction)
+**【白板核心公式】**
+- `[WHITEBOARD: 连词 = 连接词、短语、分句]`
+- `[WHITEBOARD: 并列连词连平级；从属连词连主从]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Although he was tired, but he kept working.`
+- ✅ 正确标准答案：`Although he was tired, he kept working.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`although` 和 `but` 别双开。一个让步已经够了，再叠一个，连词都嫌你多。”
+
+### 动词 (Verb)
+**【白板核心公式】**
+- `[WHITEBOARD: 动词 = 句子发动机；决定句型骨架]`
+- `[WHITEBOARD: 学语法先盯动词：它要不要宾语？要不要补语？]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She suggested me to rest.`
+- ✅ 正确标准答案：`She suggested that I rest.` / `She suggested resting.`
+- 补充说明：不同动词的搭配权限不同，不能拿一个模板套全世界。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“动词像直播间总控台，它一句话决定后面站几个人。动词搭配没背清楚，就别怪句子天天翻车。”
+
+## 第五节：谓语动词总览
+
+### 时态与状态 / 体 (Tense and Aspect)
+**【白板核心公式】**
+- `[WHITEBOARD: 时态 = 时间 + 状态(体)]`
+- `[WHITEBOARD: 四时间 × 四状态 = 常见 16 组合框架]`
+- `[WHITEBOARD: 一般 / 进行 / 完成 / 完成进行]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I am knowing the answer now.`
+- ✅ 正确标准答案：`I know the answer now.`
+- 补充说明：有些状态动词通常不用进行时，别看到“现在”就无脑加 `am -ing`。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“时态不是见到现在就开进行时。`know` 这种状态动词不陪你演热血番，它本来就静态。”
+
+### 语气 (Mood)
+**【白板核心公式】**
+- `[WHITEBOARD: 语气 = 说话者态度：陈述 / 祈使 / 虚拟]`
+- `[WHITEBOARD: 虚拟语气高频板书：If + 过去式, would + 动词原形]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`If I am you, I will study harder.`
+- ✅ 正确标准答案：`If I were you, I would study harder.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“虚拟语气在讲‘不是真的’，你还老老实实用一般现在时，属实把幻想写成了流水账。”
+
+### 语态 (Voice)
+**【白板核心公式】**
+- `[WHITEBOARD: 主动语态 = S do O]`
+- `[WHITEBOARD: 被动语态 = O + be done + (by S)]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The homework finished by me.`
+- ✅ 正确标准答案：`The homework was finished by me.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“被动语态最怕你把 `be` 吞了。过去分词不是自己会悬浮，句子也不是靠意念成型。”
+
+### 主谓一致 (Subject-Verb Agreement)
+**【白板核心公式】**
+- `[WHITEBOARD: 主谓一致 = 主语的人称/数 决定谓语形式]`
+- `[WHITEBOARD: 第三人称单数现在时：V + s/es]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`My sister watch streams every night.`
+- ✅ 正确标准答案：`My sister watches streams every night.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“第三人称单数的 `-s` 又被你吃了？这点小尾巴都守不住，还想守住整句体面？”
+
+### 助动词 (Auxiliary Verb)
+**【白板核心公式】**
+- `[WHITEBOARD: 基本助动词 = be / do / have]`
+- `[WHITEBOARD: 情态助动词 = can / may / must / should ... + 动词原形]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He doesn't likes math.`
+- ✅ 正确标准答案：`He doesn't like math.`
+- 补充说明：有了 `does`，后面的实义动词回原形。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“助动词已经帮你承担时态和否定了，后面的动词就别抢戏。`doesn't likes` 这种双重表演，真的很吵。”
+
+## 第六节：词性与句子成分的区别
+
+### 词性不等于句子成分 (Part of Speech vs Clause Element)
+**【白板核心公式】**
+- `[WHITEBOARD: 词性 = 词本身是什么；句子成分 = 词在句中干什么]`
+- `[WHITEBOARD: 同一个词/短语，位置变了，成分可能变]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Swimming is hard.` 里把 `Swimming` 说成“状语”。
+- ✅ 正确标准答案：`Swimming` 在这里是动名词短语，作主语。
+- 补充说明：判断成分要看它在句子里承担什么功能，不要只盯词长相。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“词性看身份证，成分看岗位。别因为一个词长得像动词，就默认它永远在句子里打工做谓语。”
+
+## 第七节：非谓语动词
+
+### 非谓语动词总览 (Non-finite Verb)
+**【白板核心公式】**
+- `[WHITEBOARD: 非谓语 = 不承担核心时态/主谓一致的动词形式]`
+- `[WHITEBOARD: 非谓语三大外观 = to do / doing / done]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`To study English improves me speak better.`
+- ✅ 正确标准答案：`Studying English improves my speaking.`
+- 补充说明：非谓语能压缩结构，但不能胡乱串。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“非谓语是压句神器，不是拼接废料场。看起来都像动词，不代表你能随便串成糖葫芦。”
+
+### 动词不定式 (Infinitive)
+**【白板核心公式】**
+- `[WHITEBOARD: 不定式 = to + 动词原形]`
+- `[WHITEBOARD: 常见语感 = 目的 / 将来 / 一次性动作]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I want that learn English.`
+- ✅ 正确标准答案：`I want to learn English.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“想做什么就老老实实 `want to do`。连不定式都不会接，你的愿望表达得像系统报错。”
+
+### 动名词 (Gerund)
+**【白板核心公式】**
+- `[WHITEBOARD: 动名词 = doing = 把动作当名词用]`
+- `[WHITEBOARD: 常见位置 = 主语 / 宾语 / 介词后]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I am good at to sing.`
+- ✅ 正确标准答案：`I am good at singing.`
+- 补充说明：介词后通常接名词性成分，所以这里用动名词。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“介词后面要名词感，不是你随手塞个 `to do` 就完事。`at to sing` 这种搭配，听着就像卡壳。”
+
+### 现在分词 (Present Participle)
+**【白板核心公式】**
+- `[WHITEBOARD: 现在分词 = doing = 主动 / 进行]`
+- `[WHITEBOARD: 常作定语、状语、补语]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The cried girl left the room.`
+- ✅ 正确标准答案：`The crying girl left the room.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“正在哭的女孩是 `crying girl`，不是 `cried girl`。主动进行和被动完成都分不清，词尾在替你叹气。”
+
+### 过去分词 (Past Participle)
+**【白板核心公式】**
+- `[WHITEBOARD: 过去分词 = done = 被动 / 完成]`
+- `[WHITEBOARD: 常作定语、表语、宾补、被动语态组成部分]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The breaking window was expensive.`
+- ✅ 正确标准答案：`The broken window was expensive.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“窗户是‘被打碎的’，不是‘正在主动打碎别人的’。过去分词一错，物理规律都要被你带偏。”
+
+## 结尾提示
+
+### 总控规则 (Grammar Control Rule)
+**【白板核心公式】**
+- `[WHITEBOARD: 造句四步 = 先找动词 -> 判句型 -> 补齐成分 -> 再加修饰]`
+- `[WHITEBOARD: 先骨架，后美化；先正确，后高级]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：先堆高级词，再发现主谓都没搭起来。
+- ✅ 正确标准答案：先写出 `S + V` 骨架，再逐步扩展成 `SVO / SVOC / 从句 / 非谓语`。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“别一上来就想写出满屏高级结构。骨架都没立住，你那不是高级，是豪华废墟。”

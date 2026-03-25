@@ -1,141 +1,384 @@
 import json
 import os
 import re
+import threading
+from datetime import datetime
+from pathlib import Path
 
+import uvicorn
 from fastapi import BackgroundTasks, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session
-import uvicorn
 
 import database.models
 from config import DEFAULT_STUDENT_ID
-from database.database import Base, engine, get_db
-from database.models import ErrorBook, StudentQuestion
-from diagnostician import analyze_sentence
-# 🌟 优化点：把所有的 import 都统一整齐地放在最上面
+from database.database import Base, SessionLocal, engine, get_db
+from database.models import ErrorBook, KnowledgeMastery, Student, StudentQuestion
 from llm_wrapper import (
-    generate_teacher_message,
-    generate_teacher_message_stream,
-    ask_teacher_with_rag_stream,
-    generate_agent_class_reply,
+    bg_summarize_chat_history,
+    chat_with_teacher_stream,
     generate_agent_class_reply_stream,
-    classify_user_intent,
 )
-from schemas import SentenceAnalysisReport
-from memory_manager import save_mistake
 
-# 🌟 全新的 Agent 教学任务库
 COURSE_TASKS = [
     {
         "task_name": "课程导读与开场白",
-        "goal": "这是微课的第一环。请用你毒舌、傲娇充满英式幽默的语气的导师人设，向学生宣读本节课的宏观大纲（参考00_grammar_overview.md）绝对不要提问任何具体的语法知识点。 你的目标只是进行课前Overview，并在最后冷冷地问一句：'你那可怜的脑容量准备好接收这些硬核知识了吗？' 或者引用莎士比亚的名言：你就一定要毁了这门优雅的语言吗？当学生回复类似'准备好了/来吧'等确认话语时，输出 [TASK_COMPLETED] 推进到下一关。",
-        "reference": "本节课涵盖：动词的过去、现在、将来、过去将来；以及一般、进行、完成、完成进行状态。"
+        "goal": "只做微课开场和路线宣读，不讲具体知识点。最后确认学生是否准备好进入第一关，等学生确认后再输出 [TASK_COMPLETED]。",
+        "reference_text": "微课路线：五大基本句型 -> 动词的时间 -> 动词的状态 -> 核心时态精讲。开场阶段只做课程导览，不展开任何细节知识点。",
     },
     {
-        "task_name": "引言与不及物动词",
-        "goal": "向学生介绍英语语法的核心是动词，并确保学生理解第1类：不及物动词(intransitive verbs)及主谓结构(SV)。引导学生自己造一个 SV 的句子来证明他们懂了。",
-        "reference": "绝大多数句子表达的含义其实只有一个：“什么+怎么样”... 第一种是能够独立完成动作的动词，称为不及物动词，对应的句子结构就是：主语 + 不及物动词。经典例句：The birds fly."
+        "task_name": "主谓结构（SV）",
+        "goal": "只讲主谓结构与不及物动词，引导学生造一个标准 SV 句。",
+        "textbook_file": "00_Grammar_Overview.md",
+        "section_heading": "### 主谓结构 (SV Pattern)",
+        "mastery_point": "不及物动词与主谓结构",
     },
     {
-        "task_name": "单及物动词与宾语",
-        "goal": "引导学生学习第2类动词：及物动词(transitive verbs)与宾语(object)的概念。确保学生明白为什么有些动词后面必须加动作的承受者。",
-        "reference": "有一个动作的承受者的动词 主谓宾结构(SVO)... 如果只说'I love'，句意是不完整的，这类动词称为及物动词，动作的承受者称为宾语。经典例句：I love apples."
+        "task_name": "主谓宾结构（SVO）",
+        "goal": "只讲主谓宾结构与及物动词，让学生说清为什么宾语不能缺席。",
+        "textbook_file": "00_Grammar_Overview.md",
+        "section_heading": "### 主谓宾结构 (SVO Pattern)",
+        "mastery_point": "及物动词与宾语",
     },
     {
-        "task_name": "双及物动词",
-        "goal": "讲解第3类动词：双及物动词(ditransitive verbs)。让学生区分直接宾语和间接宾语。",
-        "reference": "有2个动作承受者的动词 主谓双宾结构 (SVOO)... 教授的对象是间接宾语，教授的内容是直接宾语。经典例句：Jack teaches me English."
+        "task_name": "主谓双宾结构（SVOO）",
+        "goal": "只讲双宾结构，强调“先给人，再给物”的顺序。",
+        "textbook_file": "00_Grammar_Overview.md",
+        "section_heading": "### 主谓双宾结构 (SVOO Pattern)",
+        "mastery_point": "双及物动词",
     },
     {
-        "task_name": "主谓宾补与复杂及物动词",
-        "goal": "引导学生学习第4类动词：复杂及物动词(complex-transitive verbs)及主谓宾补结构(SVOC)。让学生理解为什么有些动词在带宾语后还需要补语才能把意思说完整，并区分宾语补语与双宾语。",
-        "reference": "有一个动作承受者（但需要补充）的动词 主谓宾补结构 (SVOC)。如果只说 Mary considers Tom 会觉得话没说完；对承受者 Tom 的补充信息称为宾语补语(object complement)，这类动词称为复杂及物动词。经典例句：Mary considers Tom smart."
+        "task_name": "主谓宾补结构（SVOC）",
+        "goal": "只讲主谓宾补结构，让学生分清宾补和双宾不是同一回事。",
+        "textbook_file": "00_Grammar_Overview.md",
+        "section_heading": "### 主谓宾补结构 (SVOC Pattern)",
+        "mastery_point": "复合及物动词与宾补",
     },
     {
-        "task_name": "主系表与系动词",
-        "goal": "讲解第5类动词：系动词(linking verbs)及主系表结构(SVP/SVC)。让学生理解系动词不是表示动作，而是把表语的信息「赋予」主语，表示状态或身份，并会辨认常见系动词（如 be, look, seem）和表语。",
-        "reference": "并非表示特定动作，而是将动词后的信息赋予动词前的动词，表示连接状态。主系表结构 (SVP/SVC)。系动词后的补充信息称为主语补语/表语(predicative)。可理解为 Jacob = tall；Smith = in the room。经典例句：Jacob is tall. Smith is in the room. Jim looks very sad."
+        "task_name": "主系表结构（SVC / SVP）",
+        "goal": "只讲系动词与表语，让学生理解系动词不是动作动词。",
+        "textbook_file": "00_Grammar_Overview.md",
+        "section_heading": "### 主系表结构 (SVC / SVP Pattern)",
+        "mastery_point": "系动词与表语",
     },
     {
-        "task_name": "动词的时间（过去、现在、将来、过去将来）",
-        "goal": "向学生解释动词的四种时间坐标（现在、过去、将来、过去将来），确保学生理解每种时间对应的形态标志与典型用法，并能区分「过去将来」是站在过去看未来的概念。",
-        "reference": "动词的时间有四种，分别是：过去、现在、将来、过去将来。现在：形态标志：动词原形或第三人称单数形式（加 -s/-es）。经典例句：I buy apples every day. 过去：形态标志：动词的过去式（通常加 -ed，或有不规则变化如 go -> went）。经典例句：I bought apples yesterday. 将来：形态标志：通常需要助动词 will / shall + 动词原形（或者用 be going to 结构）。经典例句：I will buy apples tomorrow. 过去将来：对于过去某个时间点而言的将来。形态标志：通常用过去时的助动词 would / should + 动词原形（或者用 was/were going to）。经典例句：He said he would buy apples."
+        "task_name": "动词的时间：现在",
+        "goal": "只讲 Present 这个时间坐标，让学生辨认现在时对应的时间感和基本形态。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 现在 (Present)",
+        "mastery_point": "动词的时间：现在",
     },
     {
-        "task_name": "动词的状态（一般、进行、完成、完成进行）",
-        "goal": "向学生解释动词的四种状态（一般、进行、完成、完成进行）及其形态标志，重点让学生理解每种状态背后的「潜台词」，能根据语境体会说话人的隐含意思。",
-        "reference": "动词的状态有四种：进行、完成、完成进行、一般状态。进行状态：形态标志 be + v-ing。经典例句：I am eating an apple.（潜台词：别跟我说话，我嘴里有东西。）完成状态：形态标志 have/has/had + v-ed。经典例句：I have eaten the apple.（潜台词：苹果没了，我现在肚子很饱，不用叫我吃饭了。）完成进行状态：形态标志 have/has/had + been + v-ing。经典例句：I have been eating apples all morning.（潜台词：我嚼得腮帮子都酸了，到现在还在嚼，或者刚刚才停下。）一般状态：形态标志动词原形/过去式等。经典例句：I eat apples.（潜台词：我不挑食，我具备吃苹果的习惯或能力。）"
+        "task_name": "动词的时间：过去",
+        "goal": "只讲 Past 这个时间坐标，让学生理解过去动作已经结束。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 过去 (Past)",
+        "mastery_point": "动词的时间：过去",
     },
     {
-        "task_name": "聚焦「现在」的四大时态",
-        "goal": "对比讲解一般现在、现在进行、现在完成、现在完成进行四种时态，向学生解释形态标志与典型例句；重点考察学生对「现在完成时」潜台词的理解（过去动作对现在的影响或持续到现在）。",
-        "reference": "一般现在时态：形态标志动词原形以及第三人称单数。经典例句：I live in Beijing. She eats apples. I go to lunch at 12:30 every day. 现在进行时态：形态标志助动词be的变位 + 动词现在分词。经典例句：I am doing homework. 现在完成时态：过去发生的动作对现在造成了影响，或过去的动作一直持续到现在。形态标志助动词have变位 + 动词的过去分词。经典例句：I have lost my keys. I have eaten a carrot. 与 I ate a carrot. 的区别。现在完成进行时态：形态标志 have的变位 + been + 动词的现在分词。经典例句：I have been waiting for you for two hours!"
+        "task_name": "动词的时间：将来",
+        "goal": "只讲 Future 这个时间坐标，强调 will 后面必须接动词原形。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 将来 (Future)",
+        "mastery_point": "动词的时间：将来",
     },
     {
-        "task_name": "聚焦「过去」的四大时态",
-        "goal": "讲解一般过去、过去进行、过去完成、过去完成进行四种时态；重点区分一般过去时与过去完成时（过去的过去），确保学生理解过去完成时表示在过去的某个时间点之前已经发生并产生影响。",
-        "reference": "一般过去时态：过去某个时间里发生的动作或状态，已彻底结束。形态标志动词过去式。经典例句：I loved her.（潜台词：现在不爱了，彻底结束了。）过去进行时态：形态标志助动词be的变位(be的过去式) + 动词现在分词。经典例句：I was taking a shower when the phone rang. 现在完成时、一般过去时、过去进行时的区别：现在完成时强调对现在而言是否完成及对现在的影响；一般过去时侧重过去的事实；过去进行时强调过去某时正在发生。过去完成时态：强调过去的某个时间以前发生的事情，对之后(但仍是过去)造成影响。形态标志 have的过去式 + 过去分词。经典例句：When I arrived at the station, the train had left. 过去完成进行时态：形态标志 have的过去式 + been + 现在分词。经典例句：He was exhausted because he had been working all night."
+        "task_name": "动词的时间：过去将来",
+        "goal": "只讲 Past Future 这个时间坐标，强调“站在过去看未来”。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 过去将来 (Past Future)",
+        "mastery_point": "过去将来时",
     },
     {
-        "task_name": "聚焦「将来」的四大时态",
-        "goal": "讲解一般将来、将来进行、将来完成、将来完成进行四种时态，结合教材例句说明形态标志与用法；要求学生能用将来完成进行时造句，表达到将来某时将持续完成的动作。",
-        "reference": "一般将来时态：形态标志 will + 动原。经典例句：I will buy some milk. 将来进行时态：形态标志 will + be + 现在分词。经典例句：I will be having dinner. 将来完成时态：形态标志 will + have + 过去分词。经典例句：I will have finished the report by Friday. 将来完成进行时态：对于将来某个时间，不但已经完成了，并且还要持续完成的动作。形态标志 will + have + been + 现在分词。经典例句：By next month, I will have been working at my job for 10 years."
+        "task_name": "动词的状态：进行",
+        "goal": "只讲进行状态，锁死 be + doing 结构。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 进行状态 (Progressive Aspect)",
+        "mastery_point": "动词的状态：进行",
     },
     {
-        "task_name": "时空穿越的「过去将来」",
-        "goal": "向学生解释过去将来时态的概念（站在过去看未来），说明它在从句转述与虚拟语气中的用法；让学生能区分 would 表时态、表虚拟、表礼貌请求等不同用法。",
-        "reference": "一般过去将来时态：对于过去某个时间点而言的将来，常用于从句中。形态标志 would(will的过去式) + 动原。经典例句：He promised that he would help me. 过去将来进行：would + be + 现在分词。例句：I thought he would be sleeping when I called. 过去将来完成：would + have + 过去分词，极常用于虚拟语气。经典例句：If I had money, I would have bought that car.（虚拟语气：如果当时有钱，我就已经买下那辆车了。）过去将来完成进行：would + have + been + 现在分词。例句：He told me that by the end of the year, he would have been living there for a decade. would 可作为 will 的过去式构成时态；也可用作虚拟语气；表示礼貌：Would you like to have a lunch with me?"
-    }
+        "task_name": "动词的状态：完成",
+        "goal": "只讲完成状态，强调 have + done 与过去分词。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 完成状态 (Perfect Aspect)",
+        "mastery_point": "动词的状态：完成",
+    },
+    {
+        "task_name": "动词的状态：完成进行",
+        "goal": "只讲完成进行状态，强调 have + been + doing 的持续感。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 完成进行状态 (Perfect Progressive Aspect)",
+        "mastery_point": "动词的状态：完成进行",
+    },
+    {
+        "task_name": "动词的状态：一般",
+        "goal": "只讲一般状态，强调它表达事实、习惯和常态，而不是正在发生。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 一般状态 (Simple Aspect)",
+        "mastery_point": "动词的状态：一般",
+    },
+    {
+        "task_name": "现在进行时",
+        "goal": "只讲现在进行时，要求学生能辨认并造出 am/is/are + doing 的句子。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 现在进行时 (Present Progressive)",
+        "mastery_point": "现在时态体系",
+    },
+    {
+        "task_name": "现在完成时",
+        "goal": "只讲现在完成时，强调过去动作对现在的结果影响。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 现在完成时 (Present Perfect)",
+        "mastery_point": "现在时态体系",
+    },
+    {
+        "task_name": "have been to vs have gone to",
+        "goal": "只讲 have been to 和 have gone to 的区别，必须把“去了回来了”和“去了还没回”讲清楚。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### have been to vs have gone to",
+        "mastery_point": "现在时态体系",
+    },
+    {
+        "task_name": "现在完成进行时",
+        "goal": "只讲现在完成进行时，强调动作从过去持续到现在。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 现在完成进行时 (Present Perfect Progressive)",
+        "mastery_point": "现在时态体系",
+    },
+    {
+        "task_name": "一般现在时",
+        "goal": "只讲一般现在时，强调习惯、真理与三单变化。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 一般现在时 (Simple Present)",
+        "mastery_point": "现在时态体系",
+    },
+    {
+        "task_name": "过去进行时",
+        "goal": "只讲过去进行时，强调 was/were + doing。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 过去进行时 (Past Progressive)",
+        "mastery_point": "过去时态体系",
+    },
+    {
+        "task_name": "过去完成时",
+        "goal": "只讲过去完成时，强调“过去的过去”。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 过去完成时 (Past Perfect)",
+        "mastery_point": "过去时态体系",
+    },
+    {
+        "task_name": "过去完成进行时",
+        "goal": "只讲过去完成进行时，强调 had been + doing 的持续过程。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 过去完成进行时 (Past Perfect Progressive)",
+        "mastery_point": "过去时态体系",
+    },
+    {
+        "task_name": "一般过去时",
+        "goal": "只讲一般过去时，强调过去发生且已经结束。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 一般过去时 (Simple Past)",
+        "mastery_point": "过去时态体系",
+    },
+    {
+        "task_name": "将来进行时",
+        "goal": "只讲将来进行时，强调 will + be + doing。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 将来进行时 (Future Progressive)",
+        "mastery_point": "将来时态体系",
+    },
+    {
+        "task_name": "将来完成时",
+        "goal": "只讲将来完成时，强调截止未来某点前已经完成。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 将来完成时 (Future Perfect)",
+        "mastery_point": "将来时态体系",
+    },
+    {
+        "task_name": "将来完成进行时",
+        "goal": "只讲将来完成进行时，强调 will have been doing 的长期持续感。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 将来完成进行时 (Future Perfect Progressive)",
+        "mastery_point": "将来时态体系",
+    },
+    {
+        "task_name": "一般将来时",
+        "goal": "只讲一般将来时，强调 will 后面接动词原形，以及时刻表例外。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 一般将来时 (Simple Future)",
+        "mastery_point": "将来时态体系",
+    },
+    {
+        "task_name": "过去将来进行时",
+        "goal": "只讲过去将来进行时，强调 would + be + doing。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 过去将来进行时 (Past Future Progressive)",
+        "mastery_point": "过去将来时",
+    },
+    {
+        "task_name": "过去将来完成时",
+        "goal": "只讲过去将来完成时，强调 would + have + done。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 过去将来完成时 (Past Future Perfect)",
+        "mastery_point": "过去将来时",
+    },
+    {
+        "task_name": "过去将来完成进行时",
+        "goal": "只讲过去将来完成进行时，强调 would + have + been + doing。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 过去将来完成进行时 (Past Future Perfect Progressive)",
+        "mastery_point": "过去将来时",
+    },
+    {
+        "task_name": "一般过去将来时",
+        "goal": "只讲一般过去将来时，强调 would + 动词原形的转述与预测用法。",
+        "textbook_file": "01_Verb.md",
+        "section_heading": "#### 一般过去将来时 (Simple Past Future)",
+        "mastery_point": "过去将来时",
+    },
 ]
 
-# 🌟 升级版状态管理
 student_state = {
     "is_in_class": False,
-    "current_task_index": 0, 
-    "class_history": []      
+    "current_task_index": 0,
+    "class_history": [],
 }
+stream_state = {"session_summary": ""}
+stream_state_lock = threading.Lock()
 
 TASK_COMPLETED_MARKER = "[TASK_COMPLETED]"
 CLASS_COMPLETED_MESSAGE = "🎉 恭喜你！我们所有的语法特训任务都通关啦！现在退出微课模式咯~"
-NEXT_TASK_NUDGE = "好，进入下一关。请直接开始讲授本关的第一段内容。"
-ANALYZE_META_START = "===META_START==="
-ANALYZE_META_END = "===META_END==="
-DB_LOG_START = "===DB_START==="
-DB_LOG_END = "===DB_END==="
+NEXT_TASK_NUDGE = "好，进入下一个知识点。请直接开始当前节点的正文讲解。"
 CLASS_DB_LOG_START = "===CLASS_DB_START==="
 CLASS_DB_LOG_END = "===CLASS_DB_END==="
-QUESTION_PREFIX_PATTERN = re.compile(r"^(什么是|什么叫|什么意思|为什么|为啥|怎么|如何|请问|想问|能否|可不可以|有没有|是不是|主将从现)")
-CHINESE_CHAR_PATTERN = re.compile(r"[\u4e00-\u9fff]")
-GRAMMAR_QUESTION_KEYWORDS = (
-    "语法",
-    "时态",
-    "从句",
-    "主将从现",
-    "主谓一致",
-    "表语",
-    "宾语",
-    "主语",
-    "谓语",
-    "定语",
-    "状语",
-    "同位语",
-    "非谓语",
-    "虚拟语气",
-    "被动语态",
-    "情态动词",
-    "语态",
-    "句型",
-    "现在完成时",
-    "过去完成时",
-)
+KNOWLEDGE_MASTERY_BASELINE = 50
+KNOWLEDGE_MASTERY_MIN = 0
+KNOWLEDGE_MASTERY_MAX = 100
+MASTERY_DELTA_ERROR = -12
+MASTERY_DELTA_CLASS_SUCCESS = 8
+CURRENT_STUDENT_ID = DEFAULT_STUDENT_ID
+TEXTBOOKS_DIR = Path(__file__).resolve().parent / "data" / "textbooks"
+MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{2,4})\s+(.+?)\s*$")
+TEXTBOOK_SLICE_CACHE: dict[tuple[str, str, int, int, int], str] = {}
+
+
+def _extract_markdown_section(markdown_text: str, heading_title: str) -> str:
+    lines = markdown_text.splitlines()
+    normalized_title = re.sub(r"^#{1,6}\s+", "", (heading_title or "").strip())
+    if not normalized_title:
+        return ""
+
+    start_index = None
+    start_level = None
+    fallback_index = None
+    fallback_level = None
+
+    for index, raw_line in enumerate(lines):
+        match = MARKDOWN_HEADING_PATTERN.match(raw_line.strip())
+        if not match:
+            continue
+
+        level = len(match.group(1))
+        title = match.group(2).strip()
+        if title == normalized_title:
+            start_index = index
+            start_level = level
+            break
+        if fallback_index is None and normalized_title in title:
+            fallback_index = index
+            fallback_level = level
+
+    if start_index is None:
+        start_index = fallback_index
+        start_level = fallback_level
+    if start_index is None or start_level is None:
+        return ""
+
+    end_index = len(lines)
+    for index in range(start_index + 1, len(lines)):
+        match = MARKDOWN_HEADING_PATTERN.match(lines[index].strip())
+        if match and len(match.group(1)) <= start_level:
+            end_index = index
+            break
+
+    return "\n".join(lines[start_index:end_index]).strip()
+
+
+def _compact_reference_text(section_text: str, max_chars: int = 420) -> str:
+    normalized_lines: list[str] = []
+    previous_blank = False
+
+    for raw_line in section_text.splitlines():
+        line = raw_line.rstrip()
+        if not line.strip():
+            if not previous_blank:
+                normalized_lines.append("")
+            previous_blank = True
+            continue
+        normalized_lines.append(line)
+        previous_blank = False
+
+    compact_text = "\n".join(normalized_lines).strip()
+    if len(compact_text) <= max_chars:
+        return compact_text
+
+    truncated = compact_text[:max_chars]
+    if "\n" in truncated:
+        truncated = truncated.rsplit("\n", 1)[0].rstrip()
+    if len(truncated) < max_chars * 0.6:
+        truncated = compact_text[:max_chars].rsplit(" ", 1)[0].rstrip()
+    return truncated.rstrip() + "\n..."
+
+
+def _read_precise_textbook_slice(file_name: str, section_heading: str, max_chars: int = 420) -> str:
+    textbook_path = TEXTBOOKS_DIR / file_name
+    if not textbook_path.exists():
+        return f"教材切片缺失：{file_name} / {section_heading}"
+
+    stat = textbook_path.stat()
+    cache_key = (file_name, section_heading, max_chars, stat.st_mtime_ns, stat.st_size)
+    cached = TEXTBOOK_SLICE_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        markdown_text = textbook_path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return f"教材切片读取失败：{file_name} / {section_heading} / {exc}"
+
+    section_text = _extract_markdown_section(markdown_text, section_heading)
+    if not section_text:
+        return f"教材切片缺失：{file_name} / {section_heading}"
+
+    precise_slice = _compact_reference_text(section_text, max_chars=max_chars)
+    TEXTBOOK_SLICE_CACHE[cache_key] = precise_slice
+    return precise_slice
+
+
+def _build_runtime_course_task(task_index: int) -> dict:
+    base_task = dict(COURSE_TASKS[task_index])
+    reference_text = str(base_task.get("reference_text") or "").strip()
+    textbook_file = str(base_task.get("textbook_file") or "").strip()
+    section_heading = str(base_task.get("section_heading") or "").strip()
+    reference_chars = int(base_task.get("reference_chars") or 420)
+
+    if textbook_file and section_heading:
+        reference_text = _read_precise_textbook_slice(
+            textbook_file,
+            section_heading,
+            max_chars=reference_chars,
+        )
+        base_task["reference_source"] = f"{textbook_file} :: {section_heading}"
+
+    base_task["reference"] = reference_text
+    base_task["node_name"] = base_task.get("task_name", "当前知识点")
+    return base_task
 
 class TaskCompletedBuffer:
-    """
-    滑动窗口缓冲器：安全拦截被切片的 [TASK_COMPLETED]，其余字符正常放行。
-    """
     def __init__(self, marker: str):
         self.marker = marker
         self.buffer = ""
@@ -147,26 +390,21 @@ class TaskCompletedBuffer:
             return ""
 
         released_chars = []
-
         for char in chunk:
             self.buffer += char
-
             if self.buffer == self.marker:
                 self.detected = True
                 self.buffer = ""
                 continue
-
             while self.buffer and not self.marker.startswith(self.buffer):
                 released_chars.append(self.buffer[0])
                 self.visible_parts.append(self.buffer[0])
                 self.buffer = self.buffer[1:]
-
         return "".join(released_chars)
 
     def finalize(self) -> str:
         if not self.buffer:
             return ""
-
         remaining = self.buffer
         self.visible_parts.append(remaining)
         self.buffer = ""
@@ -194,34 +432,28 @@ class AnalyzeDBLogBuffer:
             return ""
 
         released_chars = []
-
         for char in chunk:
             if self.mode == "text":
                 self.text_buffer += char
-
                 if self.text_buffer == self.start_marker:
                     self.detected = True
                     self.mode = "db"
                     self.text_buffer = ""
                     continue
-
                 while self.text_buffer and not self.start_marker.startswith(self.text_buffer):
                     released_chars.append(self.text_buffer[0])
                     self.visible_parts.append(self.text_buffer[0])
                     self.text_buffer = self.text_buffer[1:]
             elif self.mode == "db":
                 self.db_buffer += char
-
                 if self.db_buffer == self.end_marker:
                     self.completed = True
                     self.mode = "done"
                     self.db_buffer = ""
                     continue
-
                 while self.db_buffer and not self.end_marker.startswith(self.db_buffer):
                     self.db_parts.append(self.db_buffer[0])
                     self.db_buffer = self.db_buffer[1:]
-
         return "".join(released_chars)
 
     def finalize(self) -> str:
@@ -235,7 +467,6 @@ class AnalyzeDBLogBuffer:
             while self.db_buffer and not self.end_marker.startswith(self.db_buffer):
                 self.db_parts.append(self.db_buffer[0])
                 self.db_buffer = self.db_buffer[1:]
-
         return ""
 
     @property
@@ -247,18 +478,87 @@ class AnalyzeDBLogBuffer:
         return "".join(self.db_parts).strip()
 
 
+def _clamp_mastery_score(score: int) -> int:
+    return max(KNOWLEDGE_MASTERY_MIN, min(KNOWLEDGE_MASTERY_MAX, score))
+
+
+def _score_to_mastery_status(score: int) -> str:
+    if score >= 85:
+        return "mastered"
+    if score >= 65:
+        return "improving"
+    if score >= 40:
+        return "learning"
+    return "needs_review"
+
+
+def _format_mastery_status(status: str) -> str:
+    return {
+        "mastered": "已掌握",
+        "improving": "提升中",
+        "learning": "学习中",
+        "needs_review": "待巩固",
+    }.get(status, status or "学习中")
+
+
+def _resolve_course_mastery_point(task_index: int) -> str | None:
+    if 0 <= task_index < len(COURSE_TASKS):
+        return COURSE_TASKS[task_index].get("mastery_point")
+    return None
+
+
+def _update_knowledge_mastery(
+    db: Session,
+    grammar_point: str,
+    delta: int,
+    student_id: str = DEFAULT_STUDENT_ID,
+) -> None:
+    normalized_point = re.sub(r"\s+", " ", grammar_point or "").strip()
+    if not normalized_point:
+        return
+
+    try:
+        record = (
+            db.query(KnowledgeMastery)
+            .filter(
+                KnowledgeMastery.student_id == student_id,
+                KnowledgeMastery.grammar_point == normalized_point,
+            )
+            .first()
+        )
+
+        if record is None:
+            next_score = _clamp_mastery_score(KNOWLEDGE_MASTERY_BASELINE + delta)
+            record = KnowledgeMastery(
+                student_id=student_id,
+                grammar_point=normalized_point,
+                mastery_score=next_score,
+                status=_score_to_mastery_status(next_score),
+                last_tested_at=datetime.utcnow(),
+            )
+            db.add(record)
+        else:
+            next_score = _clamp_mastery_score((record.mastery_score or 0) + delta)
+            record.mastery_score = next_score
+            record.status = _score_to_mastery_status(next_score)
+            record.last_tested_at = datetime.utcnow()
+
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        print(f"KnowledgeMastery update failed: {exc}")
+
+
 def _save_error_book_entry(db: Session, user_input: str, ai_comment: str, db_json_text: str) -> None:
     try:
         payload = json.loads(db_json_text)
     except json.JSONDecodeError as exc:
-        print(f"⚠️ ErrorBook JSON 解析失败: {exc}. 原始内容: {db_json_text}")
+        print(f"ErrorBook JSON parse failed: {exc}. raw={db_json_text}")
         return
 
     grammar_point = str(payload.get("grammar_point", "")).strip()
     error_tag = str(payload.get("error_tag", "")).strip()
-
     if not grammar_point or not error_tag:
-        print(f"⚠️ ErrorBook JSON 缺少必要字段: {payload}")
         return
 
     try:
@@ -271,10 +571,100 @@ def _save_error_book_entry(db: Session, user_input: str, ai_comment: str, db_jso
             )
         )
         db.commit()
-        print(f"📝 ErrorBook 写入成功: grammar_point={grammar_point}, error_tag={error_tag}")
+        _update_knowledge_mastery(
+            db,
+            grammar_point=grammar_point,
+            delta=MASTERY_DELTA_ERROR,
+            student_id=CURRENT_STUDENT_ID,
+        )
     except Exception as exc:
         db.rollback()
-        print(f"⚠️ ErrorBook 写入失败: {exc}")
+        print(f"ErrorBook save failed: {exc}")
+
+
+def _ensure_knowledge_mastery_schema() -> None:
+    inspector = inspect(engine)
+    if "knowledge_mastery" not in inspector.get_table_names():
+        return
+
+    column_names = {column["name"] for column in inspector.get_columns("knowledge_mastery")}
+    alter_statements: list[str] = []
+
+    if "student_id" not in column_names:
+        alter_statements.append(
+            "ALTER TABLE knowledge_mastery "
+            "ADD COLUMN student_id VARCHAR(64) NOT NULL DEFAULT 'default_student'"
+        )
+    if "status" not in column_names:
+        alter_statements.append(
+            "ALTER TABLE knowledge_mastery "
+            "ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'learning'"
+        )
+    if "last_tested_at" not in column_names:
+        alter_statements.append(
+            "ALTER TABLE knowledge_mastery "
+            "ADD COLUMN last_tested_at DATETIME"
+        )
+
+    if not alter_statements:
+        return
+
+    with engine.begin() as connection:
+        for statement in alter_statements:
+            connection.execute(text(statement))
+
+
+def _build_mastery_snapshot(
+    db: Session,
+    student_id: str = DEFAULT_STUDENT_ID,
+    limit: int = 5,
+) -> list[dict]:
+    rows = (
+        db.query(KnowledgeMastery)
+        .filter(KnowledgeMastery.student_id == student_id)
+        .order_by(
+            KnowledgeMastery.mastery_score.asc(),
+            KnowledgeMastery.last_tested_at.is_(None),
+            KnowledgeMastery.last_tested_at.desc(),
+            KnowledgeMastery.grammar_point.asc(),
+        )
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "grammar_point": row.grammar_point,
+            "mastery_score": row.mastery_score or 0,
+            "status": row.status or "learning",
+            "status_label": _format_mastery_status(row.status or "learning"),
+            "last_tested_at": row.last_tested_at.isoformat() if row.last_tested_at else None,
+        }
+        for row in rows
+    ]
+
+
+def _build_mastery_summary(db: Session, student_id: str = DEFAULT_STUDENT_ID) -> str:
+    snapshot = _build_mastery_snapshot(db, student_id=student_id, limit=3)
+    if not snapshot:
+        return ""
+
+    weakest = snapshot[0]
+    lines = [
+        (
+            f"当前掌握度最低的知识点是「{weakest['grammar_point']}」，"
+            f"当前分数 {weakest['mastery_score']}/100，状态为「{weakest['status_label']}」。"
+        )
+    ]
+
+    if len(snapshot) > 1:
+        lines.append("其余需要优先盯住的点还有：")
+        for item in snapshot[1:]:
+            lines.append(
+                f"- {item['grammar_point']}：{item['mastery_score']}/100（{item['status_label']}）"
+            )
+
+    return "\n".join(lines)
 
 
 def _normalize_history(history: list[dict] | None, limit: int = 6) -> list[dict]:
@@ -301,6 +691,20 @@ def _normalize_history(history: list[dict] | None, limit: int = 6) -> list[dict]
     return normalized_history
 
 
+def _split_history_for_summary(
+    history: list[dict] | None,
+    keep_limit: int = 6,
+    evict_count: int = 3,
+) -> tuple[list[dict], list[dict]]:
+    normalized_history = _normalize_history(history, limit=64)
+    if len(normalized_history) <= keep_limit:
+        return normalized_history, []
+
+    evicted_messages = normalized_history[:evict_count]
+    recent_history = normalized_history[evict_count:]
+    return recent_history, evicted_messages
+
+
 def _pick_prompt_history(request_history: list[dict] | None, fallback_history: list[dict] | None = None) -> list[dict]:
     normalized_request_history = _normalize_history(request_history)
     if normalized_request_history:
@@ -308,24 +712,66 @@ def _pick_prompt_history(request_history: list[dict] | None, fallback_history: l
     return _normalize_history(fallback_history)
 
 
-def _should_log_student_question(text: str, intent: str | None = None) -> bool:
-    normalized_text = re.sub(r"\s+", " ", text or "").strip()
-    if not normalized_text:
-        return False
-
-    has_question_punctuation = "?" in normalized_text or "？" in normalized_text
-    has_chinese = bool(CHINESE_CHAR_PATTERN.search(normalized_text))
-    starts_like_question = bool(QUESTION_PREFIX_PATTERN.match(normalized_text))
-    has_grammar_keyword = any(keyword in normalized_text for keyword in GRAMMAR_QUESTION_KEYWORDS)
-
-    if intent == "QUESTION":
-        return True
-
-    return (
-        (has_question_punctuation and has_chinese)
-        or starts_like_question
-        or (has_grammar_keyword and (has_question_punctuation or has_chinese))
+def _get_or_create_student_record(db: Session, student_id: str = DEFAULT_STUDENT_ID) -> Student:
+    record = (
+        db.query(Student)
+        .filter(Student.student_id == student_id)
+        .first()
     )
+    if record is None:
+        record = Student(student_id=student_id, session_summary="")
+        db.add(record)
+        db.commit()
+        db.refresh(record)
+    return record
+
+
+def _load_session_summary_from_db(student_id: str = DEFAULT_STUDENT_ID) -> str:
+    db = SessionLocal()
+    try:
+        student = _get_or_create_student_record(db, student_id=student_id)
+        summary = str(student.session_summary or "").strip()
+        with stream_state_lock:
+            stream_state["session_summary"] = summary
+        return summary
+    except Exception as exc:
+        print(f"加载直播长期记忆失败：{exc}")
+        return ""
+    finally:
+        db.close()
+
+
+def _bg_update_session_summary(evicted_messages: list[dict]) -> None:
+    if not evicted_messages:
+        return
+
+    with stream_state_lock:
+        old_summary = str(stream_state.get("session_summary", "") or "")
+
+    new_summary = bg_summarize_chat_history(old_summary, evicted_messages).strip()
+
+    with stream_state_lock:
+        latest_summary = str(stream_state.get("session_summary", "") or "")
+        if latest_summary != old_summary:
+            new_summary = bg_summarize_chat_history(latest_summary, evicted_messages).strip()
+        stream_state["session_summary"] = new_summary
+
+    db = SessionLocal()
+    try:
+        student = _get_or_create_student_record(db, student_id=CURRENT_STUDENT_ID)
+        student.session_summary = new_summary
+        db.commit()
+        print(f"直播长期记忆已更新并落盘：{new_summary}")
+    except Exception as exc:
+        db.rollback()
+        print(f"直播长期记忆落盘失败：{exc}")
+    finally:
+        db.close()
+
+
+def _should_log_student_question(text: str) -> bool:
+    normalized_text = re.sub(r"\s+", " ", text or "").strip()
+    return bool(normalized_text)
 
 
 def _save_student_question(
@@ -348,10 +794,6 @@ def _save_student_question(
             )
         )
         db.commit()
-        print(
-            f"StudentQuestion saved: student_id={student_id}, "
-            f"source={source}, question={normalized_text}"
-        )
     except Exception as exc:
         db.rollback()
         print(f"StudentQuestion save failed: {exc}")
@@ -373,7 +815,7 @@ def _ensure_student_question_schema() -> None:
     if "mode" not in column_names:
         alter_statements.append(
             "ALTER TABLE student_questions "
-            "ADD COLUMN mode VARCHAR(50) NOT NULL DEFAULT 'practice'"
+            "ADD COLUMN mode VARCHAR(50) NOT NULL DEFAULT 'chat'"
         )
 
     if not alter_statements:
@@ -392,39 +834,11 @@ def _extract_db_log(text_value: str, start_marker: str, end_marker: str) -> tupl
     return visible_text, buffer.db_json_text, buffer.detected and buffer.completed
 
 
-def _build_student_profile_summary(
-    db: Session,
-    student_id: str = DEFAULT_STUDENT_ID,
-    question_limit: int = 3,
-) -> str:
-    weakness_summary = _get_top_weakness_summary(db)
-    question_rows = (
-        db.query(StudentQuestion)
-        .filter(StudentQuestion.student_id == student_id)
-        .order_by(StudentQuestion.created_at.desc(), StudentQuestion.id.desc())
-        .limit(question_limit)
-        .all()
-    )
+def _get_top_weakness_summary(db: Session, student_id: str = DEFAULT_STUDENT_ID) -> str:
+    mastery_summary = _build_mastery_summary(db, student_id=student_id)
+    if mastery_summary:
+        return mastery_summary
 
-    if not question_rows:
-        return weakness_summary
-
-    recent_question_lines = [
-        f"- [{row.mode or row.source}] {row.question_text}"
-        for row in question_rows
-        if row.question_text
-    ]
-    if not recent_question_lines:
-        return weakness_summary
-
-    return (
-        f"{weakness_summary}\n"
-        "最近学生主动暴露出来的疑问有：\n"
-        + "\n".join(recent_question_lines)
-    )
-
-
-def _get_top_weakness_summary(db: Session) -> str:
     top_row = (
         db.query(
             ErrorBook.grammar_point.label("grammar_point"),
@@ -436,14 +850,40 @@ def _get_top_weakness_summary(db: Session) -> str:
     )
 
     if not top_row or not top_row.grammar_point:
-        return "暂时没有可供嘲讽的错题雷达峰值。你可以挖苦他连稳定犯错都还没形成规模，但仍要把他引向教材总览。"
+        return "暂时还没有足够的错题或掌握度记录，先拿几轮互动把问题暴露出来再说。"
 
-    return f"雷达图最高错误项是「{top_row.grammar_point}」，累计翻车 {top_row.error_count} 次。"
+    return f"错题本里最容易翻车的知识点是「{top_row.grammar_point}」，累计失误 {top_row.error_count} 次。"
+
+
+def _build_student_profile_summary(
+    db: Session,
+    student_id: str = DEFAULT_STUDENT_ID,
+    question_limit: int = 3,
+) -> str:
+    summary_parts = [_get_top_weakness_summary(db, student_id=student_id)]
+    question_rows = (
+        db.query(StudentQuestion)
+        .filter(StudentQuestion.student_id == student_id)
+        .order_by(StudentQuestion.created_at.desc(), StudentQuestion.id.desc())
+        .limit(question_limit)
+        .all()
+    )
+
+    recent_question_lines = [
+        f"- [{row.mode or row.source}] {row.question_text}"
+        for row in question_rows
+        if row.question_text
+    ]
+    if recent_question_lines:
+        summary_parts.append("最近学生主动暴露出来的疑问有：\n" + "\n".join(recent_question_lines))
+
+    return "\n".join(part for part in summary_parts if part).strip()
 
 
 def _trim_class_history():
     if len(student_state["class_history"]) > 12:
         student_state["class_history"] = student_state["class_history"][-12:]
+
 
 def _strip_task_completed(text: str) -> tuple[str, bool]:
     has_marker = TASK_COMPLETED_MARKER in text
@@ -451,158 +891,98 @@ def _strip_task_completed(text: str) -> tuple[str, bool]:
     return clean_text, has_marker
 
 
-def _build_meta_chunk(payload: dict) -> str:
-    return f"{ANALYZE_META_START}{json.dumps(payload, ensure_ascii=False)}{ANALYZE_META_END}"
-
-
-def _build_analyze_stream_response(
-    text: str,
-    background_tasks: BackgroundTasks,
-    db: Session,
-    history: list[dict] | None = None,
-) -> StreamingResponse:
-    print(f"\n📩 收到前端发来的学生句子: {text}")
-    raw_report = analyze_sentence(text)
-    raw_report.teacher_message = ""
-
-    if not raw_report.is_grammar_correct:
-        for error in raw_report.errors:
-            background_tasks.add_task(
-                save_mistake,
-                student_id=CURRENT_STUDENT_ID,
-                original_sentence=text,
-                error_type=error.error_type,
-                suggestion=error.correction_suggestion
-            )
-
-    meta_payload = {
-        "intent": "ANALYZE",
-        "originalText": raw_report.original_sentence,
-        "report": raw_report.model_dump()
-    }
-
-    def generate():
-        yield _build_meta_chunk(meta_payload)
-
-        db_log_buffer = AnalyzeDBLogBuffer(DB_LOG_START, DB_LOG_END)
-        for chunk in generate_teacher_message_stream(
-            raw_report,
-            student_id=CURRENT_STUDENT_ID,
-            history=_normalize_history(history),
-        ):
-            visible_chunk = db_log_buffer.push(chunk)
-            if visible_chunk:
-                yield visible_chunk
-
-        remaining_text = db_log_buffer.finalize()
-        if remaining_text:
-            yield remaining_text
-
-        if db_log_buffer.detected:
-            if db_log_buffer.completed:
-                _save_error_book_entry(
-                    db=db,
-                    user_input=text,
-                    ai_comment=db_log_buffer.ai_comment,
-                    db_json_text=db_log_buffer.db_json_text,
-                )
-            else:
-                print("⚠️ 检测到 DB_START，但未找到完整的 DB_END，已跳过 ErrorBook 写入。")
-
-    print("📤 句法分析已完成，正在以 Meta + 文本流的形式返回前端...")
-    return StreamingResponse(
-    generate(),
-    media_type="text/event-stream",
-    background=background_tasks,
-    headers={
-        "X-Accel-Buffering": "no",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive"
-    }
-)
-
-
-def _build_question_stream_response(
-    text: str,
-    include_meta: bool = False,
-    db: Session | None = None,
-    history: list[dict] | None = None,
-) -> StreamingResponse:
-    print(f"\n🙋‍♂️ 收到学生流式提问: {text}")
-
-    def generate():
-        if include_meta:
-            yield _build_meta_chunk({"intent": "QUESTION"})
-
-        student_profile_summary = (
-            _build_student_profile_summary(db, CURRENT_STUDENT_ID)
-            if db is not None
-            else None
-        )
-
-        for chunk in ask_teacher_with_rag_stream(
-            text,
-            history=_normalize_history(history),
-            student_profile_summary=student_profile_summary,
-        ):
-            yield chunk
-
-    return StreamingResponse(
-    generate(), 
-   media_type="text/event-stream",
-    headers={
-        "X-Accel-Buffering": "no",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive"
-    }
-)
-
 app = FastAPI(title="AI English Teacher API")
+FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 
 
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
     _ensure_student_question_schema()
+    _ensure_knowledge_mastery_schema()
+    _load_session_summary_from_db(CURRENT_STUDENT_ID)
+
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        "null",
         "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
         "http://localhost:8000",
+        "http://127.0.0.1:8000",
     ],
-    allow_origin_regex=r"https://ai-english-teacher.*\.vercel\.app",
+    allow_origin_regex=(
+        r"https://ai-english-teacher.*\.vercel\.app"
+        r"|https://ai-english-teacher-o63p\.onrender\.com"
+        r"|https?://(localhost|127\.0\.0\.1)(:\d+)?"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+
 class UserInput(BaseModel):
     text: str
     history: list[dict] = Field(default_factory=list)
 
-CURRENT_STUDENT_ID = DEFAULT_STUDENT_ID
 
-@app.post("/analyze")
-async def analyze_student_sentence(
+class ClassInput(BaseModel):
+    text: str
+    action: str = "chat"
+    history: list[dict] = Field(default_factory=list)
+
+
+@app.post("/chat_stream")
+async def chat_stream(
     request: UserInput,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    return _build_analyze_stream_response(request.text, background_tasks, db, history=request.history)
+    if _should_log_student_question(request.text):
+        _save_student_question(
+            db,
+            request.text,
+            source="chat",
+            student_id=CURRENT_STUDENT_ID,
+        )
 
-class QuestionInput(BaseModel):
-    question: str
-    history: list[dict] = Field(default_factory=list)
+    prompt_history, evicted_messages = _split_history_for_summary(request.history, keep_limit=6, evict_count=3)
+    if evicted_messages:
+        background_tasks.add_task(_bg_update_session_summary, evicted_messages)
 
-@app.post("/ask")
-async def ask_question(request: QuestionInput, db: Session = Depends(get_db)):
-    return _build_question_stream_response(
-        request.question,
-        include_meta=False,
-        db=db,
-        history=request.history,
+    with stream_state_lock:
+        session_summary = str(stream_state.get("session_summary", "") or "")
+
+    def generate():
+        student_profile_summary = _build_student_profile_summary(db, CURRENT_STUDENT_ID)
+        yield from chat_with_teacher_stream(
+            request.text,
+            history=prompt_history,
+            student_profile_summary=student_profile_summary,
+            session_summary=session_summary,
+        )
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        background=background_tasks,
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
     )
+
+
+@app.get("/api/memory/summary")
+async def get_memory_summary():
+    with stream_state_lock:
+        summary = str(stream_state.get("session_summary", "") or "")
+    return {"summary": summary}
 
 
 @app.get("/api/dashboard/data")
@@ -652,152 +1032,33 @@ async def get_dashboard_data(db: Session = Depends(get_db)):
         for row in recent_question_rows
     ]
 
+    mastery_snapshot = _build_mastery_snapshot(db, student_id=CURRENT_STUDENT_ID, limit=5)
+
     return {
         "total_errors": total_errors,
         "radar_data": radar_data,
         "recent_errors": recent_errors,
         "recent_questions": recent_questions,
+        "mastery_snapshot": mastery_snapshot,
     }
 
-
-@app.post("/practice_chat")
-async def practice_chat(
-    request: UserInput,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-):
-    print(f"\n🧭 收到统一练习入口请求: {request.text}")
-    intent = classify_user_intent(request.text)
-    print(f"🧠 LLM 语义路由判定结果: {intent}")
-
-    if _should_log_student_question(request.text, intent=intent):
-        _save_student_question(
-            db,
-            request.text,
-            source="practice",
-            student_id=CURRENT_STUDENT_ID,
-        )
-
-    if intent == "ANALYZE":
-        return _build_analyze_stream_response(request.text, background_tasks, db, history=request.history)
-
-    return _build_question_stream_response(
-        request.text,
-        include_meta=True,
-        db=db,
-        history=request.history,
-    )
-
-class ClassInput(BaseModel):
-    text: str
-    action: str = "chat"
-    history: list[dict] = Field(default_factory=list)
 
 @app.post("/course/exit")
 async def exit_course():
     global student_state
-    print("\n🚪 收到退出微课请求，清理状态...")
-    # 🌟 修复点：确保清理的是 current_task_index 而不是过期的 current_node
     student_state["is_in_class"] = False
     student_state["current_task_index"] = 0
     student_state["class_history"] = []
     return {"status": "success", "message": "已成功重置微课状态"}
 
-@app.post("/class_chat")
-async def handle_class_interaction(request: ClassInput, db: Session = Depends(get_db)):
-    global student_state
-    print(f"\n👩‍🏫 收到微课互动: action={request.action}, text='{request.text}'")
-    
-    prompt_history = [] if request.action == "start" else _pick_prompt_history(request.history, student_state["class_history"])
-    student_profile_summary = _build_student_profile_summary(db, CURRENT_STUDENT_ID)
-
-    if request.action == "start":
-        print("🎬 正在初始化全新 Agent 微课状态...")
-        student_state["is_in_class"] = True
-        student_state["current_task_index"] = 0
-        student_state["class_history"] = []
-        user_msg = "老师好，我准备好上课了！"
-    else:
-        user_msg = request.text
-
-    if request.action != "start" and _should_log_student_question(user_msg):
-        _save_student_question(
-            db,
-            user_msg,
-            source="class",
-            student_id=CURRENT_STUDENT_ID,
-        )
-        
-    if student_state["current_task_index"] >= len(COURSE_TASKS):
-        print("🎉 所有任务已通关，下课！")
-        student_state["is_in_class"] = False
-        return {"teacher_reply": CLASS_COMPLETED_MESSAGE, "status": "ENDED"}
-
-    current_task = COURSE_TASKS[student_state["current_task_index"]]
-    print(f"🎯 正在派发当前教学任务: {current_task['task_name']}")
-    
-    raw_reply = generate_agent_class_reply(
-        current_task,
-        student_state["class_history"],
-        user_msg,
-        history=prompt_history,
-        weakness_summary=student_profile_summary,
-    )
-    print(f"🤖 Agent 原始回复生成完毕。")
-    
-    visible_reply, class_db_json_text, has_class_db_log = _extract_db_log(
-        raw_reply,
-        CLASS_DB_LOG_START,
-        CLASS_DB_LOG_END,
-    )
-    clean_reply, is_task_completed = _strip_task_completed(visible_reply)
-    if is_task_completed:
-        print("🔑 触发通关秘钥：[TASK_COMPLETED]！准备推进进度！")
-
-    if has_class_db_log:
-        _save_error_book_entry(
-            db=db,
-            user_input=user_msg,
-            ai_comment=clean_reply,
-            db_json_text=class_db_json_text,
-        )
-
-    student_state["class_history"].append({"role": "user", "content": user_msg})
-    student_state["class_history"].append({"role": "assistant", "content": clean_reply})
-    _trim_class_history()
-
-    if is_task_completed:
-        student_state["current_task_index"] += 1
-        print(f"✅ 进度推进成功，下一个任务索引将变为: {student_state['current_task_index']}")
-        
-        # 无缝衔接：自动触发下一关的第一段讲授内容（无需等待学生再发一句）
-        if student_state["current_task_index"] < len(COURSE_TASKS):
-            next_task = COURSE_TASKS[student_state["current_task_index"]]
-            print(f"⏭️ 自动衔接下一关: {next_task['task_name']}")
-            # 这里的“轻推”提示只用于让老师立即开讲下一关，不应向学生透露任何系统机制
-            next_reply_raw = generate_agent_class_reply(
-                next_task,
-                student_state["class_history"],
-                NEXT_TASK_NUDGE,
-                weakness_summary=student_profile_summary,
-            )
-            next_reply, _ = _strip_task_completed(next_reply_raw)
-            if next_reply:
-                student_state["class_history"].append({"role": "assistant", "content": next_reply})
-                _trim_class_history()
-                clean_reply = (clean_reply + "\n\n" + next_reply).strip()
-            return {"teacher_reply": clean_reply, "status": "TEACHING"}
-
-        student_state["is_in_class"] = False
-        clean_reply = (clean_reply + "\n\n" + CLASS_COMPLETED_MESSAGE).strip()
-        return {"teacher_reply": clean_reply, "status": "ENDED"}
-
-    return {"teacher_reply": clean_reply, "status": "TEACHING"}
 
 @app.post("/class_chat_stream")
 async def handle_class_interaction_stream(request: ClassInput, db: Session = Depends(get_db)):
     global student_state
-    prompt_history = [] if request.action == "start" else _pick_prompt_history(request.history, student_state["class_history"])
+    prompt_history = [] if request.action == "start" else _pick_prompt_history(
+        request.history,
+        student_state["class_history"],
+    )
     student_profile_summary = _build_student_profile_summary(db, CURRENT_STUDENT_ID)
 
     if request.action != "start" and _should_log_student_question(request.text):
@@ -808,18 +1069,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             student_id=CURRENT_STUDENT_ID,
         )
 
-    student_profile_summary = (
-        _build_student_profile_summary(db, CURRENT_STUDENT_ID)
-        if db is not None
-        else None
-    )
-
     def generate():
         global student_state
-        print(f"\n🌊 收到流式微课互动: action={request.action}, text='{request.text}'")
 
         if request.action == "start":
-            print("🎬 正在初始化全新 Agent 微课状态（流式）...")
             student_state["is_in_class"] = True
             student_state["current_task_index"] = 0
             student_state["class_history"] = []
@@ -828,16 +1081,14 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             user_msg = request.text
 
         if student_state["current_task_index"] >= len(COURSE_TASKS):
-            print("🎉 所有任务已通关，直接返回结课提示。")
             student_state["is_in_class"] = False
             yield CLASS_COMPLETED_MESSAGE
             return
 
-        current_task = COURSE_TASKS[student_state["current_task_index"]]
-        print(f"🎯 正在流式派发当前教学任务: {current_task['task_name']}")
-
+        current_task = _build_runtime_course_task(student_state["current_task_index"])
         current_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
         class_db_buffer = AnalyzeDBLogBuffer(CLASS_DB_LOG_START, CLASS_DB_LOG_END)
+
         for chunk in generate_agent_class_reply_stream(
             current_task,
             student_state["class_history"],
@@ -867,6 +1118,7 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                 ai_comment=clean_reply,
                 db_json_text=class_db_buffer.db_json_text,
             )
+
         student_state["class_history"].append({"role": "user", "content": user_msg})
         student_state["class_history"].append({"role": "assistant", "content": clean_reply})
         _trim_class_history()
@@ -874,19 +1126,23 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
         if not current_filter.detected:
             return
 
-        print("🔑 流式通关秘钥拦截成功：[TASK_COMPLETED] 已被过滤，准备推进进度！")
+        mastery_point = _resolve_course_mastery_point(student_state["current_task_index"])
+        if mastery_point:
+            _update_knowledge_mastery(
+                db,
+                grammar_point=mastery_point,
+                delta=MASTERY_DELTA_CLASS_SUCCESS,
+                student_id=CURRENT_STUDENT_ID,
+            )
+
         student_state["current_task_index"] += 1
-        print(f"✅ 流式进度推进成功，下一个任务索引将变为: {student_state['current_task_index']}")
 
         if student_state["current_task_index"] >= len(COURSE_TASKS):
-            print("🎓 微课全部完成，准备退出微课模式。")
             student_state["is_in_class"] = False
             yield "\n\n" + CLASS_COMPLETED_MESSAGE
             return
 
-        next_task = COURSE_TASKS[student_state["current_task_index"]]
-        print(f"⏭️ 流式自动衔接下一关: {next_task['task_name']}")
-
+        next_task = _build_runtime_course_task(student_state["current_task_index"])
         yield "\n\n"
 
         next_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
@@ -910,14 +1166,17 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             _trim_class_history()
 
     return StreamingResponse(
-    generate(), 
-    media_type="text/event-stream",
-    headers={
-        "X-Accel-Buffering": "no",
-        "Cache-Control": "no-cache",
-        "Connection": "keep-alive"
-    }
-)
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "X-Accel-Buffering": "no",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
 
 
 if __name__ == "__main__":

@@ -1,9 +1,13 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from pathlib import Path
+import re
 
 
 TEXTBOOKS_DIR = Path(__file__).resolve().parent.parent / "data" / "textbooks"
+SECTION_HEADING_PATTERN = re.compile(r"^(##|###)\s+(.+?)\s*$", re.MULTILINE)
+_TEXTBOOK_INDEX_CACHE: str | None = None
+_TEXTBOOK_INDEX_CACHE_KEY: tuple[tuple[str, int, int], ...] | None = None
 
 
 def _iter_textbook_files() -> list[Path]:
@@ -18,6 +22,14 @@ def _extract_first_level_heading(markdown_text: str, fallback: str) -> str:
         if line.startswith("# "):
             return line[2:].strip() or fallback
     return fallback
+
+
+def _build_textbook_index_cache_key(textbook_files: list[Path]) -> tuple[tuple[str, int, int], ...]:
+    cache_items: list[tuple[str, int, int]] = []
+    for path in textbook_files:
+        stat = path.stat()
+        cache_items.append((path.name, stat.st_mtime_ns, stat.st_size))
+    return tuple(cache_items)
 
 
 def _resolve_textbook_path(file_name: str) -> Path:
@@ -41,20 +53,43 @@ def _resolve_textbook_path(file_name: str) -> Path:
 
 
 def get_textbook_index() -> str:
+    global _TEXTBOOK_INDEX_CACHE
+    global _TEXTBOOK_INDEX_CACHE_KEY
+
     textbook_files = _iter_textbook_files()
     if not textbook_files:
         return "当前未找到任何教材 Markdown 文件。"
 
-    lines = ["教材目录："]
+    cache_key = _build_textbook_index_cache_key(textbook_files)
+    if _TEXTBOOK_INDEX_CACHE is not None and _TEXTBOOK_INDEX_CACHE_KEY == cache_key:
+        return _TEXTBOOK_INDEX_CACHE
+
+    lines = ["教材目录树："]
     for path in textbook_files:
         try:
             content = path.read_text(encoding="utf-8", errors="replace")
             heading = _extract_first_level_heading(content, path.stem)
-        except OSError as exc:
-            heading = f"{path.stem}（读取标题失败：{exc}）"
-        lines.append(f"- {path.name}: {heading}")
+            lines.append(f"- {path.name}: {heading}")
 
-    return "\n".join(lines)
+            matches = SECTION_HEADING_PATTERN.findall(content)
+            for level_marker, raw_title in matches:
+                clean_title = raw_title.strip()
+                if not clean_title:
+                    continue
+
+                if level_marker == "##":
+                    lines.append(f"  - {clean_title}")
+                else:
+                    lines.append(f"    - {clean_title}")
+        except OSError as exc:
+            lines.append(f"- {path.name}: {path.stem}（读取标题失败：{exc}）")
+
+    index_content = "\n".join(lines)
+    print("\n=== 教材深层目录树 ===\n", index_content, "\n====================\n")
+
+    _TEXTBOOK_INDEX_CACHE = index_content
+    _TEXTBOOK_INDEX_CACHE_KEY = cache_key
+    return index_content
 
 
 def read_textbook_chapter(file_name: str) -> str:

@@ -1,434 +1,1126 @@
 # 动词
-## 第一节： 动词的分类
-5大动词分类见语法综述中第一节：英语语法的引擎——动词 (Verb)
+
+## 第一节：动词的分类
+
+### 五大动词分类总览 (Five Verb Patterns)
+**【白板核心公式】**
+- `[WHITEBOARD: 动词先分型 = SV / SVO / SVOO / SVOC / SVC]`
+- `[WHITEBOARD: 看动词胃口，决定后面站几个人]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She made me.`
+- ✅ 正确标准答案：`She made me cry.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“别把动词当抽盲盒。先看它是独居、双人间，还是拖家带口型。`made me` 后面空着，像你作业只写了姓名就想拿分，天真得很有观赏性。”
 
 ## 第二节：动词的时态
-即动词的时间和状态的合称，理论上，时态的自由排列有16种组合；
 
-### 动词的时间
-动词的时间有四种，分别是：过去、现在、将来、过去将来。具体解释如下：
+### 动词的时间 (Time Reference)
 
-1. **现在 (Present)**:描述以“当下”这个时间锚点发生的事情。需要注意的是，它不仅仅指“此时此刻”，它更常用来表达现阶段的客观事实、真理，或者经常性的习惯动作。
-- 形态标志：动词原形 或 第三人称单数形式（加 -s/-es）。
-- 经典例句：I buy apples every day. (我每天都买苹果。—— 描述一个现在的习惯)
+#### 现在 (Present)
+**【白板核心公式】**
+- `[WHITEBOARD: Present = 现在 / 现阶段 / 习惯 / 事实]`
+- `[WHITEBOARD: 形态：V 原形 / 三单 V-s]`
 
-2. **过去 (Past)**:描述在“当下”之前已经发生、且已经结束的事情。
-- 形态标志：动词的过去式（通常加 -ed，或有不规则变化如 go -> went）。
-- 经典例句：I bought apples yesterday. (我昨天买了苹果。—— 动作发生在昨天，且已经买完了)
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She go to class every day.`
+- ✅ 正确标准答案：`She goes to class every day.`
 
-3. **将来 (Future)**:描述在“当下”之后、未来某个时刻将要发生的动作或存在的状态。
-- 形态标志：通常需要助动词 will / shall + 动词原形（或者用 be going to 结构）。
-- 经典例句：I will buy apples tomorrow. (我明天将要去买苹果。—— 立足现在，计划未来)
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“一般现在时不是让你把三单尾巴吞掉的许可证。第三人称单数的 `-s` 老是失踪，像直播间麦克风线每次都在关键时刻断掉一样烦人。”
 
-4. **过去将来 (Past Future)**:对于过去某个时间点而言的将来。例如：“昨天”是“前天”的这个过去的将来，“明天”是“昨天”这个过去的将来。可以这样考虑：你需要把自己的视角，先穿越回到“过去”的某一天，然后站在那一天，去预测（在那一天看来）属于“将来”的事情。需要注意的是，过去将来在实际使用中并不常见，一般出现在从句中。
-- 形态标志：通常用过去时的助动词 would / should + 动词原形（或者用 was/were going to）。
-- 经典例句：He said he would buy apples. (他说过他将会去买苹果。)
+#### 过去 (Past)
+**【白板核心公式】**
+- `[WHITEBOARD: Past = 过去某时发生且结束]`
+- `[WHITEBOARD: 形态：V-ed / 不规则过去式]`
 
-### 动词的状态
-动词的状态有四种：进行、完成、完成进行、一般状态。具体解释如下：
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Yesterday I buy a book.`
+- ✅ 正确标准答案：`Yesterday I bought a book.`
 
-1. **进行状态 (Progressive / Continuous Aspect)**: 描述动作或者过程正在进行中，强调此时此刻动作正在发生，有一种极强的画面感和未完成感。
-- 形态标志：be + v-ing (现在分词)
-- 经典例句：I am eating an apple. (我正在吃一个苹果。——潜台词：别跟我说话，我嘴里有东西。)
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“句首都把 `Yesterday` 摆出来了，动词还赖在原形不肯动。时间都已经退回昨天，你的动词倒是脸皮很厚地活在今天。”
 
-2. **完成状态 (Perfect Aspect)**: 动作在当前的时间“已结束”，并对当前产生结果或影响。注意：完成态强调动作完整了，但没有强调动作完成的时间，因为这需要与动作的时间搭配使用。
-- 形态标志：have/has/had + v-ed (过去分词)
-- 经典例句: I have eaten the apple. (我已经把苹果吃了。——潜台词：苹果没了，我现在肚子很饱，不用叫我吃饭了。)
+#### 将来 (Future)
+**【白板核心公式】**
+- `[WHITEBOARD: Future = will/shall + 动词原形]`
+- `[WHITEBOARD: 也可表达将来：be going to / 一般现在时表时刻表]`
 
-3. **完成进行状态 (Perfect Progressive Aspect)**: 聚焦动作从之前一直持续到当前，并且还有继续发展下去的势头，强调过程的持续性。
-- 形态标志：have/has/had + been + v-ing
-- 经典例句: I have been eating apples all morning. (我整个早上一直都在吃苹果。——潜台词：我嚼得腮帮子都酸了，到现在还在嚼，或者刚刚才停下。)
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I will buys it tomorrow.`
+- ✅ 正确标准答案：`I will buy it tomorrow.`
 
-4. **一般状态 (Simple Aspect)**: 陈述客观事实、习惯或动作的发生本身。并不强调动作是怎样的状态，而是描述存在这样的现象。
-- 形态标志: 动词原形 / 过去式等
-- 经典例句: I eat apples. (我吃苹果。——潜台词：我不挑食，我具备吃苹果的习惯或能力。)
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`will` 已经替你扛了将来语气，后面的动词就老老实实回原形。你还硬加 `-s`，像给西装外面再套一件校服，既多余又难看。”
 
-综上所述，英语动词的时间和状态联系非常紧密，不应当拆开来理解，此处分开讨论，只是出于教学需要，方便理解。
+#### 过去将来 (Past Future)
+**【白板核心公式】**
+- `[WHITEBOARD: 过去将来 = 站在过去看未来 = would + 动词原形]`
+- `[WHITEBOARD: 常见场景：转述 / 从句]`
 
-### 时态（重要）
-学习英语时态时，需要理解英语的时间和状态并不是混在一起的，而是在不同的时间（过去、现在、将来、过去将来）下的动作状态（一般、完成、进行、完成进行）。此外，不同的时态会对应不同的**动词变位(Verb Conjugation)**规则,这也是学习时态的难点。再者，英语时态往往要借助**助动词(Auxiliary Verbs)**,且助动词本身也有变位，需要注意。而且，时态往往会和其他的语法现象一起出现，容易造成理解上的困难。
-1. **现在进行时态(Present Progressive Tense)**: 表示此时此刻（或现阶段）正在进行的动作。
-- 形态标志: 助动词be的变位 + 动词现在分词
-- 经典例句: I am doing homework.
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He said he will help me.`
+- ✅ 正确标准答案：`He said he would help me.`
 
-2. **现在完成时态(Present Perfect Tense)**: 过去发生的动作对现在造成了影响，或过去的动作一直持续到现在。
-- 形态标志: 助动词have变位 + 动词的过去分词
-- 经典例句: I have lost my keys.
-- 这里需要注意，**过去分词(Past Participle)**不等同于**过去式(Past/Preterit)**。例如：I have eaten a carrot. 和 I ate a carrot.
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“主句都退回过去了，从句还死抱着 `will` 不放。时间线像被你拿脚踩过，皱得不堪入目。站在过去看未来，请用 `would`，谢谢你别再折磨时序。”
 
-3. **现在完成进行时态(Present Perfect Progressive Tense)**: 动作从过去开始，一直持续到现在（且很可能继续下去），强调过程的持续性。
-- 形态标志: have的变位 + been + 动词的现在分词
-- 经典例句: I have been waiting for you for two hours!
+### 动词的状态 (Aspect)
 
-4. **一般现在时态(Simple Present Tense)**:表示经常性、习惯性的动作，或客观真理、现在的状态。
-- 形态标志: 动词原形以及第三人称单数的情况
-- 经典例句：I live in Beijing. 即宣告这是一个长期的、稳定的事实。
-           She eats apples. 这是一个事实的陈述，即表明了“她是吃苹果的”这种事实。
-           I go to lunch. 这句话会让母语者感到奇怪，因为在不添加时间的情况下的一般状态，会让人不知到你是“将要”去吃午饭还是“正在”吃午饭。I go to lunch at 12:30 every day.则是对一般时态的很好应用，因为这句话表明了你吃午饭的习惯。
-- 这里需要注意的是，表示时间的“现在”和表示状态的“一般”容易混淆，初学者容易将“现在”视为“正在进行的状态”误以为是“进行”的状态，“一般”可以理解为一种事实、现象的陈述。
+#### 进行状态 (Progressive Aspect)
+**【白板核心公式】**
+- `[WHITEBOARD: 进行 = be + doing]`
+- `[WHITEBOARD: 核心语感 = 正在进行，画面感强]`
 
-5. **过去进行时态(Past Progressive Tense)**: 过去某个特定的瞬间或时间段，正在进行的动作。
-- 形态标志: 助动词be的变位(be的过去式) + 动词现在分词
-- 经典例句：I was taking a shower when the phone rang.
--现在完成时态、一般过去时态、过去进行时态的区别：三者都包含对过去行为的描述，但是现在完成时态强调对于现在的时间而言，某个动作是否完成，侧重描述过去发生的动作对现在造成的影响；例如：I have been to Shanghai，so you can't find me.(强调人已经去了上海，不在原地了)一般过去时态侧重描述过去某个时间里发生的动作或状态，考虑的是过去的事实，例如：I went to Shanghai.(曾经去过一次上海)；过去进行时态强调过去某个时间正在发生的事情。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I am eat dinner now.`
+- ✅ 正确标准答案：`I am eating dinner now.`
 
-6. **过去完成时态(Past Perfect Tense)**: 强调过去的某个时间以前发生的事情，对之后(但相对于叙述者的时间仍然是过去)的事情造成了影响。
-- 形态标志: 助动词have变位(have的过去式) + 动词的过去分词
-- 经典例句：When I arrived at the station, the train had left. 列车在我到达以前就离开了，但是对于说话者而言，到达站台和列车离开，都是过去的事情了。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`am` 都请出来了，后面还不给我 `-ing`，你这是把进行时写成半成品。语法不是预制菜，步骤不能省成这样。”
 
-7. **过去完成进行时态(Past Perfect Progressive Tense)**: 描述对于过去某个时间，不但已经完成了，而且还要继续这个行为，强调动作的持续。
-- 形态标志: have的变位(have的过去式) + been + 动词的现在分词
-- 经典例句：He was exhausted because he had been working all night.
+#### 完成状态 (Perfect Aspect)
+**【白板核心公式】**
+- `[WHITEBOARD: 完成 = have + done]`
+- `[WHITEBOARD: 核心语感 = 已完成，并影响现在/基准点]`
 
-8. **一般过去时态(Simple Past Tense)**:过去某个时间里发生的动作或状态，已彻底结束。
-- 形态标志: 动词过去式
-- 经典例句：I loved her. 潜台词：现在不爱了，彻底结束了。
-- 需要注意的是，动词的过去式和时态的"过去时态"不要混淆，前者是动词变位，后者描述了动词所处的时间。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I have ate the cake.`
+- ✅ 正确标准答案：`I have eaten the cake.`
 
-9. **将来进行时态(Future Progressive Tense)**: 将来某个特定的时刻，正在进行的动作，并且说话者对此表示确信。
-- 形态标志: will + be + 现在分词
-- 经典例句: I will be having dinner.
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“完成态后面要的是过去分词，不是你随手捡来的过去式。`have ate` 这种搭配，像穿着拖鞋进晚宴，失礼得非常稳定。”
 
-10. **将来完成时态(Future Perfect Tense)**: 在将来某个基准时间点之前，将会已经完成的动作，说话人对此表示确信。
-- 形态标志: will + have + 过去分词
-- 经典例句: I will have finished the report by Friday.
+#### 完成进行状态 (Perfect Progressive Aspect)
+**【白板核心公式】**
+- `[WHITEBOARD: 完成进行 = have + been + doing]`
+- `[WHITEBOARD: 核心语感 = 从过去持续到现在]`
 
-11. **将来完成进行时态(Future Perfect Progressive Tense)**: 对于将来某个时间，不但已经完成了，并且还要持续完成的动做，说话者对此非常确信。
-- 形态标志: will + have + been + 现在分词
-- 经典例句: By next month, I will have been working at my job for 10 years.
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I have been wait for you for an hour.`
+- ✅ 正确标准答案：`I have been waiting for you for an hour.`
 
-12. **一般将来时态(Simple Future Tense)**: 将来某个时间要发生的动作或状态, 并且说话者认为会发生。
-- 形态标志: will + 动原
-- 经典例句：I will buy some milk.
-- 关于英语的将来时态：将来时态需要助动词来辅助表达(will, shall等)，并不像过去式的动词变位，因此，有学者认为英语没有将来时态(因为没有动词将来式的变位)，只有对“将来时态的表达”，主要包括：
-    - 用一般现在时来描述： The bus leaves at 8PM.
-    - 助动词be的变位 + going + to + 动词原形： I am going to sleep.
-    - 省略"going"， 改为助动词be的变位 + to + 动词原形： You are to eat a carrot. 有命令的意味。
-    - 用介词"about“取代"going"，改为 be about + to +动原： I am about to eat a hamburger.
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“都写到 `have been` 了，最后一步 `waiting` 还能摔死。像辛辛苦苦爬到山顶，最后被自己鞋带绊下去，确实别致。”
 
-13. **过去将来进行时态(Past Future Progressive Tense)**: 站在过去，预测过去某个未来的时刻正在发生的事。
-- 形态标志: would + be + 现在分词
-- 经典例句：I thought he would be sleeping when I called. (我打过去之前猜测，那个时刻他应该正在睡觉)。
+#### 一般状态 (Simple Aspect)
+**【白板核心公式】**
+- `[WHITEBOARD: 一般 = 说事实 / 习惯 / 常态，不强调过程]`
+- `[WHITEBOARD: 一般 ≠ 正在；一般 = 平铺直叙]`
 
-14. **过去将来完成时态(Past Future Perfect Tense)**: 站在过去，预测在过去的某个未来时刻前会完成的事。（极常用于虚拟语气：本该做成但没做成）。
-- 形态标志: would + have + 过去分词
-- 经典例句：If I had money, I would have bought that car. (虚拟语气：如果当时有钱，我就已经买下那辆车了，但其实没买)。
-15. **过去将来完成进行时态(Past Future Perfect Progressive Tense)**: 站在过去看，到未来的某个点，某个动作将一直持续。（极其罕见，属于语法上的“活化石”）。
-- 形态标志: would + have + been + 现在分词
-- 经典例句：He told me that by the end of the year, he would have been living there for a decade. (嵌套极深：转述过去的一个陈述，这个陈述计算了那个过去的未来的持续状态)。
-16. **一般过去将来时态(Simple Past Future Tense)**: 对于过去某个时间点而言的将来，过去将来时态常用于从句中。
-- 形态标志: would(will的过去式) + 动原
-- 经典例句：He promised that he would help me. (当初的承诺，在当初那个时间点看是将来)。
-- would 可作为will的过去式，构成时态；
-    - 也可用做虚拟语气，表达和事实相反的情况。例如：If I were you, I would go to school. 因为”我“不可能是”你“，所以"go"就是一个假设的、虚拟的动词，在这里would构成虚拟语气。
-    - 表示礼貌用语：Would you like to have a lunch with me? (比do you 礼貌)
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I go to lunch now.`
+- ✅ 正确标准答案：`I am going to lunch now.` / `I go to lunch at 12:30 every day.`
 
-事实上，英语时态中有些时态非常不常用，日常生活中常用的是：一般现在、现状进行、现在完成、现在完成进行；一般过去、过去进行、过去完成、过去完成进行；一般将来、将来进行这几个时态。对于时态的学习建议是：少量多次，各个击破，每次只熟悉动词的一个时态。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`now` 和一般状态乱捆在一起，像把闹钟和年历贴一张纸上。你到底在说‘此刻正在去’，还是‘长期习惯去’？先把脑子里的时间轴理顺。”
+
+### 时态（重要）(Tense Matrix)
+
+#### 现在进行时 (Present Progressive)
+**【白板核心公式】**
+- `[WHITEBOARD: 现在进行时 = am/is/are + doing]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She is study now.`
+- ✅ 正确标准答案：`She is studying now.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“进行时最基本的 `be + doing` 都能拆散，你对语法结构的破坏力堪比拆迁队。”
+
+#### 现在完成时 (Present Perfect)
+**【白板核心公式】**
+- `[WHITEBOARD: 现在完成时 = have/has + done]`
+- `[WHITEBOARD: 核心：过去动作 -> 现在结果]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He has gone to Tokyo yesterday.`
+- ✅ 正确标准答案：`He went to Tokyo yesterday.` / `He has gone to Tokyo.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“现在完成时最烦你这种一边写 `yesterday`，一边还装作和现在有暧昧关系。要么老老实实一般过去时，要么别带明确过去时间，别两头骗。”
+
+#### have been to vs have gone to
+**【白板核心公式】**
+- `[WHITEBOARD: have been to = 去过，已回来]`
+- `[WHITEBOARD: have gone to = 去了，人不在这]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Where is Tom? He has been to the library.`
+- ✅ 正确标准答案：`Where is Tom? He has gone to the library.`
+- 补充说明：如果 Tom 现在不在这里，人已经去了图书馆，就用 `has gone to`；如果只是说他有“去过图书馆”的经历，才用 `has been to`。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“这两个结构分不清，效果堪比报失踪人口时说‘他去过公司’。到底是人已经回来了，还是现在不在原地？`been` 和 `gone` 不是双胞胎，别拿它们乱认亲。”
+
+#### 现在完成进行时 (Present Perfect Progressive)
+**【白板核心公式】**
+- `[WHITEBOARD: 现在完成进行时 = have/has + been + doing]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I have waited for you for two hours.`
+- ✅ 正确标准答案：`I have been waiting for you for two hours.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“如果你想强调‘一直等到现在’，请把过程写出来。只写完成态，像只给观众看结局，不给过程，抠门得很有层次。”
+
+#### 一般现在时 (Simple Present)
+**【白板核心公式】**
+- `[WHITEBOARD: 一般现在时 = V 原形 / 三单 V-s]`
+- `[WHITEBOARD: 习惯 / 真理 / 稳定事实]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The sun rise in the east.`
+- ✅ 正确标准答案：`The sun rises in the east.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“太阳都天天按时升起了，你的三单 `-s` 还在睡。自然规律都比你守规矩，多少有点尴尬。”
+
+#### 过去进行时 (Past Progressive)
+**【白板核心公式】**
+- `[WHITEBOARD: 过去进行时 = was/were + doing]`
+- `[WHITEBOARD: 常见搭配：when + 一般过去时]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I was take a shower when the phone rang.`
+- ✅ 正确标准答案：`I was taking a shower when the phone rang.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“过去进行时就这么点骨架，你还漏 `-ing`。像把浴室门装好了，结果忘了接水管，形式很完整，功能全无。”
+
+#### 过去完成时 (Past Perfect)
+**【白板核心公式】**
+- `[WHITEBOARD: 过去完成时 = had + done]`
+- `[WHITEBOARD: 核心：过去的过去]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`When I arrived, the train already left.`
+- ✅ 正确标准答案：`When I arrived, the train had already left.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“两个动作都在过去，还要分先后。你不写 `had`，时间顺序就像没贴标签的行李箱，谁先谁后全靠猜。”
+
+#### 过去完成进行时 (Past Perfect Progressive)
+**【白板核心公式】**
+- `[WHITEBOARD: 过去完成进行时 = had + been + doing]`
+- `[WHITEBOARD: 过去某点前一直在做]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He was tired because he had worked all night.` 
+- ✅ 正确标准答案：`He was tired because he had been working all night.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“想强调熬了一整夜这个过程，就别偷懒只写完成态。你把持续性删掉，整句瞬间像加班记录被人篡改过。”
+
+#### 一般过去时 (Simple Past)
+**【白板核心公式】**
+- `[WHITEBOARD: 一般过去时 = V-ed / 不规则过去式]`
+- `[WHITEBOARD: 过去发生，彻底结束]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I have loved her last year.`
+- ✅ 正确标准答案：`I loved her last year.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`last year` 都把墓碑立好了，你还写现在完成时。已经埋进过去的事，就别硬拉回现在营业。”
+
+#### 将来进行时 (Future Progressive)
+**【白板核心公式】**
+- `[WHITEBOARD: 将来进行时 = will + be + doing]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`This time tomorrow I will working.`
+- ✅ 正确标准答案：`This time tomorrow I will be working.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`will working` 这种结构像楼修到一半忘了打地基。中间那个 `be` 不写，整栋时态大楼都得塌。”
+
+#### 将来完成时 (Future Perfect)
+**【白板核心公式】**
+- `[WHITEBOARD: 将来完成时 = will + have + done]`
+- `[WHITEBOARD: 到未来某点前已经完成]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`By Friday, I will finish the report.`
+- ✅ 正确标准答案：`By Friday, I will have finished the report.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`by Friday` 是截止点，不是普通将来时的游乐场。到那时‘已经完成’，请给我 `will have done`，别把时态写得像延期申请。”
+
+#### 将来完成进行时 (Future Perfect Progressive)
+**【白板核心公式】**
+- `[WHITEBOARD: 将来完成进行时 = will + have + been + doing]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`By next month, I will work here for ten years.`
+- ✅ 正确标准答案：`By next month, I will have been working here for ten years.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“十年的持续过程你给我写成普通将来，像把史诗级连续剧压缩成一张宣传海报，粗暴得很。”
+
+#### 一般将来时 (Simple Future)
+**【白板核心公式】**
+- `[WHITEBOARD: 一般将来时 = will + 动词原形]`
+- `[WHITEBOARD: 将来表达还可用 be going to / be to / be about to]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The bus will leaves at 8 p.m.`
+- ✅ 正确标准答案：`The bus leaves at 8 p.m.` / `The bus will leave at 8 p.m.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“时刻表这种稳定安排，英语常直接用一般现在时。你要么用 `will leave`，要么用 `leaves`，别杂交，怪得像把火锅倒进下午茶。”
+
+#### 过去将来进行时 (Past Future Progressive)
+**【白板核心公式】**
+- `[WHITEBOARD: 过去将来进行时 = would + be + doing]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I thought he would sleeping when I called.`
+- ✅ 正确标准答案：`I thought he would be sleeping when I called.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“又是少一个 `be`。你们对这个词的态度，像对空气一样理所当然，失去了才知道句子活不下去。”
+
+#### 过去将来完成时 (Past Future Perfect)
+**【白板核心公式】**
+- `[WHITEBOARD: 过去将来完成时 = would + have + done]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He said he would finished it by Monday.`
+- ✅ 正确标准答案：`He said he would have finished it by Monday.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`would finished` 看起来就像把两个半成品硬焊在一起。想表达‘那时之前本会完成’，就把结构写全，别让我替你脑补工地剩下那半截。”
+
+#### 过去将来完成进行时 (Past Future Perfect Progressive)
+**【白板核心公式】**
+- `[WHITEBOARD: 过去将来完成进行时 = would + have + been + doing]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He said that by then he would work there for a decade.`
+- ✅ 正确标准答案：`He said that by then he would have been working there for a decade.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“这种时态本来就罕见，你还想靠运气拼对，未免太看得起自己。既然要写古董级结构，就请写完整，别侮辱化石。”
+
+#### 一般过去将来时 (Simple Past Future)
+**【白板核心公式】**
+- `[WHITEBOARD: 一般过去将来时 = would + 动词原形]`
+- `[WHITEBOARD: 过去承诺 / 过去预测 / 转述]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He promised that he will help me.`
+- ✅ 正确标准答案：`He promised that he would help me.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“承诺发生在过去，从句还赖在现在，像过期门票硬说自己今天也有效。时间先后这种基础礼貌，请你对语法保持一点。”
 
 ## 第三节：动词语气
 
-### 陈述语气
-**陈述语气(Indicative Mood)**即描述现实的语气。
-- 经典例句：The rabbit ate the carrot.
+### 陈述语气 (Indicative Mood)
+**【白板核心公式】**
+- `[WHITEBOARD: 陈述语气 = 描述现实 / 事实]`
 
-### 祈使语气
-**祈使语气(Imperative Mood)**表示命令或者请求。
-- 经典例句：Waiter, do the job!
-- 形态标志: 有一个小技巧，用第二人称并且使用一般现在时态造句，然后去掉第二人称，就是祈使句。例如：You give me the banana! 改为give me the banana!
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`If the earth is flat, we are in trouble.`（想表达现实事实时胡乱切语气）
+- ✅ 正确标准答案：`The earth is round.`
 
-### 虚拟语气(重点)
-**虚拟语气(Subjunctive Mood)**: 基本上用于从句，有两类主要用法。第一类，表示对"不可能"情况的假设，主要是if引导的条件从句，主要包括：
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“陈述语气就是把现实老老实实说出来。别一会儿讲事实，一会儿又像在写都市怪谈，语气切得像坏掉的电灯。”
 
-1. 当描述想象的情况，尤其是与当前的客观事实相反时，使用虚拟语气。
-- 经典例句：If I saw that man now, I would beat him. (与当前客观事实相反，事实上并没有看到那个男人。)
-- 形态标志: If + 主语 + 动词过去式 (be动词一律用 were), 主语 + would/could/should/might + 动词原形.
+### 祈使语气 (Imperative Mood)
+**【白板核心公式】**
+- `[WHITEBOARD: 祈使句 = 动词原形开头]`
+- `[WHITEBOARD: 你(You)省略，但命令感还在]`
 
-2.描述与将来的预估的情况相反时，或者说描述在将来几乎不会发生的动作时，使用虚拟语气；
-- 经典例句：If I should see the teacher tomorrow, I would admit my mistake. 万一我明天看到了老师，我会承认错误。 (与对将来的合理预期相反。事实上明天大概率碰不到老师，或者主观上认为自己碰到老师的概率微乎其微。加了 should，体现了一种“万一”的极小可能性。)
-- 形态标志: If + 主语 + should do / were to do / 动词过去式, 主语 + would/could/should/might + 动词原形. 这里注意，should是shall的过去式。
-此外，如果把这个句子写为：If I see the teacher tomorrow, I will admit my mistake. 如果我明天看到了老师，我会承认错误。这句话在语法上也是对的，但强调的含义是不同的，这里If引导的条件句使用的是一般现在时，是对事实的描述，也就是说，明天是很有可能遇见老师的，这跟虚拟语气强调与实际情况相反的用法是不一样的，需要仔细体会一下这种语义表达上的差异。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`You open the door!`
+- ✅ 正确标准答案：`Open the door!`
 
-3. 描述和过去事实相反的情况时，使用虚拟语气。
-- 经典例句：If I had seen that movie last week, I would have finished the movie review. (与过去发生的事实相反。事实上我上周并没有看那部电影，所以导致我当时没能写完影评，充满了遗憾或假设的意味。)
-- 形态标志: If + 主语 + had + 过去分词 (done), 主语 + would/could/should/might + have + 过去分词 (done).
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“祈使句本来就默认对着‘你’说，结果你还把 `You` 端出来，像宴会厅里重复报自己名字，拘谨得可怜。”
 
-第二类：表示建议、命令、要求等强烈主观意愿（名词性从句）。 形态标志: 主语 + 建议/命令/要求动词 + that + 从句主语 + (should) + 动词原形. （注意：should 经常被省略，直接裸露动词原形）常见触发词：表坚持：insist；表命令: order, command；表建议: advise, suggest, propose；表要求: demand, require, request, ask. 同样的，也包括过去、现在、将来3个时间下的描述：
+### 虚拟语气 (Subjunctive Mood)
 
-1. 对现在的愿望：
-- 经典例句：I wish (that) I were a bird. (that 引导的宾语从句，"that"可省略)
+#### 与现在事实相反 (Unreal Present)
+**【白板核心公式】**
+- `[WHITEBOARD: 与现在相反 = If + 过去式(were), would + 动词原形]`
 
-2. 对过去的愿望：
-- 经典例句：I wish (that) I had eaten the carrot.
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`If I am you, I will apologize.`
+- ✅ 正确标准答案：`If I were you, I would apologize.`
 
-3. 对将来的愿望：
-- 经典例句：I wish (that) I could eat the carrot.
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“你又不可能真变成别人，何必拿一般现在时装真实。虚拟语气就是白日梦的正装，请把 `were` 和 `would` 穿整齐。”
 
-这里有一个需要注意的地方：为什么虚拟语气在描述与当前、过去、将来的客观事实相反的情况时，从句要使用一般过去时和过去完成时？
-为了解释清楚这个看似违背常识的现象，我们需要引入一个语言学中的概念：“距离感 (Distance)”。 从英语时态的本质上说，过去时（Past Tense）这个形态，并不仅仅被用来表达“时间上的过去”。它真正核心的作用，是用来强调“与当前状态的距离”。
-我们可以认为英语的时态体系具备两个方面的作用：
-1. 表示时间距离 (Temporal Distance)：当想表达一个动作发生在昨天，使用过去时。这是为了拉开时间上的距离，告诉听众：“这件事不属于现在的时间”。
-2. 现实/心理距离 (Hypothetical/Psychological Distance)：当想表达一个现在根本不可能发生的事情（比如 If I had a million dollars now），需要向听众发送一个强烈的信号：“注意，接下来我要说的话，完全脱离了我们当前的现实世界！” 为了拉开这种与真实世界的距离，英语系统“借用”了过去时的外壳来做标记。
-也就是说，虚拟语气中，从句使用的过去时、过去完成时，并不是说这个行为发生在过去，而是强调这个事情的状态并不存在。此外，一般现在时（Present Tense）在英语里有描述客观事实、真理的作用，因此其描述拥有“真实性”。它天生自带一种“这是真的”、“这很可能发生”的属性。
-例如，如果说：If I have a million dollars... 听众的大脑会默认这是一个极其真实的条件：“哦？你是不是马上就要中彩票了？还是你马上要继承遗产了？”（这是真实条件句）。
-但如果只是表达一种假设的情况，防止听众产生对真实性的联想，就变成了过去时：If I had a million dollars now... 听众一听到过去时的发音，但明明结合语境聊的是现在的事（now），大脑就会瞬间产生认知冲突，从而立刻触发 Subjunctive Mood 接口，秒懂你是在“做白日梦”。
-这也解释了为什么在描述与现在相反的虚拟语气中，无论主语是 I 还是 He，be 动词一律要用 were（如 If I were a boy），而不用 was。
-因为 was 太常用于真实的过去时间了(一般过去时)。而第一/第三人称单数强行搭配 were，是一种极其“反常”的语法形态。这种反常感能最大化地拉开现实距离，极其刺耳地提醒对方：“这纯属虚构！”
+#### 与将来预期相反 (Unreal Future)
+**【白板核心公式】**
+- `[WHITEBOARD: 与将来相反 = If + should do / were to do / 过去式, would + 动词原形]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`If I will see the teacher tomorrow, I would admit my mistake.`
+- ✅ 正确标准答案：`If I should see the teacher tomorrow, I would admit my mistake.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“条件从句里乱塞 `will`，像在门上又装一扇门。想表达‘万一将来几乎不会发生’，请用虚拟那套，不要把真实条件和幻想条件炖成一锅糊汤。”
+
+#### 与过去事实相反 (Unreal Past)
+**【白板核心公式】**
+- `[WHITEBOARD: 与过去相反 = If + had done, would have done]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`If I saw that movie last week, I would have finished the review.`
+- ✅ 正确标准答案：`If I had seen that movie last week, I would have finished the review.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“过去没发生的事，请用 `had done` 把遗憾钉死。你只写过去式，像悔过书少写一半，诚意和语法一起蒸发。”
+
+#### 建议、命令、要求类虚拟 (Mandative Subjunctive)
+**【白板核心公式】**
+- `[WHITEBOARD: insist/suggest/demand... + that + 主语 + (should) + 动词原形]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The teacher suggested that he goes home early.`
+- ✅ 正确标准答案：`The teacher suggested that he go home early.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`suggested that he goes` 这种写法，像穿着礼服踩拖鞋。建议要求类从句里动词请回原形，别把三单尾巴乱甩。”
+
+#### wish 对现在的愿望 (Wish about Present)
+**【白板核心公式】**
+- `[WHITEBOARD: wish + 过去式 = 希望现在不同]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I wish I am a bird.`
+- ✅ 正确标准答案：`I wish I were a bird.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`wish` 后面不是许愿池自动贩卖机。既然说的是不现实的现在愿望，就给我用虚拟过去式，别把幻想写得像天气预报。”
+
+#### wish 对过去的愿望 (Wish about Past)
+**【白板核心公式】**
+- `[WHITEBOARD: wish + had done = 希望过去不同]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I wish I ate the carrot.`
+- ✅ 正确标准答案：`I wish I had eaten the carrot.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“后悔过去就老老实实 `had done`。你只写 `ate`，像忏悔时顺手交了篇流水账，不痛不痒。”
+
+#### wish 对将来的愿望 (Wish about Future)
+**【白板核心公式】**
+- `[WHITEBOARD: wish + could/would + 动词原形 = 希望未来改变]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I wish I can eat the carrot tomorrow.`
+- ✅ 正确标准答案：`I wish I could eat the carrot tomorrow.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`wish` 后面对未来愿望，别再把普通陈述句生搬硬套。你不是在报计划表，你是在表达求而不得的怨念。”
 
 ## 第四节：非谓语动词
 
-在语法综述的章节，我们曾经说过：绝大多数句子表达的含义其实只有一个：“什么+怎么样”。即“主语+谓语”的形式，谓语有只一个核心的动词，称为**谓语动词**，谓语动词有三个能力：通过动词的变位，表明动作的时间、状态、语气，合称为**时体气(TAM)**，例如： I hate you. She is doing homework. He has eaten a hamburger. 在这些句子中，谓语动词都受到了主语的限制出现了时体气的变化，相当于限定这些动词的变化，因此谓语动词也被称为**限定性动词(Finite Verb)**. 那么与之相反的，不受到主语的限制的动词，称为**非谓语动词/非限定性动词(Non-finite Verb)**, 作为不被限定的代价，这类动词也就没有表达时态的本领了。
-这也说明了为什么两个简单句无法仅仅用逗号连接，例如：I am a student, I eat apples. 这句话在语法上是错误的，因为一个简单句中，只能有一个谓语动词。对应的修改是，要么改成并列句(加上一个连词)：I am a student, and I eat apples. 要么改成从句的形式：I am a student who eats apples.
-非谓语动词可以充当除谓语动词外的句子成分(主语、宾语、宾语补语、主语补语、定语、状语等)。
+### 非谓语动词总览 (Non-finite Verb Overview)
+**【白板核心公式】**
+- `[WHITEBOARD: 非谓语 = to do / doing / done]`
+- `[WHITEBOARD: 非谓语不扛主句时态，只做成分]`
 
-### 动词不定式
-**不定式(infinitive)**源于拉丁文"infinitus"意思是"无限", 也就是不受时间、人称的限制的意思。
-- 经典例句： To be or not to be, that is a question. 有的语法书会称这种不定式为**完全不定式(Full Infinitive)**.
-- 形态标志: to + 动词原形
-但有时"to"会省略，例如： He helped me (to) finish the work. "help"是谓语动词，而"finish"是不定式省略"to". 有的语法书会称这种不定式为**裸不定式(Bare Infinitive)**.
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I am a student, I eat apples.`
+- ✅ 正确标准答案：`I am a student, and I eat apples.` / `I am a student who eats apples.`
 
-1. 不定式作主语：
-- 经典例句：To eat an apple every day is good for your health.
-"to eat"做不定式，句子的主语是"To eat an apple every day", "is" 做系动词， "good for your health"做表语，构成主系表结构。
-上述句子可以改写成：It is good for your health to eat an apple every day. 这是一个常见的搭配：it is + adj.(形容词) + for somebody + to do sth. 这种写法是为了避免像上一句中主语太长而显得头重脚轻。这里的"it"称为形式主语，而真正的主语是"to eat an apple every day". 
-也相当于带形式主语的主语从句: It is good for your health that you eat an apple every day. "it"称为形式主语， "that you eat an apple every day"是主语从句。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“两个完整简单句直接拿逗号缝起来，像用创可贴修高架桥。并列就加连词，修饰就变从句，别指望标点替你干语法的活。”
 
-2. 不定式作宾语
-- 经典例句：Jason likes to watch Tiktok. "to watch Tiktok"作宾语。
-但有的动词后是不可接不定式做宾语的。
-it除了做形式主语外，也可以做形式宾语，例如：She considers it important to report latest situation. "to report latest situation"是宾语。
+### 动词不定式 (Infinitive)
 
-3. 不定式作宾补
-- 经典例句：The boy expected the dog to chase the rat. 
-这里主语"The boy", 谓语动词"expected",宾语"the dog", 宾补"to chase the rat".
- 需要注意的是，有些动词"see, find, watch, have, make, let"等, 用于不定式做宾补时需要省略"to". 即构成**裸不定式(Bare Infinitive)**. 例如：Vegetables make me feel healthy. "feel healthy"做宾补。
- 也有一些动词"to"省略与否意义不大，例如：The teacher helped me finish my homework. 也可以写为：The teacher helped me to finish my homework.
+#### 不定式基本形态 (Basic Form)
+**【白板核心公式】**
+- `[WHITEBOARD: 不定式 = to + 动词原形]`
+- `[WHITEBOARD: 裸不定式 = 动词原形]`
 
- 4. 不定式作表语
- - 经典例句：My dream is to be a scientist. "to be a scientist"做表语。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I want learn English.`
+- ✅ 正确标准答案：`I want to learn English.`
 
- 5. 不定式作定语
- - 经典例句：Lisa got a lot of work to do. "to do"做后置定语修饰"work", 这句话是说，Lisa有很多的工作，很多什么样的工作呢？是很多要做的工作。整句话的意思就是Lisa有很多要做的工作。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“不定式最基本的 `to` 都能丢，像出门西装革履却忘了穿鞋。想、希望、计划这类动词后面，先把结构穿戴整齐。”
 
- 6. 不定式作状语：
- - 经典例句(表示原因)：He was surprised to get a promotion. "to get a promotion"做状语表原因。也可以写成原因状语从句： He was surprised because he got a promotion.
+#### 不定式作主语 (Infinitive as Subject)
+**【白板核心公式】**
+- `[WHITEBOARD: To do ... + be + 表语]`
+- `[WHITEBOARD: 形式主语版 = It is + adj. + to do]`
 
- -经典例句(表示目的)：Jack will do the housework to earn some money. "to earn some money"做状语表目的，也可以写成表目的状语从句：Jack will do the housework in order that he earns some money.
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Eat an apple every day is healthy.`
+- ✅ 正确标准答案：`To eat an apple every day is healthy.` / `It is healthy to eat an apple every day.`
 
--经典例句(表示结果)：I have collected enough books to donate to  the library. "to donate to the library."做状语，表结果。也可以写成结果状语从句：I have collected enough books so that I can donate them to the library.
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“主语位置要么用完整不定式，要么换成形式主语 `it`。你这句半生不熟，像苹果切一半就端上桌，既不体面也不安全。”
 
-更加高级的不定式的用法：是将不定式和动词的状态相结合，相当于把形态标志: to + 动词原形中的动词原形扩展为更多的状态(进行、完成、完成进行), 尽管表达了状态，但作为非谓语动词，仍然不能取代谓语动词描述时体气的能力。
--经典例句: The dog seemed to be eating a bone. 这只狗之前似乎正在吃一根骨头。
-          He will appear to have worn a coat. 他(之后)会看起来像穿上了一件外套。
+#### 不定式作宾语 (Infinitive as Object)
+**【白板核心公式】**
+- `[WHITEBOARD: like/want/hope/plan + to do]`
+- `[WHITEBOARD: 形式宾语 = consider/find + it + adj. + to do]`
 
-### 动名词
-将动词转化为名词，具备名词的属性，称为**动名词(Gerund)**。因此，名词能够充当的句子成分，动名词同样可以。
-- 形态标志:  动词ing形式
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She considers important to report the news.`
+- ✅ 正确标准答案：`She considers it important to report the news.`
 
-1. 动名词做作主语
--经典例句: Eating breakfast is healthy for children. "Eating breakfast"作为主语，并且"吃早餐"这个行为相当于一个名词， "is"做系动词，"healthy"做表语。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“形式宾语里的 `it` 不是摆设，是支撑结构的钢梁。你把它拆了，剩下那句就像违章建筑，风一吹就塌。”
 
-2. 动名词作表语
--经典例句: My hobby is collecting stamps. "collecting stamps"作为表语。
+#### 不定式作宾补 (Infinitive as Object Complement)
+**【白板核心公式】**
+- `[WHITEBOARD: expect/tell/ask + O + to do]`
+- `[WHITEBOARD: see/watch/make/let/have + O + do]`
 
-2. 动名词作定语
--经典例句: A washing machine. "washing"作为定语，修饰"machine".
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I made him to apologize.`
+- ✅ 正确标准答案：`I made him apologize.`
 
-3. 动名词作宾语
--经典例句: Miss Mary enjoys watching live streaming. "watching live streaming"作宾语。
-这里需要注意的是：非谓语动词的不定式，可以作为宾语，并且动名词也可作为宾语，但二者存在着区别，例如：
-The farmer stopped to grow corn. 在这里"stopped to grow"表示停止种植，并含有去做另一件事情的意思。而 The farmer stopped growing corn. 则是强调农夫停止种植玉米这件事情。参考我们之前语法综述中的结论：
-**动词不定式 (Infinitive)**：to + 动词原形。常自带“目的”和“将来”的意味。
-**动名词 (Gerund)**：动词 + ing。完全把动词当名词用，常表示习惯性或抽象的动作。
-之前讨论过有的动词后是不可接不定式做宾语的，这些动词包括：enjoy, avoid, advise, consider, escape, mind, practice等动词；insist on, give up, feel like, put off等词组。
-此外，宾语除了接在动词后，也可以接在介词后，也即是介词 + 动名词的形式。
-例如：Mike is fond of playing video games.
-有时候，会遇到"to"作介词的词组，应当注意不要跟动词不定式相混淆，例如：I am looking forward to receiving your reply. "look forward to"是动词短语，"to"是介词，后接动名词"receiving"作宾语，而不是动词不定式。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“使役和部分感官动词后面锁死裸不定式。`made him to apologize` 这种写法，像在咖啡里倒酱油，理论上都能入口，实践上非常冒犯。”
 
-### 现在分词
-**现在分词 (Present Participle)**动词的ing形态。表示“主动”和“正在进行”。作为非谓语动词，同样不发挥非谓语动词的功能，因此，现在分词未必描绘了动作在"现在"的状态。
+#### 裸不定式高危区 (Bare Infinitive Trap)
+**【白板核心公式】**
+- `[WHITEBOARD: make / have / let + O + do]`
+- `[WHITEBOARD: get + O + to do]`
 
-1. 现在分词作定语和动名词在作定语时的区别如下：
--经典例句: A sleeping dog. 一只睡着的狗。 属于现在分词作定语。"sleeping"修饰兔子的状态。
-而这句话： A sleeping pill. 一片安眠药。 可以写为：A pill for sleeping. 这是动名词作为定语，修饰药片的功能。
-也就是说，两者的区别在于现在分词作定语表动作/状态（狗在睡）；动名词作定语表功能/用途（药片用来睡）。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She let me to leave early.`
+- ✅ 正确标准答案：`She let me leave early.`
 
-2. 现在分词作表语
--经典例句: The prince is charming. 王子有魅力。 事实上，charming(adj.)是由动词charm变换得到的，也就是charm的现在分词形式。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`let` 后面还加 `to`，像明明电梯直达，你非要在里面装一截楼梯。使役动词有自己的脾气，别拿统一模板硬套。”
 
-3. 现在分词作宾补
--经典例句: I saw him climbing the tree. 我之前看到他正在爬树。现在分词"climbing"作宾补。
-这里需要区分不定式作宾补和现在分词作宾补的区别，例如：
--经典例句: She saw Tom escape from a disaster.  她看见了汤姆逃离了灾难。 "escape"是不定式，"escape from a disaster"作宾补。
-区别在于：动词不定式作为宾补时，表示的是动作从头到尾的发展过程，强调事情已经发生；现在分词作宾补时，强调动作正在进行中，意在说明动作的状态。
+#### 不定式作表语 (Infinitive as Predicative)
+**【白板核心公式】**
+- `[WHITEBOARD: 主语 + be + to do]`
 
-4. 现在分词作状语
--经典例句: Hearing the news, the whole country became excited. 听到这个消息，举国陷入了激动。"Hearing the news"作为时间状语从句。也可以说： When people heard the news, the whole country became excited.
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`My dream is be a scientist.`
+- ✅ 正确标准答案：`My dream is to be a scientist.`
 
-### 过去分词
-**过去分词 (Past Participle)**：动词的过去分词形式 (done)。表示“被动”和“已经完成”。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“表语位置的不定式也得带 `to`，别写得像愿望还没出生就先夭折了。”
 
-1. 过去分词作定语
--经典例句: Liquefied natural gas. 液化天然气。
-这里需要注意的是，常见的形容词、过去分词作定语接在名词前，但，过去分词短语作定语则要放在名词后，即**后置定语**。例如：The building destroyed by the tornado is expensive.
+#### 不定式作定语 (Infinitive as Attributive)
+**【白板核心公式】**
+- `[WHITEBOARD: 名词 + to do = 要做的 / 可做的]`
 
-2. 过去分词作表语
--经典例句: Max is excited about hiking. 
-这里需要区分现在分词和过去分词作表语的区别：
--经典例句: The book is interesting. 这本书很有趣。 现在分词体现出了动作的主动关系，即动作、现象是动作描述对象做出的。
--经典例句: The policeman is irritated. 警察被激怒了。过去分词体现出了动作的被动关系，即动作、现象是对动作描述对象做出的。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Lisa has a lot of work do.`
+- ✅ 正确标准答案：`Lisa has a lot of work to do.`
 
-3. 过去分词作宾补
--经典例句: The old man found his wallet stolen. "stolen"作宾补。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`work to do` 这种结构非常老实。你把 `to` 拿掉，整句像工位上只剩任务，没有执行说明，荒凉得很。”
 
-4.过去分词作状语
--经典例句: Seen from the space station, the earth looks beautiful. 从空间站看，地球很美。 "the earth"充当了过去分词"Seen"的逻辑主语，而"the earth"与"Seen"应当是被动关系，即地球是被看的。
--经典例句: Born into a farming family, the old Mike has been growing corn all his life. 出生在农场家庭，老麦克种了一辈子玉米。
+#### 不定式作状语 (Infinitive as Adverbial)
+**【白板核心公式】**
+- `[WHITEBOARD: to do 可表目的 / 结果 / 原因]`
 
-## 第五节: 独立主格
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He studied hard for pass the exam.`
+- ✅ 正确标准答案：`He studied hard to pass the exam.`
 
--经典例句: The work finished, the worker went home. 这句话是简单句，谓语动词是"went".
-这里需要注意的是，之所以用过去分词 finished，是因为它的逻辑主语是前面的"The work".工作是被完成的（The work is finished），这属于被动关系，所以必须用过去分词。而主句的主语是 "the worker". 整句话相当于一个并列句： The work was finished, and the worker went home. 或者从句：After the work was finished, the worker went home.
-上述例句通过让句子只有一个谓语动词，其他动词变成非谓语动词，并用简单句写出的操作，这种语法现象称为独立主格。之所以称为独立主格，是因为"The work finished"在整句话中作状语成分，而在状语中，"The work"相对于"finished"有"主语"的意义，在语法上称"The work"是动词"finished"的逻辑主语，但并不是真正意义上的主语，故称为"主格"； 此外，"The work"是游离于真正主语"the worker"之外的，在状语成分中具备了类似"主语"的地位，故称为"独立"，合称**独立主格(Absolute Nominative)**。
-再看看独立主格对于句子的简化作用：可以把它提炼成一个万能公式- 独立主格 = **逻辑主语(Logical Subject)** + **逻辑谓语(Logical Predicate)**
-1. 名词/代词 + 现在分词
--经典例句: If the weather permits, Martin will go out. 这是个状语从句。
--经典例句: The weather permitting, Martin will go out. 这是独立主格的表述。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“目的状语用不定式，别把 `for` 乱推上去顶班。语法岗位混用，跟让园丁去开飞机没区别。”
 
-2. 名词/代词 + 过去分词
--经典例句: The grandma is lying in bed and a book is still held in her hand. and引导的并列句。
--经典例句: The grandma is lying in bed, a book still held in her hand. 这里要注意的是：既然已经把 held 变成了非谓语动词（构成了独立主格），这个句子就不再是并列句了。绝对不能保留连词"and"独立主格和主句之间只能用逗号隔开。
+#### 不定式进阶状态 (Advanced Infinitive Forms)
+**【白板核心公式】**
+- `[WHITEBOARD: to be doing / to have done / to have been doing]`
+- `[WHITEBOARD: 非谓语也可带状态，但不扛主句时态]`
 
-3. 名词/代词 + 动词不定式
--经典例句: The general to come, the soldiers are excited. 将军要来，士兵们很激动。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He seems eating.`
+- ✅ 正确标准答案：`He seems to be eating.`
 
-4. 名词/代词 + 名词
--经典例句: Many people went to the meeting, some of them experts. 许多人参加会议，其中有些人是专家。 因为"some of"是不定代词的短语，后面可以直接跟名词/形容词。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`seem` 这种动词后面爱接不定式，你直接塞一个 `eating`，像西装扣子扣到别人衣服上，错位得很努力。”
 
-5. 名词/代词 + 副词
--经典例句: The child sat on a table, hands up.
+### 动名词 (Gerund)
 
-6. 名词/代词 + 介词短语
--经典例句: The mob came in, gun in hand.
+#### 动名词基本形态 (Basic Form)
+**【白板核心公式】**
+- `[WHITEBOARD: 动名词 = doing = 动作名词化]`
 
-7. 名词/代词 + 形容词
--经典例句: Many students participated in the activity, some of them happy.
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Swim is good exercise.`
+- ✅ 正确标准答案：`Swimming is good exercise.`
 
-上述独立主格的结构可以归纳为：名词/代词 + (being) + 形容词/副词/介词短语，但是省略了"being".例如：Many people went to the meeting, some of them (being) experts. The child sat on a table, hands (being) up. 为什么动词不定式、现在分词、过去分词不适用？因为现在分词的例句中本身就不存在系动词be，它是实义动词 permit 直接发生形变，变成了 permitting。如果你强行用“省略了 being”去解释，就会变成 The weather being permitting，这不仅啰嗦，而且时态语感全错了（变成了荒谬的“天气正在允许”）；同样，不定式的例句中不定式"to do"本身就自带“将来”的属性，直接替代了 will come。这里面也从来没有出现过 be 动词。不能解释为 The general being to come;对于过去分词的例句，在英语里，过去分词 "finished"本身就已经极其完美地包含了“被动”和“完成”的双重属性。如果强行加上being，变成 The work being finished，这通常会被理解为“正在被完成”或者强调原因（因为工作正在被完成）。所以，The work finished 不是“省略being”，而是直接把过去分词拿过来当修饰语用了。
-这里需要注意，独立主格的后半部分如果是介词短语、副词、形容词时，无论前面是名词还是代词，being 通常都是天然省略的（为了追求极简）。比如：He sat there, his eyes closed.（没有 being，前面是物主代词+名词）。如只有人称代词，则不能省略。
-此外，我们在讨论独立主格时，仍然涉及到了非谓语动词的概念：如现在分词和逻辑主语的搭配表示主动、进行的概念；过去分词和逻辑主语则体现被动、完成的状态； 其他的形式则是省略现在分词"being"的形式，因此，学好独立主格，要求我们也要具备对非谓语动词的理解。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“要把动作当名词用，就别拿动词原形硬闯。你这句像让短跑选手去坐办公室，岗位完全不对。”
 
-注意这个结构： "with" + 宾语 + 宾补，也是一个独立主格结构，例如：
--经典例句: The scientist came in, with a laptop in his hand. 即with a laptop (being) in his hand. 这句话还可以继续省略：
--经典例句: The scientist came in, laptop in hand. 省掉了冠词和物主代词。
+#### 动名词作主语 (Gerund as Subject)
+**【白板核心公式】**
+- `[WHITEBOARD: Doing ... + be + 表语]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Eat breakfast is healthy for children.`
+- ✅ 正确标准答案：`Eating breakfast is healthy for children.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“主语位置要的是名词感，不是光秃秃的动词原形。连句子门口的门禁都过不了，还想进来上班？”
+
+#### 动名词作表语 (Gerund as Predicative)
+**【白板核心公式】**
+- `[WHITEBOARD: 主语 + be + doing(动名词)]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`My hobby is collect stamps.`
+- ✅ 正确标准答案：`My hobby is collecting stamps.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“爱好这种东西要名词化表达，不是把原形动词丢上去就假装文明。语感粗糙得像砂纸。”
+
+#### 动名词作定语 (Gerund as Attributive)
+**【白板核心公式】**
+- `[WHITEBOARD: 动名词定语 = 表功能/用途]`
+- `[WHITEBOARD: washing machine = machine for washing]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`a sleep pill`
+- ✅ 正确标准答案：`a sleeping pill`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“这里说的是药片的用途，不是药片本人正在睡觉。功能和状态都分不清，词尾已经替你羞耻了。”
+
+#### 动名词作宾语 (Gerund as Object)
+**【白板核心公式】**
+- `[WHITEBOARD: enjoy/avoid/practice/mind + doing]`
+- `[WHITEBOARD: 介词后 = doing]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Miss Mary enjoys to watch live streaming.`
+- ✅ 正确标准答案：`Miss Mary enjoys watching live streaming.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`enjoy` 后面偏爱动名词，不是你想塞什么就塞什么。搭配都不背，像闭眼参加钢琴比赛，勇气可嘉，结果可悲。”
+
+#### to do vs doing (Infinitive vs Gerund)
+**【白板核心公式】**
+- `[WHITEBOARD: stop to do = 停下来去做另一事]`
+- `[WHITEBOARD: stop doing = 停止正在做的事]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He stopped to smoke.`（想表达戒烟）
+- ✅ 正确标准答案：`He stopped smoking.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`stop to smoke` 是停下手头事情去抽烟，`stop smoking` 才是戒烟。两者意思差得像辞职和摸鱼，你可别再混成一锅。”
+
+#### 介词后动名词 (Gerund after Preposition)
+**【白板核心公式】**
+- `[WHITEBOARD: 介词 + doing]`
+- `[WHITEBOARD: look forward to / be fond of / insist on + doing]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I am looking forward to receive your reply.`
+- ✅ 正确标准答案：`I am looking forward to receiving your reply.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“这里的 `to` 是介词，不是不定式发车口。你看见 `to` 就无脑接原形，条件反射快得像见到红灯还加速。”
+
+### 现在分词 (Present Participle)
+
+#### 现在分词基本含义 (Basic Meaning)
+**【白板核心公式】**
+- `[WHITEBOARD: 现在分词 = doing = 主动 / 进行]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The cry girl ran away.`
+- ✅ 正确标准答案：`The crying girl ran away.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“现在分词作定语时，是在给名词挂状态标签。你直接把原形扔上去，像给快递贴白纸，信息量为零。”
+
+#### 现在分词定语 vs 动名词定语
+**【白板核心公式】**
+- `[WHITEBOARD: sleeping dog = 正在睡的狗]`
+- `[WHITEBOARD: sleeping pill = 用来睡觉的药]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：把 `sleeping pill` 解释成“正在睡觉的药片”
+- ✅ 正确标准答案：`sleeping` 在这里是动名词作定语，表示用途，不是状态。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“药片本人并不会打哈欠上床，谢谢。功能型定语和状态型定语分不清，想象力倒是比语法跑得快。”
+
+#### 现在分词作表语 (Present Participle as Predicative)
+**【白板核心公式】**
+- `[WHITEBOARD: be + charming/interesting/exciting ...]`
+- `[WHITEBOARD: 现在分词表语 = 主动使人产生某感受]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The movie is bored.`
+- ✅ 正确标准答案：`The movie is boring.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“电影让人无聊，所以电影是 `boring`，不是电影自己‘感到无聊’。主动和被动都能错位，句子当然会精神分裂。”
+
+#### 现在分词作宾补 (Present Participle as Object Complement)
+**【白板核心公式】**
+- `[WHITEBOARD: see/watch/hear + O + doing = 看见过程进行中]`
+- `[WHITEBOARD: see/watch/hear + O + do = 看见全过程]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I saw him climb the tree.`（想强调正在爬）
+- ✅ 正确标准答案：`I saw him climbing the tree.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“想抓住动作正在发生的画面，就用 `doing`。你写成裸不定式，像监控只留了开头和结尾，中间全黑屏。”
+
+#### 现在分词作状语 (Present Participle as Adverbial)
+**【白板核心公式】**
+- `[WHITEBOARD: Doing ..., 主句]`
+- `[WHITEBOARD: 常表时间 / 原因 / 伴随]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Hear the news, everyone became excited.`
+- ✅ 正确标准答案：`Hearing the news, everyone became excited.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“分词状语不是把动词原形拎出来晒太阳。该变形就变形，别让句子穿着睡衣出门。”
+
+### 过去分词 (Past Participle)
+
+#### 过去分词基本含义 (Basic Meaning)
+**【白板核心公式】**
+- `[WHITEBOARD: 过去分词 = done = 被动 / 完成]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The break window was expensive.`
+- ✅ 正确标准答案：`The broken window was expensive.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“窗户是被打碎的，不是自己主动去‘break’谁。被动意味都写不出来，物理世界看了都想报警。”
+
+#### 过去分词作定语 (Past Participle as Attributive)
+**【白板核心公式】**
+- `[WHITEBOARD: 单个过去分词常前置；分词短语常后置]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The destroyed by the tornado building is expensive.`
+- ✅ 正确标准答案：`The building destroyed by the tornado is expensive.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“分词短语那么长，还非要硬塞到名词前面，像把整套沙发试图塞进鞋盒，审美和空间感都很可疑。”
+
+#### 过去分词作表语 (Past Participle as Predicative)
+**【白板核心公式】**
+- `[WHITEBOARD: interested / excited / irritated = 受到影响的状态]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The policeman is irritating.`
+- ✅ 正确标准答案：`The policeman is irritated.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“如果警察是‘被惹恼的’，就用 `irritated`。你写 `irritating`，等于说警察本人惹人烦，虽然有时也不是完全没可能，但这里不是这个意思。”
+
+#### 过去分词作宾补 (Past Participle as Object Complement)
+**【白板核心公式】**
+- `[WHITEBOARD: find / keep / leave / have + O + done]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The old man found his wallet steal.`
+- ✅ 正确标准答案：`The old man found his wallet stolen.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“钱包是‘被偷了’，不是自己跑去偷别人。宾补位置的被动都看不出来，属实对受害者不太尊重。”
+
+#### 过去分词作状语 (Past Participle as Adverbial)
+**【白板核心公式】**
+- `[WHITEBOARD: Done ..., 主句]`
+- `[WHITEBOARD: 逻辑主语与分词 = 被动关系]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Seeing from space, the earth looks beautiful.`
+- ✅ 正确标准答案：`Seen from space, the earth looks beautiful.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“地球是‘被看见’，不是自己长了眼睛在看你。逻辑主被动关系再乱套，句子就会开始超自然。”
+
+## 第五节：独立主格
+
+### 独立主格总览 (Absolute Construction)
+**【白板核心公式】**
+- `[WHITEBOARD: 独立主格 = 逻辑主语 + 逻辑谓语/补语]`
+- `[WHITEBOARD: 主句只能保留 1 个核心谓语]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The work finished, and the worker went home.`
+- ✅ 正确标准答案：`The work finished, the worker went home.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“都已经用独立主格把前半截降级了，还舍不得丢 `and`。这就像人都下车了，你还坚持给空座位买票。”
+
+### 名词/代词 + 现在分词 (Noun + Present Participle)
+**【白板核心公式】**
+- `[WHITEBOARD: N + doing = 主动 / 进行]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The weather permiting, Martin will go out.`
+- ✅ 正确标准答案：`The weather permitting, Martin will go out.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“拼写都能把 `permitting` 弄断腿，确实很有个人风格。独立主格已经够难了，别再把词本身也写残。”
+
+### 名词/代词 + 过去分词 (Noun + Past Participle)
+**【白板核心公式】**
+- `[WHITEBOARD: N + done = 被动 / 完成]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The work finishing, the worker went home.`
+- ✅ 正确标准答案：`The work finished, the worker went home.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“工作是被完成，不是自己正在主动完成别人。关系一错，整句像桌子自己在给主人开会。”
+
+### 名词/代词 + 动词不定式 (Noun + Infinitive)
+**【白板核心公式】**
+- `[WHITEBOARD: N + to do = 将来 / 未发生]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The general coming, the soldiers were excited.`（想表达将军将到）
+- ✅ 正确标准答案：`The general to come, the soldiers were excited.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“想表达‘即将到来’，请用不定式。你拿现在分词乱顶，时态语感像把明天写成正在发生，时间管理烂得透明。”
+
+### 名词/代词 + 名词 (Noun + Noun)
+**【白板核心公式】**
+- `[WHITEBOARD: N + 名词 = 省略 being 的静态补充]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Many people went to the meeting, some of them were experts.`
+- ✅ 正确标准答案：`Many people went to the meeting, some of them experts.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“既然要压缩成独立主格，就别把完整谓语又搬回来。你这操作像辛苦减肥三个月，转头把奶茶当水喝。”
+
+### 名词/代词 + 副词 (Noun + Adverb)
+**【白板核心公式】**
+- `[WHITEBOARD: N + adv = 省略 being 的状态]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The child sat on a table, hands were up.`
+- ✅ 正确标准答案：`The child sat on a table, hands up.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“压缩结构时还把 `were` 留在那儿，像行李都托运了，手里还攥着空箱子把手，不嫌累吗？”
+
+### 名词/代词 + 介词短语 (Noun + Prepositional Phrase)
+**【白板核心公式】**
+- `[WHITEBOARD: N + prep phrase = 省略 being]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The mob came in, gun was in hand.`
+- ✅ 正确标准答案：`The mob came in, gun in hand.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“独立主格的魅力就在于利落。你非要把 `was` 拉回来，像西装都熨平了又拿去团一遍。”
+
+### 名词/代词 + 形容词 (Noun + Adjective)
+**【白板核心公式】**
+- `[WHITEBOARD: N + adj = 省略 being 的状态补充]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Many students participated in the activity, some of them were happy.`
+- ✅ 正确标准答案：`Many students participated in the activity, some of them happy.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“要么写完整分句，要么彻底压缩。半压不压的结构最丑，像头发只吹了一半还敢出门。”
+
+### with + 宾语 + 宾补 (With-Construction)
+**【白板核心公式】**
+- `[WHITEBOARD: with + O + C = 伴随型独立主格]`
+- `[WHITEBOARD: with a laptop in his hand = laptop in hand]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The scientist came in, with a laptop was in his hand.`
+- ✅ 正确标准答案：`The scientist came in, with a laptop in his hand.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`with` 结构里别再额外挂一个 `was`，这不是给你自由发挥叠句子的区域。结构已经够你用了，别贪。”
 
 ## 第六节：助动词
-先前的语法综述中，我们讨论过了谓语动词往往无法独立表达某些语法概念，需要其他词的辅助，而这些用于辅助构成谓语动词的词称为**助动词(Auxiliary Verbs)**. 例如：
--经典例句: The monkey will eat a banana. 如果是一般现在时，我们可以说The monkey  eats a banana. 如果是一般过去时可以说The monkey  ate a banana. 可以看到，谓语动词"it"有现在时和过去时的变位，但是没有将来时的变位，那么如何表达将来时态呢？就需要借助助动词"will".
-综上所述，助动词有两个基本特征：1. 辅助谓语动词；2. 不能单独作谓语动词。例如：
--经典例句: I can drive car. 这句换不能说I can car.
 
-### 基本助动词
-**基本助动词 (Primary Auxiliaries)**只有三个：be, do, have. 这些词作为助动词，本身并没实际含义。但是，这些词也可以作实义动词，即单独作谓语动词，例如：to be or not to be; I do my job; He has a car.
-基本助动词be的应用：
-1. The horse is running on the ranch. 这里助动词be变位为is辅助构成现在进行时态。
-2. The victim was killed by the murderer. 助动词辅助构成被动语态。
+### 助动词总览 (Auxiliary Overview)
+**【白板核心公式】**
+- `[WHITEBOARD: 助动词 = 辅助谓语，不单独扛完整句意]`
+- `[WHITEBOARD: 基本助动词 = be / do / have]`
 
-have的应用：
-1. Mike has eaten the meal. 助动词辅助构成现在完成时态。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I can car.`
+- ✅ 正确标准答案：`I can drive a car.`
 
-do的应用：
-1. She does enjoy watching movies. 助动词辅助动词，表示强调。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“助动词不是吃完主菜就走人的餐前面包，后面得有实义动词。`I can car` 这种句子，像说‘我会汽车’，荒唐得很统一。”
 
-### 情态助动词
-**情态助动词 (Modal Auxiliaries)**包括：can/could, may/might, will/would, shall/should, must, ought to, dare/dared, need, used to. 同样的，这些词也可以作实义动词，即单独作谓语动词。
+### 基本助动词 (Primary Auxiliaries)
 
-can/could的应用：
-1. The knife can cut threads. 辅助动词"cut"， 表示有能力做某事。
-2. Can/Could you lend me a pen? 辅助动词"lend", 表示许可。此处尽管could是过去式，但并不是谓语动词，不表达时间上的含义，而是表达礼貌，委婉的语气。
-3. Anything can/could happen. 辅助动词，表示可能性。could含有对过去的推测，；例如： Tim could have gone home earlier, but he didn't finish work on time. "could have gone"就是对过去的虚拟表达。
+#### be 的助动用法 (Auxiliary Be)
+**【白板核心公式】**
+- `[WHITEBOARD: be + doing = 进行]`
+- `[WHITEBOARD: be + done = 被动]`
 
-may/might的应用：
-1. May/Might I use the toilet? 表示请求。
-2. Mr.Zeratul may/might be at home. 表示可能、也许，且概率小于 Can/Could. 且might的可能性比may更小。
-3. May god bless you. 表示祝愿。 这里不用might。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The horse is run on the ranch.`
+- ✅ 正确标准答案：`The horse is running on the ranch.`
 
-must的应用
-1. You must finish this task first. 表示必须做某事。
-2. You must not smoke here. 后加否定表示禁止做某事。
-3. He must walk through this road. 表示笃定的推测。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`be` 后面接什么，决定你句子是活的还是瘫的。进行时要 `doing`，别把原形拖出来丢人现眼。”
 
-will/would的应用
-1. I will kill you； He said he would become the king.辅助构成将来时、过去将来时。
-2. Will you marry me? 表示请求建议。 用would更礼貌。
-3. Ask Tao， He will/would know. 去问陶，他应该知道。 这里表推测。且would的推测程度要比will低。
+#### have 的助动用法 (Auxiliary Have)
+**【白板核心公式】**
+- `[WHITEBOARD: have + done = 完成态]`
 
-shall/should的应用
-1. I shall go home before 10p.m.. 辅助动词，构成将来时。
-2. Shall we meet at 1st street? 表示征求意见。
-3. They should pass that bill. 表示应该做某事。
-4. The answer should be 8. 表示推测。
-5. It's unbelievable that he should be late. 表示"竟然"。
-6. If it should rain tomorrow, I would stay at home. 构成虚拟语气。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Mike has ate the meal.`
+- ✅ 正确标准答案：`Mike has eaten the meal.`
 
-ought to的应用
-1. We ought to study hard. 表示应该，但语气比should强。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`have` 后面请上过去分词，不是过去式。完成态的门槛就这么低，你还是能被绊倒，真不容易。”
 
-need的应用
-1. I need some food. 表示需要。
-2. He needs wait. 这里need做情态动词，辅助主动词wait, 更常见的说法是：He needs to wait.但是，这里的need就不再做情态动词了，而是做谓语动词接不定式。如果对上面两句做否定，就是：He need not wait; He does not need to wait.
+#### do 的助动用法 (Auxiliary Do)
+**【白板核心公式】**
+- `[WHITEBOARD: do/does/did + 动词原形]`
+- `[WHITEBOARD: 用途：否定 / 疑问 / 强调]`
 
-dare的应用
-1. I dare not tell the truth to my parents. 做情态动词，表示"敢..."
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She does enjoys movies.`
+- ✅ 正确标准答案：`She does enjoy movies.`
 
-used to的应用
-1. Grandpa used to play piano, now he only watches videos. 强调过去常做某些事情，和现在做对比。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`does` 都上场了，后面动词就请回原形。两个标记抢一份活，像两个主持人同时读提词器，吵得难看。”
 
-### 半助动词
-这类词主要包括：be able to, be going to, be about to, had better等
-be able to的应用
-1. I will be able to break the world record, if I exercise every day. 表示能够做到某事，相较于can而言，还可以表示未来能做到的事情。
+### 情态助动词 (Modal Auxiliaries)
 
-be going to, be about to，be to的应用
-1. I am going to finish my homework. 表示打算做某事，跟will用法类似。
-2. He is about to join the part. 同样表示将要做某事，但是描述的时间范围更短。
-3. You are to deal with these tasks first. 强调必须先做某事， 或命中注定做某事。
+#### 情态助动词总规则 (Modal Rule)
+**【白板核心公式】**
+- `[WHITEBOARD: 情态动词 + 动词原形]`
+- `[WHITEBOARD: 无三单-s，无 to（ought to 除外）]`
 
-had better的应用
-1. You had better follow the instruction. 表示最好做某事，暗示有不好的结果。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He can sings well.`
+- ✅ 正确标准答案：`He can sing well.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“情态动词后面就是原形工位。你还给它加 `-s`，像电梯里再架一段楼梯，勤奋得毫无必要。”
+
+#### can / could
+**【白板核心公式】**
+- `[WHITEBOARD: can/could = 能力 / 请求 / 可能]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Could you to lend me a pen?`
+- ✅ 正确标准答案：`Could you lend me a pen?`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“礼貌请求用 `Could you + 动词原形`。你再塞个 `to`，像鞠躬鞠到一半突然平地摔，体面尽失。”
+
+#### may / might
+**【白板核心公式】**
+- `[WHITEBOARD: may/might = 许可 / 可能 / 祝愿]`
+- `[WHITEBOARD: might 的可能性通常更低]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He might is at home.`
+- ✅ 正确标准答案：`He might be at home.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“情态后面接原形，`be` 也一样。你把 `is` 塞进去，像给钥匙孔硬塞一把勺子，完全不匹配。”
+
+#### must
+**【白板核心公式】**
+- `[WHITEBOARD: must = 必须 / 禁止(must not) / 笃定推测]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`You must to finish this task.`
+- ✅ 正确标准答案：`You must finish this task.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`must` 后面不带 `to`。命令都下了，你还给它穿多一层格式外套，累不累？”
+
+#### will / would
+**【白板核心公式】**
+- `[WHITEBOARD: will/would = 将来 / 过去将来 / 请求 / 推测]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Would you like have lunch with me?`
+- ✅ 正确标准答案：`Would you like to have lunch with me?`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`would like` 后面接不定式，别写得像礼貌用语走到门口又摔了一跤。”
+
+#### shall / should
+**【白板核心公式】**
+- `[WHITEBOARD: shall = 征求意见/正式将来]`
+- `[WHITEBOARD: should = 应该 / 推测 / 虚拟条件]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Shall we to meet at 1st Street?`
+- ✅ 正确标准答案：`Shall we meet at 1st Street?`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“征求意见时 `Shall we + 动词原形` 就够了。别每见到动词就想给它加 `to`，那不是礼貌，是强迫症。”
+
+#### ought to
+**【白板核心公式】**
+- `[WHITEBOARD: ought to + 动词原形 = 应当]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`We ought study hard.`
+- ✅ 正确标准答案：`We ought to study hard.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“终于有个情态结构自带 `to`，你偏偏把它省了。命运把正确答案送到你手边，你还是能精准避开。”
+
+#### need
+**【白板核心公式】**
+- `[WHITEBOARD: need 作情态 = 多见否定/疑问：need not do / Need ... do?]`
+- `[WHITEBOARD: need 作实义 = need to do]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He needs wait here.` 
+- ✅ 正确标准答案：`He need not wait here.` / `He needs to wait here.`
+- 补充说明：情态 `need` 不加三单 `-s`，且后面接原形；实义动词 `need` 才用 `needs to do`。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`needs wait` 这种写法，像半截桥修在河中央，两边都不沾。要么情态：`need not wait`；要么实义：`needs to wait`。别把两套系统搅成粥。”
+
+#### dare
+**【白板核心公式】**
+- `[WHITEBOARD: dare 作情态 = dare not do]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I dare not to tell the truth.`
+- ✅ 正确标准答案：`I dare not tell the truth.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“既然 `dare` 这会儿是情态，就别再塞 `to`。胆子没多大，格式倒是加得很莽。”
+
+#### used to
+**【白板核心公式】**
+- `[WHITEBOARD: used to do = 过去常常，现在不了]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Grandpa used to playing the piano.`
+- ✅ 正确标准答案：`Grandpa used to play the piano.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`used to` 后面接原形，不接 `-ing`。你这句像把过去习惯和当前过程强行包办婚姻，尴尬得令人肃然起敬。”
+
+### 半助动词 (Semi-Auxiliaries)
+
+#### be able to
+**【白板核心公式】**
+- `[WHITEBOARD: be able to = 能够；可表达未来能力]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I will can break the record.`
+- ✅ 正确标准答案：`I will be able to break the record.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`will can` 像把两辆车硬塞一个车位。想说未来有能力，请用 `be able to`，别让情态动词互相踩脚。”
+
+#### be going to / be about to / be to
+**【白板核心公式】**
+- `[WHITEBOARD: be going to = 打算]`
+- `[WHITEBOARD: be about to = 马上就要]`
+- `[WHITEBOARD: be to = 命令 / 安排 / 注定]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He is about join the party.`
+- ✅ 正确标准答案：`He is about to join the party.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`about to` 是固定搭配，那个 `to` 不是装饰品。你把它抠掉，像把钟表的发条抽走，还问为什么不走。”
+
+#### had better
+**【白板核心公式】**
+- `[WHITEBOARD: had better + 动词原形 = 最好（带警告）]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`You had better to follow the instruction.`
+- ✅ 正确标准答案：`You had better follow the instruction.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`had better` 后面也别加 `to`。都已经是在委婉警告你了，结构还写错，属实不珍惜最后的体面。”
 
 ## 第七节：系动词
-将该词后端的含义赋予前端，相当于"赋值"的过程，从而将前后两端练习了起来，故称之为**连系动词(Linking Verbs)**或**系动词**.
-- 经典例句： He is the best baseball player. 相当于把"the best baseball player"的含义赋予给"He"即："He" = "the best baseball player"
-- 经典例句：The soup smells good. "smells"作系动词，相当于"The soup" = "good"， 但是有"闻"这个动作含义。
+
+### 系动词 (Linking Verb)
+**【白板核心公式】**
+- `[WHITEBOARD: 系动词 = 连接主语与表语 = 主语 + link verb + predicative]`
+- `[WHITEBOARD: 主语 = 表语（逻辑赋值）]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The soup smells well.`
+- ✅ 正确标准答案：`The soup smells good.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“系动词后面接状态，不接方式。汤是‘闻起来好’，不是‘闻得很好’。你把副词塞进去，像往甜点里撒味精，方向全错。”
 
 ## 第八节：使役动词
-有一部分动词需要后接宾语和宾补，被称为使役动词，表达"使.../令.../让..."的含义。包括:make, let, have, get等。
 
-make的应用：
-1. make后使用动词原形或者裸不定式。
-- 经典例句：I usually make students do their homework at library. 注意这里"make"的用法，是"使...某人作某事"的意思。 这里"students"作宾语，"do their homework"作宾补。"do"是不定式，省略了"to". 
+### 使役动词总览 (Causative Verbs)
+**【白板核心公式】**
+- `[WHITEBOARD: 使役 = make / let / have / get + O + C]`
+- `[WHITEBOARD: make/let/have + O + do；get + O + to do]`
 
-2. make后使用形容词
-- 经典例句：The victory made the general arrogant. "the general"作宾语，"arrogant"作宾补。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The teacher made me to rewrite the essay.`
+- ✅ 正确标准答案：`The teacher made me rewrite the essay.`
 
-let的应用：
-1. let后使用动词原形或者裸不定式。
-- 经典例句：I will let her finish the work. 表示允许某人作某事。"her"作宾语， "finish the work"是宾补。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“使役动词是本章最大雷区。`make/let/have` 后面敢加 `to`，就像把手术刀拿反了还自信开刀，观感非常惨烈。”
 
-2. let后使用副词。
-- 经典例句：Let him go. "go"作副词，是宾语补语。
+### make
+**【白板核心公式】**
+- `[WHITEBOARD: make + O + do / adj.]`
 
-have的应用
-1. have后使用动词原形或者裸不定式。
-- 经典例句：I will have the policeman arrest the thief. "have"在这里有让某人作某事的意思。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The victory made the general arrogantly.`
+- ✅ 正确标准答案：`The victory made the general arrogant.`
+- 补充说明：`make + O + adj.` 表示“使宾语处于某种状态”；若用动词，通常是 `make + O + do`，如 `make me cry`。
 
-2. have后使用过去分词
-- 经典例句：I had my car washed. 注意和这句话的区别：I had someone washed my car. 这里的宾语从"someone"替换为了"my car", 宾补改为了过去分词，体现了被动的逻辑。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`make` 后面不是随便捡个词就能拼。它要么让宾语‘去做’，要么让宾语‘变成某状态’。语义路线都不选，像路口中央原地打转。”
 
-3. get的应用：
-1. get后使用不定式
-- 经典例句：I will get the kid to read the book. 注意这里不同于之前的裸不定式，而是带"to"的不定式，有说服、鼓励某人做某事的含义。
+### let
+**【白板核心公式】**
+- `[WHITEBOARD: let + O + do = 允许某人做]`
 
-2. get后使用过去分词
-- 经典例句：He got the work done. 宾补"done"使用过去分词，体现了被动的逻辑。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`My mother let me to go out.`
+- ✅ 正确标准答案：`My mother let me go out.`
 
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`let` 后面一律裸不定式。你给它加 `to`，像保安都刷卡放你进门了，你还非要翻栏杆，纯属多此一举。”
+
+### have
+**【白板核心公式】**
+- `[WHITEBOARD: have + O + do = 让某人做]`
+- `[WHITEBOARD: have + O + done = 让某事被做]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I had my car wash.`
+- ✅ 正确标准答案：`I had my car washed.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“车是被洗，不是车自己去洗别人。`have + O + done` 这么经典的被动使役结构，写错了就像把洗车单填成寻人启事。”
+
+### get
+**【白板核心公式】**
+- `[WHITEBOARD: get + O + to do = 说服 / 促成某人去做]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I got the kid read the book.`
+- ✅ 正确标准答案：`I got the kid to read the book.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“终于轮到 `get` 这种要带 `to` 的。你前面该省的不省，这里该留的不留，稳定发挥得像闹钟永远慢十分钟。”

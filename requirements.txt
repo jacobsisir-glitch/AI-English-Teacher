@@ -1,9 +1,7 @@
 fastapi
 uvicorn
-spacy
 pydantic
 openai
 requests
 python-dotenv
-chromadb
 sqlalchemy

@@ -1,167 +1,505 @@
 # 从句
-英语从句的基本原理：用一个句子充当另一个句子的某个句子成分的语法现象，称为**从句（Subordinate Clause）**, 而被从句充当了句子成分的那个句子，称为**主句(Main Clause)**, 整个句子被称为**复杂句 (Complex Sentence)**。除了谓语动词外，每种句子成分都可以有对应的从句。
 
 ## 从句的分类
-按照句子成分分：
-主语从句、宾语从句、宾语补语从句、表语从句、定语从句、状语从句、同位语从句。
 
-按词类(词性)分类：
-名词性从句：主语从句、宾语从句、宾语补语从句、表语从句、同位语从句。因为这些从句本身具备名词的属性。
-形容词性从句：定语从句。此外，因为定语从句往往会用到"关系词"，也被称为关系从句。
-副词从句：状语从句(时间状语、地点状语、条件状语、原因状语、方式状语、比较状语、让步状语)
+### 从句总览 (Subordinate Clause Overview)
+**【白板核心公式】**
+- `[WHITEBOARD: 复杂句 = 主句(Main Clause) + 从句(Subordinate Clause)]`
+- `[WHITEBOARD: 从句 = 降级后的完整句子，去主句里当成分]`
 
-### 形容词从句(定语从句)
-形容词从句的造句方式，在很大程度上反应了中英之间的思维差异。例如：
-- 经典例句：I met a professor who is famous in our country yesterday. 我昨天遇到了一个举国闻名的教授。
-中文的定语一般置于修饰的名词前，本质上是"形容词/句子 + 的"这种结构；英语中，单个形容词也是置于被修饰的名词前的，但是，如果定语是一句话时，会放置在被修饰词的后面，并在两者间添加一个关系词，被修饰的词称为先行词。例如上面的例句，先行词是"professor", 关系词是"who", 定语从句是"who is famous". 这样的从句也被称为关系从句。定语从句的主要功能是限定描述对象的范围。
-用于引导定语从句的关系词可以分为：关系代词和关系副词
-1. 关系代词引导的定语从句：
-- 经典例句：The teacher who teaches French is a kind person.
-- 经典例句：That officer whom I met yesterday is a minister.
-- 经典例句：Those children whose homework is finished are excellent.
-- 经典例句：The birds which hunted by the hunter were extincted.
-- 经典例句：He is playing a computer that I bought last year. 这句画中，"that"作为"that I bought"的引导词，起代词的作用。代指"computer", 属于关系代词。此外，除去关系代词的从句，实际上是陈述句的语序。比如说：对于这句话"That officer whom I met yesterday is a minister." 这句话的定语从句按照陈述语序应该是："I met That officer", 将"That officer"替换为"whom", 再将这个关系代词移到开头，就得到了"whom I met".
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I know he is right is obvious.`
+- ✅ 正确标准答案：`I know that he is right.` / `It is obvious that he is right.`
 
-关系代词that vs. which
-二者常常可以互换，区别在于：
-当先行词是唯一、明确的，且没有其他可能时，用that. 例如：The sailer hangs up the largest flag that I have ever seen. "the largest flag"表明了唯一性。
-当先行词是多个同类事物中按照限定的条件选择时，用which. 例如：I read a book which I borrowed from library yesterday. "book"是有很多的，但是，我读的是从图书馆借的那本，所以需要限定条件，用which.
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“从句是进主句里打工的，不是进去篡位的。你把两套结构胡乱叠在一起，像两个主播抢同一支麦，吵得句子当场去世。”
 
-2. 关系副词引导的定语从句
-- 经典例句：This was the place where I spent my time with my family.
-- 经典例句：This is the reason why you fail to accomplish this mission.
-- 经典例句：This was the day when his father take him to see the sea.
-因为这些例句中关系词的词性是副词，因此称为关系副词。关系副词可以转化为关系代词："where"="at which",
-"why"="for which", "when"="on which", 也就是说，关系副词 = 介词 + which
+### 按句子成分分类 (By Clause Function)
+**【白板核心公式】**
+- `[WHITEBOARD: 从句按成分分 = 主语 / 宾语 / 宾补 / 表语 / 定语 / 状语 / 同位语]`
 
-限定性定语从句(形容词从句)
-- 经典例句：I bought the jeans which my parents searched on internet before. 主句是我买了牛仔裤，但是哪一条裤子呢？是我父母之前在网上看到的那一条，限定性定语从句在这里起到了对修饰的对象的限定作用，让人更清楚买的是哪一条裤子。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：把 `what you like` 一律叫“宾语从句”
+- ✅ 正确标准答案：从句名称看它在主句中担任什么成分，不看它“看起来像不像问题”。
 
-非限定性定语从句
-- 经典例句：I have a pen which is expensive. 是限定性定语从句，意思是我有一支很贵的笔(暗示这支笔是我的所有笔中比较贵的)。
-- 经典例句：I have a pen, which is expensive. 是非限定性定语从句，意思是我有一支笔，这支笔很贵。这就体现了非限定性定语从句并不对被修饰的词产生限定的作用，这句话也相当于:I have a pen, the pen is expensive. 基于非限定性定语从句的特点，常常将其作为插入语使用。例如：
-- 经典例句：The bag, which is empty, is useful for containing luggage. "which is empty"做插入语，即使删除也不影响句子整体结构。
-此外，非限定性定语从句还可以指代整句话，例如：
-- 经典例句：Lions eat sheep, which is not surprising. 这里的"which"就是指代了"Lions eat sheep"这句话。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“分类看岗位，不看脸。别看见 `what / where / who` 就开始瞎喊‘宾语从句’，这不是街头认亲节目。”
 
-### 名词从句
-1. 主语从句：即句子的主语成分由从句充当。
-- 经典例句：That the Germans was defeated is true. 德国人被打败了这件事是真的。这句话中"That the German was defeated"做主语从句。"that"做引导词(因为主语从句的开头是这个词，因此称为引导词)，引导主语从句。
-- 经典例句：Wether the postman sent the mail is obvious.
-- 经典例句：Where did those pirates hide the treasure is important.
-- 经典例句: When will the flight recover is still unknowing.
-- 经典例句: Who goes to the room to find out the key is important.
-- 经典例句: What did he do last night was very rude.
-此处需要注意：这些引导词如果在问句中出现，被称为疑问代词/副词。 例如： Who moved my cheese? "Who"作为疑问代词。而在主语从句中，这些属于连接代词/副词。
+### 按词性分类 (By Clause Type)
+**【白板核心公式】**
+- `[WHITEBOARD: 名词性从句 = 主语/宾语/表语/同位语/宾补从句]`
+- `[WHITEBOARD: 形容词性从句 = 定语从句]`
+- `[WHITEBOARD: 副词性从句 = 状语从句]`
 
-形式主语(重要)：主语从句的描述方式往往造成一种头重脚轻的阅读体验，例如：
-- 经典例句: That building an AI Agent from 0 to 1 is not easy. 这句话要听到最后才知道从0到1开发AI Agent这件事情不容易，如果从句再长一些，听者会非常费劲。因此，英语母语使用者会运用形式主语的方式来将想要强调的事情提前，如：
-- 经典例句: It is not easy that building an AI Agent from 0 to 1. "It"在这里，指代后面的从句"that building an AI Agent from 0 to 1", 本身没有实际意义，因此被称为形式主语。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：把定语从句说成“名词性从句”
+- ✅ 正确标准答案：定语从句修饰名词，功能像形容词，所以归到形容词性从句。
 
-2. 宾语从句：即句子的宾语成分由从句充当。
-- 经典例句：I found out that current policy has many faults.
-- 经典例句：He saw who entered the room.
-- 经典例句：Wolves eat what they find out.
-- 经典例句：She noticed where the glass broken.
-- 经典例句：I saw when the sheep drank the water.
-- 经典例句：I saw how the teacher taught the students.
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“词性分类看功能取向，不是抓到个从句就塞进最近的垃圾桶。修饰名词的是形容词性，从句界也讲专业分工。”
 
-这里需要注意的是，引导词"that"是可以省略的，且只有"that"可以省略，因为其他的引导词往往具备具体的含义，去掉会影响句意表达。例如：
-- 经典例句：John knows (that) I will become a great man one day.
+### 形容词从句 / 定语从句 (Relative Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 先行词 + 关系词 + 定语从句]`
+- `[WHITEBOARD: 定语从句 = 放在名词后面补充限定]`
 
-但也有时候不可以省略"that"，否则会造成歧义，例如：
-- 经典例句：I did not know that the child drank the beer and that you saw it. 这句话是两个宾语从句的并列句，意思是，我不知道孩子喝了啤酒，而且我不知道你还看见了(孩子喝了啤酒)。
-- 经典例句：I did not know the child drank the beer and you saw it. 这句话的意思是：我不知道孩子喝了啤酒，并且你看见了(孩子喝了啤酒)。
-此外再做插入语时，不可省略"that"。
-- 经典例句：I know, just like you do, that the dog ate the bone. 我和你一样，知道狗吃了骨头。但如果去掉"that"，变成：
-- 经典例句：I know, just like you do, the dog ate the bone.  会让人难以意识到后面的"the dog ate the bone"是从句，误认为这句话有语病。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I met a professor is famous in our country yesterday.`
+- ✅ 正确标准答案：`I met a professor who is famous in our country yesterday.`
 
-某些词后面的宾语从句表示否定时, 否定要提前。
-- 经典例句：Nio did not believe (that) Kim betrayed everyone. 而不是写为：Nio believe (that) Kim did not betrayed everyone. 二者在语义上存在着微妙的区别。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“英语可没你那么爱把整句话都塞到名词前面。修饰信息太长，就老老实实放名词后面，用关系词领进去，别像把整套家具硬塞进抽屉。”
 
-宾语从句往往强调主从的时态一致，例如：
-- 经典例句：I don't think (that) you are failed. 如果改为过去时态，则是：I didn't think (that) you were failed.
-但如果是描述恒定的客观现象，则可以例外，例如：
-- 经典例句：The ancient chinese knew that the sun rises in the east. 
+### 关系代词 (Relative Pronouns)
+**【白板核心公式】**
+- `[WHITEBOARD: who = 人(主格)；whom = 人(宾格)；whose = 谁的]`
+- `[WHITEBOARD: which = 物；that = 人/物(常用)]`
 
-be + adj. + that句型：这类句子的归类存在争议，分别有学者归类为宾语从句、同位语从句、状语从句。
-(1). 宾语从句
-- 经典例句：Laura is sure that Paul will come to see her.
-从宾语从句的视角看，上述例句的形容词是表达了某种看法和判断，"that"引导的从句就相当于这个看法和判断，即劳拉确信的是"that Paul will come to see her". 上述句子相当于：Laura confirms that Paul will come to see her.
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The teacher which teaches French is kind.`
+- ✅ 正确标准答案：`The teacher who teaches French is kind.`
 
-(2). 同位语从句
-- 经典例句：Laura is sure that Paul will come to see her.
-从同位语从句的视角看，上述例句等同于Laura is sure of the fact that Paul will come to see her. 即同位语从句"that Paul will come to see her", "fact"就代指后面的从句。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“老师是人，不是物件。你拿 `which` 去指人，像在拍卖会上给教授贴条形码，多少有点失礼。”
 
-(3). 状语从句
-- 经典例句：Laura is happy that Paul will come to see her.
-从状语从句的视角看，上述例句等同于Laura is happy because Paul will come to see her. "because Paul will come to see her"作为原因状语从句，解释"happy"的原因。
+### 关系代词在从句中的位置 (Relative Pronoun Mechanics)
+**【白板核心公式】**
+- `[WHITEBOARD: 关系代词 = 代先行词 + 在从句里充当成分]`
+- `[WHITEBOARD: 先改陈述句，再把重复成分换成关系词]`
 
-3. 表语从句
-(1). 有系动词(be)的表语从句
-- 经典例句: The problems is that the company has ran out of money.
-- 经典例句: The situation is that whether we should submit the report.
-- 经典例句: The question is that what kind of material really works.
-- 经典例句: The difficult is that where/when/how prisoners should do the work.
-表语从句和主语从句有如下的关系：
-The question is that what kind of material really works. 可以改写为：That what kind of material really works is a question. 二者的区别主要体现在对语义的强调上。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`That officer whom yesterday I met is a minister.`
+- ✅ 正确标准答案：`That officer whom I met yesterday is a minister.`
 
-(2). 非系动词(be)的表语从句
-- 经典例句: It seems that the government does not like to solve the problem.
-此处"it"是形式主语
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“把关系词搬进来之后，从句内部还是陈述句语序。别一看到 `whom` 就激动得把词序掀翻，冷静一点，句子不是车祸现场。”
 
-4. 同位语从句
-语法综述中提到过同位语的概念，相当于再重复一遍主语或宾语，有强调、解释的含义。
-- 经典例句: The truth that our business failed did not surprise my parents. 这里"that our business failed"和"The truth"是一回事。
-- 经典例句: The question whether he will choose me as the new employee is still unknown.
+### that vs which
+**【白板核心公式】**
+- `[WHITEBOARD: that 常用于唯一/最高级/不定代词后]`
+- `[WHITEBOARD: which 常用于普通物的限定与非限制性从句]`
 
-5. 宾语补语从句
-- 经典例句: You can eat what you like. 这里"what you like"作为宾语补语从句。
-- 经典例句: My family education made me who I am today. "who I am"作为宾补从句。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`This is the largest flag which I have ever seen.`
+- ✅ 正确标准答案：`This is the largest flag that I have ever seen.`
 
-### 副词从句(状语从句)
-副词从句相较于前两个类从句类型而言，种类更加丰富，因为"状语"在句子中作为补充信息的用途，本身适用范围就十分广泛。
-1. 时间状语从句：
-- 经典例句: Before my professor's class began, I asked him several questions. 这里"Before my professor's class began"作为时间状语从句，解释了我询问教授问题的时间。
-- 经典例句: The young man was fixing his bicycle when the postman knocked the door. "when the postman knocked the door"作为时间状语从句。
-- 经典例句: My brother was playing computer while I was clean the kitchen. "while I was clean the kitchen"作为时间状语从句。
-- 经典例句: Jenny did her housework as I watered the garden. "as I watered the garden"作为时间状语从句。
-上述三个引导词when/while/as的不同之处在于：
-when: 强调在某个时间点突然发生的事情。
-while: 强调在某个时间段内，发生的事情。
-as: 强调两个动作同时进行。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“最高级后面你还慢悠悠用 `which`，语法倒也不是错得天崩地裂，但像穿礼服配拖鞋一样，总归不够讲究。”
 
-- 经典例句: Actors went to tents to rest after the director communicated with sponsors. "the director communicated with sponsors"作为时间状语从句。
-- 经典例句: The police officer has tried to arrest David since he committed the first crime.
-"since"强调从一个时间点开始，就一直在做某事。
-- 经典例句: I will wait until he comes to me and admits the mistake he made. "until"强调在一个时间点以前就一直在做某事，与"since"有相反的语义。
-- 经典例句: Helen will leave the house as soon as she graduate from university. "as soon as"含义是一个动作紧跟着另一个动作发生。
-- 经典例句: The ceo will share the newest idea the next time the meeting starts. "the next time the meeting starts"做时间状语。
+### 关系副词 (Relative Adverbs)
+**【白板核心公式】**
+- `[WHITEBOARD: where = 地点；when = 时间；why = 原因]`
+- `[WHITEBOARD: 关系副词 = 介词 + which]`
 
-2. 地点状语从句
-- 经典例句: Django cut down the tree where he found it. "where he found it"是where引导的地点状语从句。
-这里需要跟定语从句做区分，上述内容可以这样写：Django cut down the tree at the place where he found it. 注意这里" where he found it"事实上修饰的是"the place"即先行词，因此这里是形容词从句。再对比下面两句:
-- 经典例句: This is where he found the tree. 表语从句。
-- 经典例句: Where he found the tree is a secret. 主语从句。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`This is the day where his father took him to see the sea.`
+- ✅ 正确标准答案：`This is the day when his father took him to see the sea.`
 
-此外，地点状语的引导词为了表示强调还可以写为：wherever/everywhere/anywhere
-- 经典例句: The soldiers will go wherever to defeat the enemy. 不论去哪里，战士们都会击败敌人。
-- 经典例句: I saw advertises everywhere I went. 我去的每一个地方都能看到广告。
-- 经典例句: You can use this phone anywhere you like. 你可以在任何地方用这部手机。
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“地点用 `where`，时间用 `when`，原因用 `why`。功能位都能坐错，你这关系副词排班表看着像是用骰子决定的。”
 
-3. 比较状语从句
-- 经典例句: He is faster than me. 这句话其实有省略，完整的写法是：
-- 经典例句: He is faster than I am. "than I am"做状语从句，补充说明主句的情况。即补充"他很快"，有多快呢？ 比我"我"还快。
-句型：as + adj. + as 意思是像/和...一样的...
-- 经典例句: This jet is  as fast as a rocket.
-句型： the + 比较级， the + 比较级
-- 经典例句: The more, the better. 多多益善。
+### 限制性定语从句 (Restrictive Relative Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 限制性定语从句 = 缩小范围，决定“到底是哪一个”]`
+- `[WHITEBOARD: 无逗号；删掉会伤句意]`
 
-4. 条件状语从句
-- 经典例句: If you give me the key, I will reconsider you job's promotion.
-这里需要跟虚拟语气中描述主观情况和客观情况相反的情形做区别。例如：
-- 经典例句: If I were you, I would return the money back. 这事实上是使用了虚拟语气的条件副词从句。
-这里我们可能接触过这样的语法概念："主将从现"，比如在例句中：
-If you give me the key, I will reconsider you job's promotion. 主句是一般将来时，从句是一般现在时。但是事实上，从句的一般现在时不是表述事情发生的时间，而是强调状态。回忆第二章动词的时态部分，所谓的一般现在时是体现动作发生的普遍、常见或是客观的真理的描述，而不是强调动作"在现在发生"，这个状态，应该使用"现在进行时"来描述。因此，从句的"现"，只是强调有这样的状态、现象，并不说明动作发生的时间。进一步的，从句的意思是"如果你给我钥匙"，只是表述一种假设的情况，只能用一般的状态来描述(因为将来时表示对未来会发生的事物的描述)，因此，在这个条件成立的前提下(即给我钥匙)，我"会"重新考虑你的工作晋升。这才是主句用将来时的原因，因为在从句的条件下，主句的动作会发生，这就正好是一般将来时的使用方式。其实，这跟中文的语言习惯是类似的，我们会说："如果你给我钥匙，我会重新考虑你的工作晋升"，而不太说："如果你将要给我钥匙，我会重新考虑你的工作晋升"。因为是否给钥匙是不确定的嘛。
-另一方面，这也说明了条件状语从句为什么从句总是在时态上落后于主句(如主将从现、虚拟语气)例如：
-- 经典例句: If I had seen that cat yesterday, I would have fed it. 因为从句如果要作为主句的成立条件，就需要在主句前一个时间段成立。
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The jeans, which my parents searched online before, were expensive.`（想表达“那条我爸妈之前搜到的牛仔裤”）
+- ✅ 正确标准答案：`The jeans which my parents searched for online before were expensive.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“限制性从句是身份证，不是八卦补充。你想锁定是哪条牛仔裤，就别乱加逗号，把限定作用守住。”
+
+### 非限制性定语从句 (Non-restrictive Relative Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 非限制性定语从句 = 补充说明，不缩小范围]`
+- `[WHITEBOARD: 必须有逗号；删掉主干仍成立]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I have a pen which is expensive.`（想表达“我有一支笔，这支笔很贵”）
+- ✅ 正确标准答案：`I have a pen, which is expensive.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“非限制性从句要用逗号优雅隔开。你不给逗号，补充说明瞬间变身份识别，语义拐弯拐得比山路还狠。”
+
+### which 指代整句话 (Which Referring to a Whole Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 逗号 + which = 可回指整句]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Lions eat sheep which is not surprising.`
+- ✅ 正确标准答案：`Lions eat sheep, which is not surprising.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“这里的 `which` 不是指羊，是指前面整件事。逗号一丢，指代范围立刻塌陷，像地图比例尺被你徒手撕掉。”
+
+### 名词从句 (Noun Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 名词性从句 = 从句去做主语/宾语/表语/同位语/宾补]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`That he left surprised.` 
+- ✅ 正确标准答案：`That he left surprised me.` / `It surprised me that he left.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“名词性从句是去占名词工位的，不是去句子里闲逛。位置没站稳，主句就会像少拧了一颗螺丝那样松垮。”
+
+### 主语从句 (Subject Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 主语从句 = [从句] + 谓语]`
+- `[WHITEBOARD: 引导词可用 that / whether / wh-]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Whether the postman sent the mail are obvious.`
+- ✅ 正确标准答案：`Whether the postman sent the mail is obvious.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“整个从句当主语时，别被里面的人多势众骗了，主句谓语通常按单数走。看着长，不代表它在语法上突然变成一支军队。”
+
+### 连接词 vs 疑问词 (Connector vs Question Word)
+**【白板核心公式】**
+- `[WHITEBOARD: Who moved my cheese? = 疑问代词]`
+- `[WHITEBOARD: Who moved my cheese is unknown. = 连接代词]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：把 `Who goes to the room is important.` 里的 `Who` 说成普通疑问词
+- ✅ 正确标准答案：它在从句里负责连接并充当主语，是连接代词。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“同一个词换个岗位，身份就变了。别看见 `who` 就条件反射喊‘疑问词’，这不是刻板印象训练营。”
+
+### 形式主语 (Formal Subject)
+**【白板核心公式】**
+- `[WHITEBOARD: It + be + adj./n. + that/whether/wh-clause]`
+- `[WHITEBOARD: 真主语后置，避免头重脚轻]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`It is not easy that build an AI agent from 0 to 1.`
+- ✅ 正确标准答案：`It is not easy to build an AI agent from 0 to 1.` / `Building an AI agent from 0 to 1 is not easy.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“英语不喜欢句子一开头就扛着一整栋大楼进场。主语太长就请 `it` 顶上，别让句子一出场就头重脚轻地摔死。”
+
+### 宾语从句 (Object Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 动词 + [宾语从句]]`
+- `[WHITEBOARD: that / whether / wh- 均可引导]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`She noticed where the glass broken.`
+- ✅ 正确标准答案：`She noticed where the glass was broken.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“从句内部也得是完整句子，别把 `be` 吞了就想蒙混过关。你这不是宾语从句，是语法事故现场。”
+
+### that 的省略 (Omission of that)
+**【白板核心公式】**
+- `[WHITEBOARD: 宾语从句里的 that 常可省]`
+- `[WHITEBOARD: 但并列/插入语环境常不能省]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I know, just like you do, the dog ate the bone.`
+- ✅ 正确标准答案：`I know, just like you do, that the dog ate the bone.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`that` 不是次次都能辞职。尤其插入语一搅局，你再把它省了，后半句立刻像无证上岗，身份不明。”
+
+### 并列宾语从句中的 that (That in Coordinate Object Clauses)
+**【白板核心公式】**
+- `[WHITEBOARD: 宾语从句并列时，后一个 that 常保留]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I did not know the child drank the beer and you saw it.`
+- ✅ 正确标准答案：`I did not know that the child drank the beer and that you saw it.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“并列从句里不把 `that` 立起来，句子边界就会糊成一锅。你自己都未必看得懂，还指望观众替你善后？”
+
+### 否定前移 (Negative Raising)
+**【白板核心公式】**
+- `[WHITEBOARD: think / believe / suppose 常见：主句否定前移]`
+- `[WHITEBOARD: I don't think ... > I think ... not ...]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I think he is not right.`（想表达整体不相信）
+- ✅ 正确标准答案：`I don't think he is right.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“英语很爱把否定提前挂在主句上。你死抱着从句不放，倒也不能说错绝对，但语气笨重得像拖着行李爬楼梯。”
+
+### 主从时态一致 (Sequence of Tenses)
+**【白板核心公式】**
+- `[WHITEBOARD: 主句过去 -> 从句常后退]`
+- `[WHITEBOARD: 客观真理例外 = 现在时保留]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I didn't think you are ready.`
+- ✅ 正确标准答案：`I didn't think you were ready.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“主句都退到过去了，从句还赖在现在，像电影都切回回忆镜头了，配乐却还在现场直播。”
+
+### 客观真理例外 (Tense Sequence Exception)
+**【白板核心公式】**
+- `[WHITEBOARD: 真理/恒常事实 = 不跟着主句过去而后退]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The ancient Chinese knew that the sun rose in the east.`（若强调恒真）
+- ✅ 正确标准答案：`The ancient Chinese knew that the sun rises in the east.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“太阳不会因为主句过去了就突然改路线。恒真事实请保持现在时，别把自然规律也一起拖回历史博物馆。”
+
+### be + adj. + that 句型 (Be + Adjective + That-Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: be + sure/happy + that-clause]`
+- `[WHITEBOARD: 可作宾语解释 / 原因补充，按功能理解]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Laura is sure of that Paul will come.`
+- ✅ 正确标准答案：`Laura is sure that Paul will come.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“这个结构本来就够你学了，别再多塞一个 `of` 去添乱。你不是在堆积木，是在写句子。”
+
+### 表语从句 (Predicative Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 系动词 + [表语从句]]`
+- `[WHITEBOARD: The problem is that ...]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The problem is because we are late.`
+- ✅ 正确标准答案：`The problem is that we are late.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“表语从句是拿来补足‘是什么’，不是随便抓个连词就往里扔。`because` 和 `that` 职务完全不同，别让它们串岗。”
+
+### it seems that ... (Clause after Seem)
+**【白板核心公式】**
+- `[WHITEBOARD: It seems that ... = 看起来 / 似乎 ...]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Seems that the government does not care.`
+- ✅ 正确标准答案：`It seems that the government does not care.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“形式主语 `it` 又不是空气。你把它删掉，像舞台灯都没开就强行开播，观众只会看见一片黑。”
+
+### 同位语从句 (Appositive Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 抽象名词 + that/whether + 从句]`
+- `[WHITEBOARD: 同位语从句 = 解释名词内容，不修饰名词特征]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The truth which our business failed shocked them.`
+- ✅ 正确标准答案：`The truth that our business failed shocked them.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“同位语从句解释‘内容’，定语从句修饰‘名词’。你把两者混了，像把病历和病人照片当同一回事，信息系统直接崩。”
+
+### 宾语补语从句 (Object Complement Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 动词 + O + [宾补从句/结构]]`
+- `[WHITEBOARD: 关键：看从句是否补足宾语身份/结果]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`My family education made me what I am today.`（误判为普通宾语从句）
+- ✅ 正确标准答案：`what I am today` 在这里补足说明 `me`，属于宾补性质。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“别看见从句就想一键归类成宾语从句。它如果是在补足宾语，那就是宾补职责。岗位识别再混乱，HR 都要拉黑你。”
+
+### 副词从句 / 状语从句 (Adverbial Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: 状语从句 = 从句去修饰主句动作/状态/整句]`
+- `[WHITEBOARD: 功能高频 = 时间 / 地点 / 条件 / 让步 / 原因 / 方式 / 目的 / 结果 / 比较]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Because he was tired, so he went home.`
+- ✅ 正确标准答案：`Because he was tired, he went home.` / `He was tired, so he went home.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“从属连词和并列连词别双开。`because ... so ...` 就像同时踩油门和刹车，机械和语法都会一起崩溃。”
+
+### 时间状语从句 (Time Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: before / after / when / while / as / since / until / as soon as]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`My brother was playing on the computer while I was clean the kitchen.`
+- ✅ 正确标准答案：`My brother was playing on the computer while I was cleaning the kitchen.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“时间从句里也得是完整结构。`was clean` 这种半吊子组合，像把围裙当拖把使，功能错得很彻底。”
+
+### when / while / as
+**【白板核心公式】**
+- `[WHITEBOARD: when = 某时点/某事发生]`
+- `[WHITEBOARD: while = 一段时间内]`
+- `[WHITEBOARD: as = 两动作同时推进]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`As I was reading, the phone suddenly rang.`（想强调“突然打断”）
+- ✅ 正确标准答案：`When I was reading, the phone suddenly rang.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“三个词都能译成‘当……时’，于是你就开始闭眼投骰子。细微语感才是区分高手和语法观光客的地方。”
+
+### since / until / as soon as
+**【白板核心公式】**
+- `[WHITEBOARD: since = 自从...起]`
+- `[WHITEBOARD: until = 直到...为止]`
+- `[WHITEBOARD: as soon as = 一...就...]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I will wait until he will come.`
+- ✅ 正确标准答案：`I will wait until he comes.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“时间从句里别乱塞 `will`。主句负责将来感，从句用一般现在时就够了。你两边都开未来标记，像生日蛋糕插两层同样的蜡烛，累赘。”
+
+### 地点状语从句 (Place Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: where / wherever / anywhere / everywhere + 从句]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The soldiers will go wherever to defeat the enemy.`
+- ✅ 正确标准答案：`The soldiers will go wherever they need to go to defeat the enemy.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`wherever` 后面要接完整从句，不是随手粘一个不定式就完事。地点结构被你写得像导航语音卡带，真是别致。”
+
+### 地点状语从句 vs 定语从句 vs 名词性从句
+**【白板核心公式】**
+- `[WHITEBOARD: This is where ... = 表语从句]`
+- `[WHITEBOARD: Where ... is ... = 主语从句]`
+- `[WHITEBOARD: the place where ... = 定语从句]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：把 `This is where he found the tree.` 说成定语从句
+- ✅ 正确标准答案：这里 `where he found the tree` 作表语从句，不修饰先行词。
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`where` 长得一样，不代表工作一样。是修饰先行词，还是补主语内容，先看岗位，再发言，别像见到制服就乱认职业。”
+
+### 比较状语从句 (Comparison Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: than + 从句]`
+- `[WHITEBOARD: as + adj./adv. + as]`
+- `[WHITEBOARD: the + 比较级, the + 比较级]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He is faster than me am.`
+- ✅ 正确标准答案：`He is faster than I am.` / `He is faster than me.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“比较结构最怕你把口语残片和完整从句缝在一起。要么优雅完整，要么口语到底，别半人半鬼。”
+
+### 条件状语从句 (Conditional Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: if / unless / provided that / as long as / in case + 从句]`
+- `[WHITEBOARD: 真实条件高频 = 主将从现]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`If you will give me the key, I will reconsider your promotion.`
+- ✅ 正确标准答案：`If you give me the key, I will reconsider your promotion.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“条件从句里别无脑塞 `will`。主句负责结果，从句负责条件。你两边都抢戏，像群演硬要站 C 位。”
+
+### unless / provided that / as long as / in case
+**【白板核心公式】**
+- `[WHITEBOARD: unless = 除非]`
+- `[WHITEBOARD: provided that = 如果/前提是]`
+- `[WHITEBOARD: as long as = 只要]`
+- `[WHITEBOARD: in case = 如果 / 以防]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`I will go unless it doesn't rain.`
+- ✅ 正确标准答案：`I will go unless it rains.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`unless` 自带否定意味，你还再加个 `not`，像给门锁上两把锁然后把钥匙吞了，纯粹自找麻烦。”
+
+### 让步状语从句 (Concessive Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: although / though / even though / even if + 从句]`
+- `[WHITEBOARD: 语义 = 即使/尽管...也...]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Although she failed the exam, but she learned a lot.`
+- ✅ 正确标准答案：`Although she failed the exam, she learned a lot.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`although` 和 `but` 不要双开。我知道你想显得句子很有转折，但这不是买一送一活动。”
+
+### no matter + 疑问词 / regardless of
+**【白板核心公式】**
+- `[WHITEBOARD: no matter + wh- = 不管...]`
+- `[WHITEBOARD: regardless of + 名词/名词短语]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Regardless what you have done, you can restart.`
+- ✅ 正确标准答案：`Regardless of what you have done, you can restart.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`regardless` 后面请带 `of`，别把介词当空气。你这句像西装扣子永远差最后一颗，越看越难受。”
+
+### 方式状语从句 (Manner Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: as if / as though = 好像...]`
+- `[WHITEBOARD: as = 像...那样]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He talks as if he knows everything.`（想表达与事实相反，仍可接受口语）
+- ✅ 正确标准答案：`He talks as if he knew everything.`（更标准的虚拟感）
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`as if` 后面常带虚拟感，尤其你在阴阳怪气别人时。你要表达‘他好像什么都懂’这种不真实意味，就别写得像官方认证公告。”
+
+### 原因状语从句 (Reason Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: because > since > as （因果力度递减）]`
+- `[WHITEBOARD: because 可前可后；since/as 常放前]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`Because he broke the law, so George was arrested.`
+- ✅ 正确标准答案：`Because he broke the law, George was arrested.` / `He broke the law, so George was arrested.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“又来了，`because ... so ...` 这种双重因果像给一张椅子装四条多出来的腿，坐上去只会更不稳。”
+
+### for 表原因 (For as Coordinator)
+**【白板核心公式】**
+- `[WHITEBOARD: for = 并列连词，补充原因，不引导从句前置]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`For she has promised to attend, Teresa must like you.` 
+- ✅ 正确标准答案：`Teresa must like you, for she has promised to attend your new show.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`for` 这里不是普通从属连词，它更像补刀式解释。位置都放反了，像把脚注印在标题上，荒谬得很整齐。”
+
+### 目的状语从句 (Purpose Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: so that + can/could/may/might]`
+- `[WHITEBOARD: in order to + 动词原形]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`He studied hard so that pass the exam.`
+- ✅ 正确标准答案：`He studied hard so that he could pass the exam.` / `He studied hard to pass the exam.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“目的表达不是拿 `so that` 当万能胶。后面得有完整从句；要图省事就直接不定式，别写得像语法中途断电。”
+
+### 结果状语从句 (Result Clause)
+**【白板核心公式】**
+- `[WHITEBOARD: so ... that ... = 如此...以至于...]`
+- `[WHITEBOARD: so that 也可表结果，需看语义]`
+
+**【经典对错对比】**
+- ❌ 弹幕常犯错误：`The test was so hard that I had to looked at my notebook.`
+- ✅ 正确标准答案：`The test was so hard that I had to look at my notebook.`
+
+**【AI 主播话术与人设 Trigger】**
+- 主播台词建议：“`had to` 后面接原形，这种基础还要错，属实是结果状语从句里附送了一个动词搭配事故。”

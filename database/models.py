@@ -5,6 +5,14 @@ from sqlalchemy import Column, DateTime, Integer, String, Text
 from database.database import Base
 
 
+class Student(Base):
+    __tablename__ = "students"
+
+    student_id = Column(String(64), primary_key=True, index=True)
+    session_summary = Column(Text, nullable=False, default="")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class StudyLog(Base):
     __tablename__ = "study_logs"
 
@@ -18,9 +26,10 @@ class KnowledgeMastery(Base):
     __tablename__ = "knowledge_mastery"
 
     id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(String(64), nullable=False, default="default_student", index=True)
     grammar_point = Column(String(100), index=True, nullable=False)
     mastery_score = Column(Integer, default=0, nullable=False)
-    status = Column(String(20), default="学习中", nullable=False)
+    status = Column(String(20), default="learning", nullable=False)
     last_tested_at = Column(DateTime, nullable=True)
 
 

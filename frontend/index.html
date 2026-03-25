@@ -108,6 +108,54 @@
             background: linear-gradient(135deg, rgba(248, 250, 252, 0.95), rgba(238, 242, 255, 0.8));
             border: 1px dashed rgba(148, 163, 184, 0.6);
         }
+        .api-switch-card {
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.94));
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }
+        .api-switch-segment {
+            background: rgba(241, 245, 249, 0.95);
+            border: 1px solid rgba(226, 232, 240, 0.9);
+        }
+        .api-switch-btn {
+            border-radius: 0.85rem;
+            color: var(--ink-500);
+            transition: all 0.2s ease;
+        }
+        .api-switch-btn:hover {
+            color: var(--ink-700);
+            background: rgba(255, 255, 255, 0.82);
+        }
+        .api-switch-btn.active-local {
+            color: #047857;
+            background: rgba(236, 253, 245, 0.98);
+            box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.18);
+        }
+        .api-switch-btn.active-prod {
+            color: #4338ca;
+            background: rgba(238, 242, 255, 0.98);
+            box-shadow: inset 0 0 0 1px rgba(99, 102, 241, 0.18);
+        }
+        .api-switch-btn.active-auto {
+            color: #92400e;
+            background: rgba(255, 247, 237, 0.98);
+            box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.18);
+        }
+        .api-status-dot {
+            width: 0.55rem;
+            height: 0.55rem;
+            border-radius: 999px;
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.9);
+        }
+        .api-status-dot.local {
+            background: #10b981;
+        }
+        .api-status-dot.prod {
+            background: #6366f1;
+        }
+        .api-status-dot.custom {
+            background: #f59e0b;
+        }
         #radar-chart {
             width: 100%;
             height: 300px;
@@ -121,7 +169,7 @@
     <aside class="hidden md:flex flex-col w-64 bg-slate-50 border-r border-slate-200 h-full flex-shrink-0">
         <div class="p-4 space-y-3">
             <button @click="startNewChat" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border border-slate-200 shadow-sm rounded-xl text-slate-700 hover:bg-slate-100 transition-colors font-medium">
-                <i class="fa-solid fa-pen-to-square"></i> 新建自由练习
+                <i class="fa-solid fa-pen-to-square"></i> 新建对话
             </button>
             <button @click="startClass" :disabled="isInClass || isInputLocked" :class="isInClass || isInputLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 shadow-sm rounded-xl text-white transition-colors font-medium">
                 <i class="fa-solid fa-graduation-cap"></i> 开启微课 (系统课)
@@ -137,7 +185,39 @@
             <div class="text-xs font-semibold text-slate-400 mb-2 px-2 mt-2">当前状态</div>
             <div class="w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors" :class="isInClass ? 'text-amber-600 bg-amber-50' : 'text-emerald-600 bg-emerald-50'">
                 <i class="fa-solid" :class="isInClass ? 'fa-chalkboard-user mr-2' : 'fa-link mr-2'"></i> 
-                {{ isInClass ? '微课进行中...' : '自由练习模式' }}
+                {{ isInClass ? '微课进行中...' : '闲聊 / 答疑模式' }}
+            </div>
+            <div class="text-xs font-semibold text-slate-400 mb-2 px-2 mt-4">接口路由</div>
+            <div class="api-switch-card rounded-2xl p-3">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="api-status-dot" :class="currentApiKind"></span>
+                            <span class="text-xs font-semibold" :class="currentApiKind === 'local' ? 'text-emerald-700' : (currentApiKind === 'prod' ? 'text-indigo-700' : 'text-amber-700')">
+                                {{ currentApiModeLabel }}
+                            </span>
+                        </div>
+                        <p class="mt-2 text-[11px] leading-relaxed text-slate-500">{{ currentApiStatusText }}</p>
+                    </div>
+                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold"
+                          :class="currentApiKind === 'local' ? 'bg-emerald-50 text-emerald-700' : (currentApiKind === 'prod' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700')">
+                        {{ currentApiKind === 'local' ? '本地' : (currentApiKind === 'prod' ? '公网' : '自定义') }}
+                    </span>
+                </div>
+                <div class="api-switch-segment mt-3 p-1 grid grid-cols-3 gap-1">
+                    <button @click="switchToLocalApi" :disabled="currentApiMode === 'local'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'local' ? 'active-local cursor-default' : ''">
+                        本地
+                    </button>
+                    <button @click="switchToProdApi" :disabled="currentApiMode === 'prod'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'prod' ? 'active-prod cursor-default' : ''">
+                        公网
+                    </button>
+                    <button @click="switchToAutoApi" :disabled="currentApiMode === 'auto'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'auto' ? 'active-auto cursor-default' : ''">
+                        自动
+                    </button>
+                </div>
+                <div class="mt-3 rounded-xl bg-white/80 px-3 py-2 text-[11px] text-slate-400 truncate border border-slate-100">
+                    {{ currentApiBaseUrl }}
+                </div>
             </div>
         </div>
     </aside>
@@ -157,6 +237,29 @@
                 <i class="fa-solid fa-door-open"></i> 退出
             </button>
         </div>
+        <div class="md:hidden px-4 pb-3 bg-white/90 backdrop-blur-sm border-b border-slate-100 flex-shrink-0">
+            <div class="api-switch-card rounded-2xl px-3 py-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                            <span class="api-status-dot" :class="currentApiKind"></span>
+                            <span class="text-xs font-semibold" :class="currentApiKind === 'local' ? 'text-emerald-700' : (currentApiKind === 'prod' ? 'text-indigo-700' : 'text-amber-700')">
+                                {{ currentApiModeLabel }}
+                            </span>
+                        </div>
+                        <p class="mt-1 text-[11px] text-slate-500 truncate">{{ currentApiBaseUrl }}</p>
+                    </div>
+                    <div class="api-switch-segment p-1 flex gap-1 shrink-0">
+                        <button @click="switchToLocalApi" :disabled="currentApiMode === 'local'" class="api-switch-btn px-3 py-1.5 text-[11px] font-medium" :class="currentApiMode === 'local' ? 'active-local cursor-default' : ''">
+                            本地
+                        </button>
+                        <button @click="switchToProdApi" :disabled="currentApiMode === 'prod'" class="api-switch-btn px-3 py-1.5 text-[11px] font-medium" :class="currentApiMode === 'prod' ? 'active-prod cursor-default' : ''">
+                            公网
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth">
             
@@ -165,7 +268,7 @@
                     <i class="fa-solid fa-bolt"></i>
                 </div>
                 <h2 class="text-2xl font-bold text-slate-700">前后端已连通！</h2>
-                <p class="text-slate-500 max-w-md">现在发送的每一句话，都会实时发往后台接口进行处理。</p>
+                <p class="text-slate-500 max-w-md">现在你可以直接闲聊、提英语问题，或者开启微课，让老师按教材继续讲。</p>
             </div>
 
             <div v-for="(msg, index) in messages" :key="index" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
@@ -179,39 +282,10 @@
                     
                     <div v-if="msg.role === 'user'" class="leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
                     
-                    <div v-else-if="msg.isAnalysis" class="space-y-4">
-                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-lg tracking-wide leading-loose">
-                            <span v-for="(chunk, cIdx) in generateRenderChunks(msg.originalText, msg.report.basic_components, msg.report.structural_components, msg.report.errors)" 
-                                  :key="cIdx"
-                                  :class="chunk.classStr">
-                                {{ chunk.text }}
-                                <div v-if="chunk.hasTooltip" 
-                                     class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-max max-w-[250px] bg-slate-800 text-white text-xs py-2 px-3 rounded shadow-xl z-20 text-left leading-relaxed"
-                                     v-html="chunk.tooltipHtml">
-                                </div>
-                            </span>
-                        </div>
-
-                        <div class="bg-indigo-50/50 p-4 rounded-xl border-l-4 border-indigo-400">
-                            <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
-                                <i class="fa-solid fa-lightbulb text-amber-500"></i> AI 名师解析
-                            </h4>
-                            <div class="prose prose-sm prose-indigo max-w-none text-slate-700" v-html="renderMarkdown(msg.report.teacher_message)"></div>
-                        </div>
-                    </div>
-                    <div v-else-if="msg.isQA" class="space-y-4">
-                        <div class="bg-indigo-50/50 p-4 rounded-xl border-l-4 border-indigo-400">
-                            <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
-                                <i class="fa-solid fa-book-open text-indigo-500"></i> 教材解答
-                            </h4>
-                            <div class="prose prose-sm prose-indigo max-w-none text-slate-700" v-html="renderMarkdown(msg.content)"></div>
-                        </div>
-                    </div>
-
                     <div v-else-if="msg.isClass" class="space-y-4">
                         <div class="bg-amber-50/80 p-4 rounded-xl border-l-4 border-amber-400">
                             <h4 class="font-bold text-amber-900 text-sm mb-2 flex items-center gap-2">
-                                <i class="fa-solid fa-chalkboard-user text-amber-500"></i> AI 课堂
+                                <i class="fa-solid fa-chalkboard-user text-amber-500"></i> AI 微课
                             </h4>
                             <div v-if="msg.systemStatus" class="mb-3 rounded-xl border border-slate-200 bg-slate-100/90 px-3 py-2 text-xs italic text-slate-500 animate-pulse">
                                 {{ msg.systemStatus }}
@@ -219,8 +293,14 @@
                             <div class="prose prose-sm prose-amber max-w-none text-slate-800" v-html="renderMarkdown(msg.content)"></div>
                         </div>
                     </div>
-
-                    <div v-else class="leading-relaxed text-red-600 font-medium">{{ msg.content }}</div>
+                    <div v-else class="space-y-4">
+                        <div class="bg-indigo-50/50 p-4 rounded-xl border-l-4 border-indigo-400">
+                            <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
+                                <i class="fa-solid fa-comments text-indigo-500"></i> AI 老师
+                            </h4>
+                            <div class="prose prose-sm prose-indigo max-w-none text-slate-700" v-html="renderMarkdown(msg.content)"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -248,7 +328,7 @@
                     @input="autoResize"
                     @keydown.enter.prevent="handleEnter"
                     rows="1"
-                    placeholder="输入英文进行语法诊断，或输入中文向老师提问 (如: 什么是表语？)"
+                    placeholder="输入你想聊的话题、英语问题，或直接开启微课继续上课"
                     class="flex-1 max-h-[150px] min-h-[40px] bg-transparent py-2.5 px-3 text-slate-800 placeholder-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                 ></textarea>
                 <button 
@@ -367,6 +447,44 @@
                 <section class="dashboard-list-panel rounded-[24px] p-5 md:p-6">
                     <div class="flex items-center justify-between gap-3 mb-4">
                         <div>
+                            <h3 class="text-lg font-bold text-slate-800">掌握度快照</h3>
+                            <p class="text-sm text-slate-500 mt-1">这部分不看你错了几次，而看你现在对每个点还剩多少把握。</p>
+                        </div>
+                        <span class="inline-flex items-center rounded-full bg-emerald-50 text-emerald-700 px-3 py-1 text-xs font-semibold">KnowledgeMastery</span>
+                    </div>
+
+                    <div v-if="dashboardError" class="dashboard-empty rounded-2xl p-6 text-sm text-slate-600">
+                        {{ dashboardError }}
+                    </div>
+
+                    <div v-else-if="!dashboardLoading && dashboardData.mastery_snapshot.length === 0" class="dashboard-empty rounded-2xl p-6 text-sm text-slate-600">
+                        还没有生成掌握度快照。先做几轮练习或微课，让系统知道你到底卡在哪。
+                    </div>
+
+                    <div v-else class="space-y-4">
+                        <div v-for="(item, idx) in dashboardData.mastery_snapshot" :key="`mastery-${idx}`" class="rounded-[22px] border border-slate-100 bg-white p-4 md:p-5 shadow-sm">
+                            <div class="flex items-center justify-between gap-3 mb-3">
+                                <div>
+                                    <h4 class="text-base font-semibold text-slate-800">{{ item.grammar_point }}</h4>
+                                    <p class="text-xs text-slate-500 mt-1">{{ item.status_label }}</p>
+                                </div>
+                                <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
+                                      :class="item.mastery_score >= 85 ? 'bg-emerald-50 text-emerald-700' : (item.mastery_score >= 65 ? 'bg-sky-50 text-sky-700' : (item.mastery_score >= 40 ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'))">
+                                    {{ item.mastery_score }}/100
+                                </span>
+                            </div>
+                            <div class="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                                <div class="h-full rounded-full transition-all duration-500"
+                                     :class="item.mastery_score >= 85 ? 'bg-emerald-500' : (item.mastery_score >= 65 ? 'bg-sky-500' : (item.mastery_score >= 40 ? 'bg-amber-500' : 'bg-rose-500'))"
+                                     :style="{ width: `${Math.max(4, item.mastery_score)}%` }"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dashboard-list-panel rounded-[24px] p-5 md:p-6">
+                    <div class="flex items-center justify-between gap-3 mb-4">
+                        <div>
                             <h3 class="text-lg font-bold text-slate-800">最近提出的疑问</h3>
                             <p class="text-sm text-slate-500 mt-1">这些问题比错题更诚实，说明你至少知道自己卡在哪儿。</p>
                         </div>
@@ -386,7 +504,7 @@
                             <div class="flex items-center justify-between gap-3 mb-3">
                                 <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold"
                                       :class="item.source === 'class' ? 'bg-amber-50 text-amber-700' : 'bg-sky-50 text-sky-700'">
-                                    <i class="fa-solid fa-circle-question mr-2 text-[10px]"></i>{{ item.source === 'class' ? '微课提问' : '自由练习' }}
+                                    <i class="fa-solid fa-circle-question mr-2 text-[10px]"></i>{{ item.source === 'class' ? '微课提问' : '闲聊答疑' }}
                                 </span>
                                 <span class="text-xs text-slate-400">{{ formatDashboardTime(item.created_at) }}</span>
                             </div>
@@ -402,27 +520,128 @@
             </div>
         </div>
     </div>
+
 </div>
 
 <script>
-    // 环境路由：
-    // 1. 本地开发：localhost / 127.0.0.1 / file:// 直连本地 FastAPI
-    // 2. 生产环境：统一指向 Render 后端
+    // 接口路由：
+    // 1. 默认自动判断，本地打开页面时优先走本地
+    // 2. 支持通过 ?api=local / ?api=prod 持久切换
+    // 3. 支持通过 ?apiBase=http://127.0.0.1:8000 指定自定义后端
     const CLASS_COMPLETED_HINT = "现在退出微课模式咯~";
+    const API_ROUTE_STORAGE_KEY = "aiTeacherApiMode";
+    const API_CUSTOM_BASE_URL_STORAGE_KEY = "aiTeacherCustomApiBaseUrl";
     const LOCAL_API_BASE_URL = "http://127.0.0.1:8000";
     const PROD_API_BASE_URL = "https://ai-english-teacher-o63p.onrender.com";
+    const DEFAULT_API_MODE = "auto";
 
-    function getApiBaseUrl() {
+    function normalizeApiBaseUrl(url) {
+        return String(url || "").trim().replace(/\/+$/, "");
+    }
+
+    function resolveAutoApiBaseUrl() {
         const hostname = window.location.hostname;
         const isLocalHost = hostname === "localhost" || hostname === "127.0.0.1";
         const isDirectFileOpen = window.location.protocol === "file:";
         return (isLocalHost || isDirectFileOpen) ? LOCAL_API_BASE_URL : PROD_API_BASE_URL;
     }
 
+    function getApiBaseUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const queryMode = String(params.get("api") || "").trim().toLowerCase();
+        const queryCustomBaseUrl = normalizeApiBaseUrl(params.get("apiBase"));
+
+        if (queryCustomBaseUrl) {
+            localStorage.setItem(API_ROUTE_STORAGE_KEY, "custom");
+            localStorage.setItem(API_CUSTOM_BASE_URL_STORAGE_KEY, queryCustomBaseUrl);
+            return queryCustomBaseUrl;
+        }
+
+        if (queryMode === "local" || queryMode === "prod" || queryMode === "auto") {
+            localStorage.setItem(API_ROUTE_STORAGE_KEY, queryMode);
+            if (queryMode !== "custom") {
+                localStorage.removeItem(API_CUSTOM_BASE_URL_STORAGE_KEY);
+            }
+        }
+
+        const storedMode = String(localStorage.getItem(API_ROUTE_STORAGE_KEY) || DEFAULT_API_MODE).trim().toLowerCase();
+        const storedCustomBaseUrl = normalizeApiBaseUrl(localStorage.getItem(API_CUSTOM_BASE_URL_STORAGE_KEY));
+
+        if (storedMode === "custom" && storedCustomBaseUrl) {
+            return storedCustomBaseUrl;
+        }
+        if (storedMode === "local") {
+            return LOCAL_API_BASE_URL;
+        }
+        if (storedMode === "prod") {
+            return PROD_API_BASE_URL;
+        }
+        return resolveAutoApiBaseUrl();
+    }
+
+    function getStoredApiRouteMode() {
+        return String(localStorage.getItem(API_ROUTE_STORAGE_KEY) || DEFAULT_API_MODE).trim().toLowerCase() || DEFAULT_API_MODE;
+    }
+
+    function resolveApiKind(apiBaseUrl) {
+        const normalized = normalizeApiBaseUrl(apiBaseUrl);
+        if (normalized === LOCAL_API_BASE_URL) return "local";
+        if (normalized === PROD_API_BASE_URL) return "prod";
+        return "custom";
+    }
+
+    function getApiModeLabel(routeMode, apiKind) {
+        if (routeMode === "local") return "当前接口：本地调试";
+        if (routeMode === "prod") return "当前接口：公网服务";
+        if (routeMode === "custom") return "当前接口：自定义地址";
+        return apiKind === "local" ? "当前接口：自动命中本地" : "当前接口：自动命中公网";
+    }
+
+    function getApiStatusText(routeMode, apiKind) {
+        if (routeMode === "local") return "你现在看到的更新会直接来自本机后端，最适合边改边测。";
+        if (routeMode === "prod") return "当前走部署环境，适合确认线上体验，但不会马上反映本地改动。";
+        if (routeMode === "custom") return "当前走的是手动指定地址，方便你连到其他测试机或代理端口。";
+        return apiKind === "local"
+            ? "系统检测到你正在本地打开页面，所以自动优先命中本机 FastAPI。"
+            : "系统正在自动走公网接口；如果你要联调本地改动，可以一键切回本地。";
+    }
+
     const API_BASE_URL = getApiBaseUrl();
-    const ANALYZE_META_START = "===META_START===";
-    const ANALYZE_META_END = "===META_END===";
+    const API_ROUTE_MODE = getStoredApiRouteMode();
+    const ACTIVE_API_KIND = resolveApiKind(API_BASE_URL);
+    const API_MODE_LABEL = getApiModeLabel(API_ROUTE_MODE, ACTIVE_API_KIND);
+    const API_STATUS_TEXT = getApiStatusText(API_ROUTE_MODE, ACTIVE_API_KIND);
+    console.info("[AI Teacher] Active API endpoint:", API_BASE_URL);
+    if (window.location.protocol === "https:" && API_BASE_URL.startsWith("http://")) {
+        console.warn("[AI Teacher] HTTPS 页面无法直接请求本地 HTTP 接口。要测试本地更新，请本地打开 frontend/index.html 或用本地静态服务启动前端。");
+    }
+    window.aiTeacherApi = {
+        current: API_BASE_URL,
+        useLocal() {
+            localStorage.setItem(API_ROUTE_STORAGE_KEY, "local");
+            localStorage.removeItem(API_CUSTOM_BASE_URL_STORAGE_KEY);
+            window.location.reload();
+        },
+        useProd() {
+            localStorage.setItem(API_ROUTE_STORAGE_KEY, "prod");
+            localStorage.removeItem(API_CUSTOM_BASE_URL_STORAGE_KEY);
+            window.location.reload();
+        },
+        useAuto() {
+            localStorage.setItem(API_ROUTE_STORAGE_KEY, "auto");
+            localStorage.removeItem(API_CUSTOM_BASE_URL_STORAGE_KEY);
+            window.location.reload();
+        },
+        setCustom(baseUrl) {
+            const nextBaseUrl = normalizeApiBaseUrl(baseUrl);
+            if (!nextBaseUrl) return;
+            localStorage.setItem(API_ROUTE_STORAGE_KEY, "custom");
+            localStorage.setItem(API_CUSTOM_BASE_URL_STORAGE_KEY, nextBaseUrl);
+            window.location.reload();
+        }
+    };
     const DASHBOARD_CACHE_KEY = 'aiTeacherDashboardCache';
+    const WHITEBOARD_DIRECTIVE_REGEX = /\[WHITEBOARD:\s*([\s\S]*?)\]/g;
     const DASHBOARD_PALETTE = {
         primary: '#4f46e5',
         secondary: '#6366f1',
@@ -441,13 +660,19 @@
             const isThinking = ref(false);
             const isInputLocked = ref(false);
             const isDashboardOpen = ref(false);
+            const currentApiBaseUrl = API_BASE_URL;
+            const currentApiMode = API_ROUTE_MODE;
+            const currentApiKind = ACTIVE_API_KIND;
+            const currentApiModeLabel = API_MODE_LABEL;
+            const currentApiStatusText = API_STATUS_TEXT;
             const dashboardLoading = ref(false);
             const dashboardError = ref('');
             const dashboardData = ref({
                 total_errors: 0,
                 radar_data: [],
                 recent_errors: [],
-                recent_questions: []
+                recent_questions: [],
+                mastery_snapshot: []
             });
             const latestDashboardTime = ref('暂无记录');
             let radarChart = null;
@@ -559,7 +784,7 @@
             const getLatestTimestamp = (...groups) => {
                 const candidates = groups
                     .flat()
-                    .map(item => item?.created_at)
+                    .map(item => item?.created_at || item?.last_tested_at)
                     .filter(Boolean)
                     .map(value => new Date(value))
                     .filter(date => !Number.isNaN(date.getTime()))
@@ -571,7 +796,8 @@
             const syncDashboardMeta = () => {
                 const latestTimestamp = getLatestTimestamp(
                     dashboardData.value.recent_errors || [],
-                    dashboardData.value.recent_questions || []
+                    dashboardData.value.recent_questions || [],
+                    dashboardData.value.mastery_snapshot || []
                 );
                 latestDashboardTime.value = latestTimestamp
                     ? formatDashboardTime(latestTimestamp)
@@ -582,7 +808,8 @@
                 total_errors: Number(payload?.total_errors || 0),
                 radar_data: Array.isArray(payload?.radar_data) ? payload.radar_data : [],
                 recent_errors: Array.isArray(payload?.recent_errors) ? payload.recent_errors : [],
-                recent_questions: Array.isArray(payload?.recent_questions) ? payload.recent_questions : []
+                recent_questions: Array.isArray(payload?.recent_questions) ? payload.recent_questions : [],
+                mastery_snapshot: Array.isArray(payload?.mastery_snapshot) ? payload.mastery_snapshot : []
             });
 
             const applyDashboardData = (payload) => {
@@ -745,7 +972,8 @@
                         total_errors: 0,
                         radar_data: [],
                         recent_errors: [],
-                        recent_questions: []
+                        recent_questions: [],
+                        mastery_snapshot: []
                     };
                 }
 
@@ -807,9 +1035,6 @@
                 if (typeof message.content === 'string' && message.content.trim()) {
                     return message.content.trim();
                 }
-                if (message.isAnalysis && message.report?.teacher_message) {
-                    return String(message.report.teacher_message).trim();
-                }
                 return '';
             };
 
@@ -831,6 +1056,31 @@
                     .slice(-limit);
             };
 
+            const extractWhiteboardPayload = (rawText, carryBuffer = '') => {
+                let text = (carryBuffer || '') + (rawText || '');
+                let nextCarry = '';
+                const whiteboardItems = [];
+
+                const lastDirectiveStart = text.lastIndexOf('[WHITEBOARD:');
+                if (lastDirectiveStart !== -1) {
+                    const closingBracketIndex = text.indexOf(']', lastDirectiveStart);
+                    if (closingBracketIndex === -1) {
+                        nextCarry = text.slice(lastDirectiveStart);
+                        text = text.slice(0, lastDirectiveStart);
+                    }
+                }
+
+                const visibleText = text.replace(WHITEBOARD_DIRECTIVE_REGEX, (_, payload) => {
+                    const boardText = String(payload || '').trim();
+                    if (boardText) {
+                        whiteboardItems.push(boardText);
+                    }
+                    return '';
+                });
+
+                return { visibleText, whiteboardItems, nextCarry };
+            };
+
             const readStreamIntoMessage = async (url, payload, messageIndex) => {
                 const response = await fetch(url, {
                     method: 'POST',
@@ -849,6 +1099,7 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
                 let systemBuffer = '';
+                let whiteboardBuffer = '';
 
                 const appendClassStreamChunk = (rawText) => {
                     if (!messages.value[messageIndex]) return;
@@ -870,9 +1121,19 @@
                         return '';
                     });
 
-                    if (chunkText.trim()) {
+                    const whiteboardResult = extractWhiteboardPayload(chunkText, whiteboardBuffer);
+                    whiteboardBuffer = whiteboardResult.nextCarry;
+
+                    if (whiteboardResult.whiteboardItems.length > 0) {
+                        // TODO: 后续这里可以直接派发给独立白板 UI 组件，而不是只打控制台。
+                        whiteboardResult.whiteboardItems.forEach((item) => {
+                            console.log('[WHITEBOARD]', item);
+                        });
+                    }
+
+                    if (whiteboardResult.visibleText) {
                         messages.value[messageIndex].systemStatus = '';
-                        messages.value[messageIndex].content += chunkText;
+                        messages.value[messageIndex].content += whiteboardResult.visibleText;
                     }
 
                     scrollToBottom();
@@ -907,9 +1168,9 @@
                 }
             };
 
-            const readPracticeStreamIntoMessage = async (text, messageIndex) => {
+            const readChatStreamIntoMessage = async (text, messageIndex) => {
                 const history = buildRecentHistory(2, 6);
-                const response = await fetch(API_BASE_URL + '/practice_chat', {
+                const response = await fetch(API_BASE_URL + '/chat_stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ text, history })
@@ -920,133 +1181,55 @@
                 }
 
                 if (!response.body) {
-                    throw new Error('响应体为空，无法读取分析流');
+                    throw new Error('响应体为空，无法读取聊天流');
                 }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
                 let buffer = "";
-                let metaResolved = false;
-
-                const flushBuffer = () => {
-                    if (!buffer) return;
-                    if (messages.value[messageIndex].isAnalysis) {
-                        messages.value[messageIndex].report.teacher_message += buffer;
-                    } else {
-                        messages.value[messageIndex].content += buffer;
-                    }
-                    buffer = "";
-                    scrollToBottom();
-                };
-
-                const tryResolveMeta = () => {
-                    if (metaResolved) return;
-
-                    const endIndex = buffer.indexOf(ANALYZE_META_END);
-                    if (endIndex === -1) return;
-
-                    const startIndex = buffer.indexOf(ANALYZE_META_START);
-                    if (startIndex === -1 || startIndex > endIndex) {
-                        throw new Error('分析流 Meta 分隔符异常');
-                    }
-
-                    const metaJson = buffer.slice(startIndex + ANALYZE_META_START.length, endIndex);
-                    const meta = JSON.parse(metaJson);
-
-                    if (meta.intent === 'ANALYZE') {
-                        messages.value[messageIndex].isQA = false;
-                        messages.value[messageIndex].isAnalysis = true;
-                        messages.value[messageIndex].originalText = meta.originalText || text;
-                        messages.value[messageIndex].report = {
-                            original_sentence: text,
-                            is_grammar_correct: false,
-                            basic_components: [],
-                            structural_components: [],
-                            errors: [],
-                            teacher_message: '',
-                            ...(meta.report || {})
-                        };
-                    } else {
-                        messages.value[messageIndex].isQA = true;
-                        messages.value[messageIndex].isAnalysis = false;
-                    }
-
-                    buffer = buffer.slice(endIndex + ANALYZE_META_END.length);
-                    metaResolved = true;
-                    scrollToBottom();
-                };
+                let whiteboardBuffer = "";
 
                 while (true) {
                     const { done, value } = await reader.read();
                     if (done) break;
 
                     buffer += decoder.decode(value, { stream: true });
-                    tryResolveMeta();
+                    if (buffer) {
+                        const whiteboardResult = extractWhiteboardPayload(buffer, whiteboardBuffer);
+                        whiteboardBuffer = whiteboardResult.nextCarry;
 
-                    if (metaResolved) {
-                        flushBuffer();
+                        if (whiteboardResult.whiteboardItems.length > 0) {
+                            // TODO: 后续这里可以直接派发给独立白板 UI 组件，而不是只打控制台。
+                            whiteboardResult.whiteboardItems.forEach((item) => {
+                                console.log('[WHITEBOARD]', item);
+                            });
+                        }
+
+                        messages.value[messageIndex].content += whiteboardResult.visibleText;
+                        buffer = "";
+                        scrollToBottom();
                     }
                 }
 
                 buffer += decoder.decode();
-                tryResolveMeta();
+                if (buffer) {
+                    const whiteboardResult = extractWhiteboardPayload(buffer, whiteboardBuffer);
+                    whiteboardBuffer = whiteboardResult.nextCarry;
 
-                if (!metaResolved) {
-                    throw new Error('分析流未返回完整 Meta 数据');
-                }
-
-                flushBuffer();
-            };
-
-            const generateRenderChunks = (text, basic, structures, errors) => {
-                if (!text) return [];
-                let markers = new Set([0, text.length]);
-                
-                (basic || []).forEach(c => { markers.add(c.start_char); markers.add(c.end_char); });
-                (structures || []).forEach(c => { markers.add(c.start_char); markers.add(c.end_char); });
-                (errors || []).forEach(e => { markers.add(e.start_char); markers.add(e.end_char); });
-                
-                const sortedMarkers = Array.from(markers).sort((a, b) => a - b);
-                const chunks = [];
-                
-                const basicColors = { "主语": "bg-red-100 text-red-800", "核心谓语": "bg-blue-100 text-blue-800", "宾语": "bg-green-100 text-green-800", "定语": "bg-yellow-100 text-yellow-800", "状语": "bg-purple-100 text-purple-800" };
-                const structColors = { "介词短语": "underline decoration-slate-400 decoration-solid decoration-2 underline-offset-4", "定语从句": "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "名词性从句": "underline decoration-indigo-400 decoration-dashed decoration-2 underline-offset-4", "非谓语/不定式": "underline decoration-teal-400 decoration-wavy decoration-2 underline-offset-4" };
-
-                for (let i = 0; i < sortedMarkers.length - 1; i++) {
-                    const start = sortedMarkers[i];
-                    const end = sortedMarkers[i+1];
-                    if (start === end) continue; 
-                    
-                    const chunkText = text.substring(start, end);
-                    const errorMatch = (errors || []).find(e => start >= e.start_char && end <= e.end_char);
-                    const basicMatch = (basic || []).find(c => start >= c.start_char && end <= c.end_char);
-                    const structMatch = (structures || []).find(c => start >= c.start_char && end <= c.end_char);
-                    
-                    let classList = "relative group cursor-help transition-colors duration-200 ";
-                    let tooltipLines = [];
-
-                    if (errorMatch) {
-                        classList += "bg-red-200 text-red-900 font-bold border-b-2 border-red-500 rounded-sm ";
-                        tooltipLines.push(`❌ ${errorMatch.correction_suggestion}`);
-                    } else if (basicMatch) {
-                        classList += (basicColors[basicMatch.component_type] || "bg-slate-100 text-slate-700") + " rounded px-0.5 mx-[1px] ";
-                        tooltipLines.push(`📌 ${basicMatch.component_type}`);
+                    if (whiteboardResult.whiteboardItems.length > 0) {
+                        whiteboardResult.whiteboardItems.forEach((item) => {
+                            console.log('[WHITEBOARD]', item);
+                        });
                     }
 
-                    if (structMatch) {
-                        classList += (structColors[structMatch.component_type] || "underline") + " ";
-                        tooltipLines.push(`📦 ${structMatch.component_type}`);
-                    }
-
-                    chunks.push({
-                        text: chunkText,
-                        classStr: classList.trim(),
-                        hasTooltip: tooltipLines.length > 0,
-                        tooltipHtml: tooltipLines.join('<br>') 
-                    });
+                    messages.value[messageIndex].content += whiteboardResult.visibleText;
+                    scrollToBottom();
                 }
-                return chunks;
             };
+
+            const switchToLocalApi = () => window.aiTeacherApi.useLocal();
+            const switchToProdApi = () => window.aiTeacherApi.useProd();
+            const switchToAutoApi = () => window.aiTeacherApi.useAuto();
 
             const startClass = async () => {
                 if (isInputLocked.value) return;
@@ -1079,7 +1262,7 @@
                     isInClass.value = false;
                     messages.value.push({ 
                         role: 'ai', 
-                        content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算放弃了吗？很好，微课模式关闭。现在进入自由散漫的练习模式，随便扔点你写的破烂句子过来让我挑刺吧。' 
+                        content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算先喘口气了？很好，微课模式关闭。现在回到闲聊和答疑通道，你要是还有问题，就继续开口。' 
                     });
                     scrollToBottom();
                 } catch (error) {
@@ -1104,25 +1287,11 @@
                     if (isInClass.value) {
                         await streamClassMessage(text, "chat");
                     } else {
-                        const aiMessage = {
-                            role: 'ai',
-                            isQA: true,
-                            isAnalysis: false,
-                            content: '',
-                            originalText: text,
-                            report: {
-                                original_sentence: text,
-                                is_grammar_correct: false,
-                                basic_components: [],
-                                structural_components: [],
-                                errors: [],
-                                teacher_message: ''
-                            }
-                        };
+                        const aiMessage = { role: 'ai', content: '' };
                         messages.value.push(aiMessage);
                         const aiMessageIndex = messages.value.length - 1;
                         isThinking.value = false;
-                        await readPracticeStreamIntoMessage(text, aiMessageIndex);
+                        await readChatStreamIntoMessage(text, aiMessageIndex);
                     }
                 } catch (error) {
                     messages.value.push({ role: 'ai', content: "❌ 请求失败！请检查后端网络。" });
@@ -1144,9 +1313,11 @@
 
             return {
                 inputText, messages, isThinking, isInClass, isInputLocked,
+                currentApiBaseUrl, currentApiMode, currentApiKind, currentApiModeLabel, currentApiStatusText,
                 isDashboardOpen, dashboardLoading, dashboardError, dashboardData, latestDashboardTime,
-                autoResize, handleEnter, sendMessage, startNewChat, generateRenderChunks, startClass, exitClass, renderMarkdown,
-                openDashboard, closeDashboard, formatDashboardTime
+                autoResize, handleEnter, sendMessage, startNewChat, startClass, exitClass, renderMarkdown,
+                openDashboard, closeDashboard, formatDashboardTime,
+                switchToLocalApi, switchToProdApi, switchToAutoApi
             };
         }
     }).mount('#app');
