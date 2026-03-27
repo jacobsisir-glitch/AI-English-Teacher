@@ -264,6 +264,9 @@ CURRENT_STUDENT_ID = DEFAULT_STUDENT_ID
 TEXTBOOKS_DIR = Path(__file__).resolve().parent / "data" / "textbooks"
 MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{2,4})\s+(.+?)\s*$")
 TEXTBOOK_SLICE_CACHE: dict[tuple[str, str, int, int, int], str] = {}
+WHITEBOARD_EVENT_OPEN = "<WBEVENT>"
+WHITEBOARD_EVENT_CLOSE = "</WBEVENT>"
+WHITEBOARD_WRAPPER_PATTERN = re.compile(r"^`?\[WHITEBOARD:\s*(.*?)\]`?$")
 
 
 def _extract_markdown_section(markdown_text: str, heading_title: str) -> str:
@@ -377,6 +380,124 @@ def _build_runtime_course_task(task_index: int) -> dict:
     base_task["reference"] = reference_text
     base_task["node_name"] = base_task.get("task_name", "当前知识点")
     return base_task
+
+def _clean_whiteboard_markdown_line(raw_line: str) -> str:
+    line = str(raw_line or "").strip()
+    if not line:
+        return ""
+
+    is_bullet = bool(re.match(r"^[-*]\s+", line))
+    core_text = re.sub(r"^[-*]\s+", "", line).strip()
+    wrapped_match = WHITEBOARD_WRAPPER_PATTERN.match(core_text)
+    if wrapped_match:
+        core_text = wrapped_match.group(1).strip()
+
+    core_text = core_text.strip("`").strip()
+    if not core_text:
+        return ""
+
+    return f"- {core_text}" if is_bullet else core_text
+
+
+def _build_whiteboard_contents(reference_text: str) -> list[str]:
+    formula_lines: list[str] = []
+    example_lines: list[str] = []
+    note_lines: list[str] = []
+    section = ""
+
+    for raw_line in str(reference_text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        if line.startswith("#"):
+            continue
+        if "白板核心公式" in line:
+            section = "formula"
+            continue
+        if "经典对错对比" in line:
+            section = "example"
+            continue
+        if "AI 主播话术" in line or "Trigger" in line:
+            section = ""
+            continue
+
+        cleaned_line = _clean_whiteboard_markdown_line(line)
+        if not cleaned_line:
+            continue
+
+        if section == "formula":
+            formula_lines.append(cleaned_line)
+        elif section == "example":
+            example_lines.append(cleaned_line)
+        else:
+            note_lines.append(cleaned_line)
+
+    contents: list[str] = []
+    if formula_lines:
+        contents.append("### 核心公式\n" + "\n".join(formula_lines))
+    if example_lines:
+        contents.append("### 经典对错对比\n" + "\n".join(example_lines))
+    if note_lines:
+        contents.append("### 板书补充\n" + "\n".join(note_lines))
+
+    if contents:
+        return contents
+
+    fallback_lines = [
+        cleaned_line
+        for line in str(reference_text or "").splitlines()
+        if (cleaned_line := _clean_whiteboard_markdown_line(line))
+    ]
+    if not fallback_lines:
+        return []
+    return ["### 当前板书\n" + "\n".join(fallback_lines)]
+
+
+def _build_whiteboard_update_payload(task_info: dict) -> dict:
+    return {
+        "type": "whiteboard_update",
+        "node_key": str(task_info.get("task_name") or task_info.get("node_name") or "").strip(),
+        "title": str(task_info.get("node_name") or task_info.get("task_name") or "当前知识点").strip(),
+        "contents": _build_whiteboard_contents(task_info.get("reference") or ""),
+        "question": "",
+    }
+
+
+def _serialize_whiteboard_update(payload: dict) -> str:
+    return (
+        f"{WHITEBOARD_EVENT_OPEN}"
+        f"{json.dumps(payload, ensure_ascii=False)}"
+        f"{WHITEBOARD_EVENT_CLOSE}\n"
+    )
+
+
+def _iter_whiteboard_events(task_info: dict):
+    node_key = str(task_info.get("task_name") or task_info.get("node_name") or "").strip()
+    title = str(task_info.get("node_name") or task_info.get("task_name") or "微课板书").strip()
+    contents = _build_whiteboard_contents(task_info.get("reference") or "")
+
+    yield _serialize_whiteboard_update(
+        {
+            "action": "new_page",
+            "node_key": node_key,
+            "title": title,
+        }
+    )
+
+    for content in contents:
+        cleaned_content = str(content or "").strip()
+        if not cleaned_content:
+            continue
+        yield _serialize_whiteboard_update(
+            {
+                "action": "append",
+                "node_key": node_key,
+                "title": title,
+                "content": cleaned_content,
+            }
+        )
+
 
 class TaskCompletedBuffer:
     def __init__(self, marker: str):
@@ -1086,6 +1207,9 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             return
 
         current_task = _build_runtime_course_task(student_state["current_task_index"])
+        if request.action == "start":
+            for event_str in _iter_whiteboard_events(current_task):
+                yield event_str
         current_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
         class_db_buffer = AnalyzeDBLogBuffer(CLASS_DB_LOG_START, CLASS_DB_LOG_END)
 
@@ -1143,6 +1267,8 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             return
 
         next_task = _build_runtime_course_task(student_state["current_task_index"])
+        for event_str in _iter_whiteboard_events(next_task):
+            yield event_str
         yield "\n\n"
 
         next_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)

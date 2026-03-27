@@ -34,8 +34,119 @@
         textarea:focus { outline: none; }
         body {
             background:
-                radial-gradient(circle at top left, rgba(99, 102, 241, 0.10), transparent 30%),
-                linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+                radial-gradient(circle at 12% 18%, rgba(125, 211, 252, 0.18), transparent 26%),
+                radial-gradient(circle at 82% 14%, rgba(253, 224, 71, 0.14), transparent 24%),
+                linear-gradient(180deg, #fffdf8 0%, #f8f5ee 46%, #f6f1e7 100%);
+            min-height: 100vh;
+        }
+        .immersive-grid {
+            background-image:
+                linear-gradient(rgba(148, 163, 184, 0.10) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(148, 163, 184, 0.10) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: radial-gradient(circle at center, black 42%, transparent 92%);
+        }
+        .control-deck {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 250, 240, 0.74));
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            box-shadow: 0 24px 60px rgba(15, 23, 42, 0.10);
+            backdrop-filter: blur(18px);
+        }
+        .stage-shell {
+            background: rgba(255, 255, 255, 0.92);
+            border: 1px solid rgba(226, 232, 240, 0.98);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.05);
+            backdrop-filter: blur(18px);
+        }
+        .stage-shell::before {
+            content: "";
+            position: absolute;
+            inset: 1.25rem;
+            border-radius: 1.5rem;
+            border: 1px solid rgba(226, 232, 240, 0.9);
+            background:
+                linear-gradient(180deg, rgba(248, 250, 252, 0.9), rgba(255, 255, 255, 0.55)),
+                radial-gradient(circle at top left, rgba(125, 211, 252, 0.14), transparent 30%);
+            pointer-events: none;
+        }
+        .subtitle-mask {
+            white-space: nowrap;
+            text-shadow: 0 2px 10px rgba(255, 255, 255, 0.55);
+        }
+        .subtitle-stack {
+            position: relative;
+        }
+        .subtitle-stack-enter-active,
+        .subtitle-stack-leave-active,
+        .subtitle-stack-move {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        .subtitle-stack-enter-from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        .subtitle-stack-leave-to {
+            opacity: 0;
+            transform: translateY(-18px);
+        }
+        .subtitle-stack-leave-active {
+            position: absolute;
+            left: 0;
+            right: 0;
+        }
+        .wb-block-enter-active,
+        .wb-block-move {
+            transition: opacity 0.4s ease, transform 0.4s ease;
+        }
+        .wb-block-enter-from {
+            opacity: 0;
+            transform: translateY(22px);
+        }
+        .wb-block-flash {
+            animation: wbBlockFlash 1.8s ease-out forwards;
+        }
+        .wb-question-enter-active {
+            animation: wbQuestionIn 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .wb-question-leave-active {
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+        .wb-question-enter-from,
+        .wb-question-leave-to {
+            opacity: 0;
+            transform: translateY(18px) scale(0.98);
+        }
+        @keyframes wbBlockFlash {
+            0% {
+                background-color: rgba(254, 249, 195, 0.9);
+                border-color: rgba(253, 224, 71, 0.68);
+                box-shadow: 0 18px 40px rgba(250, 204, 21, 0.18);
+            }
+            100% {
+                background-color: rgba(255, 255, 255, 0.7);
+                border-color: rgba(226, 232, 240, 0.9);
+                box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            }
+        }
+        @keyframes wbQuestionIn {
+            0% {
+                opacity: 0;
+                transform: translateY(26px) scale(0.96);
+            }
+            65% {
+                opacity: 1;
+                transform: translateY(-4px) scale(1.01);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+        .live2d-card {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(250, 245, 235, 0.74));
+            border: 1px solid rgba(226, 232, 240, 0.95);
+            box-shadow: 0 18px 48px rgba(15, 23, 42, 0.10);
+            backdrop-filter: blur(18px);
         }
         .report-trigger {
             background: linear-gradient(135deg, var(--brand-primary), #3b82f6);
@@ -162,185 +273,185 @@
         }
     </style>
 </head>
-<body class="bg-white text-slate-800 antialiased h-screen overflow-hidden">
+<body class="bg-stone-50 text-slate-800 antialiased h-screen overflow-hidden">
 
-<div id="app" class="flex h-full w-full" v-cloak>
+<div id="app" class="relative h-full w-full overflow-hidden" v-cloak>
+    <div class="immersive-grid absolute inset-0 opacity-70"></div>
+    <div class="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-amber-100/70 to-transparent pointer-events-none"></div>
+    <div class="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-stone-100/80 via-stone-50/70 to-transparent pointer-events-none"></div>
 
-    <aside class="hidden md:flex flex-col w-64 bg-slate-50 border-r border-slate-200 h-full flex-shrink-0">
-        <div class="p-4 space-y-3">
-            <button @click="startNewChat" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-white border border-slate-200 shadow-sm rounded-xl text-slate-700 hover:bg-slate-100 transition-colors font-medium">
-                <i class="fa-solid fa-pen-to-square"></i> 新建对话
+    <div class="control-deck fixed left-4 top-4 z-40 w-[calc(100vw-2rem)] max-w-sm rounded-3xl p-4 md:left-6 md:top-6 md:w-80">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <p class="text-[11px] uppercase tracking-[0.34em] text-sky-600/80">Immersive Live</p>
+                <h1 class="mt-2 text-xl font-semibold text-slate-800">AI 虚拟英语老师</h1>
+                <p class="mt-2 text-sm leading-6 text-slate-600">聊天瀑布流已经下岗。现在请把注意力留给白板、字幕和老师的冷嘲热讽。</p>
+            </div>
+            <span class="rounded-full border border-sky-300/40 bg-sky-100/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-700">
+                {{ isInClass ? 'Class Live' : 'Chat Live' }}
+            </span>
+        </div>
+
+        <div class="mt-4 grid grid-cols-2 gap-2">
+            <button @click="startNewChat" class="rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-white">
+                <i class="fa-solid fa-rotate-left mr-2"></i>重置舞台
             </button>
-            <button @click="startClass" :disabled="isInClass || isInputLocked" :class="isInClass || isInputLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-indigo-700'" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 shadow-sm rounded-xl text-white transition-colors font-medium">
-                <i class="fa-solid fa-graduation-cap"></i> 开启微课 (系统课)
+            <button @click="openDashboard" :disabled="dashboardLoading" :class="dashboardLoading ? 'opacity-60 cursor-wait' : 'hover:bg-indigo-500/90'" class="report-trigger rounded-2xl px-4 py-3 text-sm font-medium text-white transition">
+                <i class="fa-solid fa-chart-column mr-2"></i>学习报告
             </button>
-            <button @click="openDashboard" :disabled="dashboardLoading" :class="dashboardLoading ? 'opacity-60 cursor-wait' : ''" class="report-trigger w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-white transition-all font-medium">
-                <i class="fa-solid fa-chart-column"></i> 个人学习报告
+            <button v-if="!isInClass" @click="startClass" :disabled="isInputLocked" :class="isInputLocked ? 'opacity-50 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-500'" class="col-span-2 rounded-2xl px-4 py-3 text-sm font-medium text-white transition">
+                <i class="fa-solid fa-graduation-cap mr-2"></i>开启微课
             </button>
-            <button v-if="isInClass" @click="exitClass" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-red-500 shadow-sm rounded-xl text-white hover:bg-red-600 transition-colors font-medium">
-                <i class="fa-solid fa-door-open"></i> 退出微课
+            <button v-else @click="exitClass" class="col-span-2 rounded-2xl bg-rose-500 px-4 py-3 text-sm font-medium text-white transition hover:bg-rose-400">
+                <i class="fa-solid fa-door-open mr-2"></i>退出微课
             </button>
         </div>
-        <div class="flex-1 overflow-y-auto px-3">
-            <div class="text-xs font-semibold text-slate-400 mb-2 px-2 mt-2">当前状态</div>
-            <div class="w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors" :class="isInClass ? 'text-amber-600 bg-amber-50' : 'text-emerald-600 bg-emerald-50'">
-                <i class="fa-solid" :class="isInClass ? 'fa-chalkboard-user mr-2' : 'fa-link mr-2'"></i> 
-                {{ isInClass ? '微课进行中...' : '闲聊 / 答疑模式' }}
+
+        <div class="mt-4 rounded-2xl border border-slate-200 bg-white/70 px-4 py-3 shadow-xl">
+            <div class="flex items-center gap-2">
+                <span class="api-status-dot" :class="currentApiKind"></span>
+                <span class="text-xs font-semibold text-slate-700">{{ currentApiModeLabel }}</span>
             </div>
-            <div class="text-xs font-semibold text-slate-400 mb-2 px-2 mt-4">接口路由</div>
-            <div class="api-switch-card rounded-2xl p-3">
-                <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                            <span class="api-status-dot" :class="currentApiKind"></span>
-                            <span class="text-xs font-semibold" :class="currentApiKind === 'local' ? 'text-emerald-700' : (currentApiKind === 'prod' ? 'text-indigo-700' : 'text-amber-700')">
-                                {{ currentApiModeLabel }}
-                            </span>
+            <p class="mt-2 text-[11px] leading-5 text-slate-500">{{ currentApiStatusText }}</p>
+            <div class="api-switch-segment mt-3 grid grid-cols-3 gap-1 bg-stone-100/90">
+                <button @click="switchToLocalApi" :disabled="currentApiMode === 'local'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'local' ? 'active-local cursor-default' : ''">本地</button>
+                <button @click="switchToProdApi" :disabled="currentApiMode === 'prod'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'prod' ? 'active-prod cursor-default' : ''">公网</button>
+                <button @click="switchToAutoApi" :disabled="currentApiMode === 'auto'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'auto' ? 'active-auto cursor-default' : ''">自动</button>
+            </div>
+            <div class="mt-3 truncate rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-[11px] text-slate-500">{{ currentApiBaseUrl }}</div>
+        </div>
+    </div>
+
+    <main class="relative z-10 flex h-full flex-col items-center px-4 pb-44 pt-24 md:px-8 md:pt-10">
+        <div class="mt-2 flex w-full max-w-6xl items-center justify-center gap-3 text-center md:mt-4">
+            <span class="rounded-full border border-sky-300/40 bg-sky-100/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-sky-700">
+                {{ isInClass ? 'Micro Lesson On Air' : 'Studio Chat' }}
+            </span>
+            <span v-if="isThinking" class="rounded-full border border-amber-300/40 bg-amber-100/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-700">
+                老师正在组织语言
+            </span>
+        </div>
+
+        <section class="stage-shell w-11/12 max-w-6xl h-[65vh] mx-auto mt-6 bg-white/90 backdrop-blur-xl border border-slate-200 shadow-[0_20px_60px_rgba(0,0,0,0.05)] rounded-3xl relative overflow-hidden">
+            <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.16),transparent_32%)] pointer-events-none"></div>
+            <div class="absolute inset-x-10 top-8 flex items-center justify-between text-[11px] uppercase tracking-[0.36em] text-slate-400">
+                <span>Whiteboard Stage</span>
+                <span class="inline-flex items-center gap-2">
+                    <span>{{ whiteboardPages.length > 0 ? `Page ${currentPageIndex + 1}/${whiteboardPages.length}` : 'Grammar Live Feed' }}</span>
+                    <span v-if="hasUnreadWhiteboardUpdate" class="inline-flex h-2.5 w-2.5 rounded-full bg-rose-400 shadow-[0_0_0_4px_rgba(251,113,133,0.16)]"></span>
+                </span>
+            </div>
+
+            <button
+                v-if="whiteboardPages.length > 1"
+                @click="goToPrevWhiteboardPage"
+                :disabled="!canGoPrevWhiteboardPage"
+                class="absolute left-4 top-1/2 z-30 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/85 text-xl text-slate-600 shadow-lg backdrop-blur transition hover:border-sky-300 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+                &lt;
+            </button>
+
+            <button
+                v-if="whiteboardPages.length > 1"
+                @click="goToNextWhiteboardPage"
+                :disabled="!canGoNextWhiteboardPage"
+                class="absolute right-4 top-1/2 z-30 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/85 text-xl text-slate-600 shadow-lg backdrop-blur transition hover:border-sky-300 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-35"
+            >
+                &gt;
+            </button>
+
+            <div v-if="currentWhiteboardPage" class="relative z-10 flex h-full flex-col px-10 pb-10 pt-20 md:px-14">
+                <div class="border-b border-slate-200/90 pb-5">
+                    <h2 class="text-2xl font-semibold tracking-wide text-slate-800 md:text-3xl">{{ currentWhiteboardPage.title || '当前知识点' }}</h2>
+                </div>
+
+                <div class="mt-6 flex-1 overflow-y-auto pr-2">
+                    <transition-group name="wb-block" tag="div" class="flex flex-col gap-5">
+                        <div
+                            v-for="(content, index) in currentWhiteboardPage.contents"
+                            :key="`${currentPageIndex}-${index}`"
+                            :class="[
+                                'rounded-2xl border px-5 py-4 shadow-sm transition-colors duration-[1600ms]',
+                                freshWhiteboardBlockKey === `${currentPageIndex}-${index}`
+                                    ? 'wb-block-flash'
+                                    : 'border-slate-200/90 bg-white/70'
+                            ]"
+                        >
+                            <div class="prose prose-slate prose-lg md:prose-xl max-w-none text-left" v-html="renderMarkdown(content)"></div>
                         </div>
-                        <p class="mt-2 text-[11px] leading-relaxed text-slate-500">{{ currentApiStatusText }}</p>
+                    </transition-group>
+                </div>
+
+                <transition name="wb-question" mode="out-in">
+                    <div
+                        v-if="currentWhiteboardPage.question"
+                        :key="currentQuestionDisplayKey"
+                        class="mt-6 rounded-2xl border border-amber-300 bg-amber-50/90 px-5 py-4 shadow-[0_12px_30px_rgba(251,191,36,0.14)]"
+                    >
+                        <div class="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-600">Question On Board</div>
+                        <div class="mt-2 text-base font-medium leading-7 text-amber-900 md:text-lg">{{ currentWhiteboardPage.question }}</div>
                     </div>
-                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold"
-                          :class="currentApiKind === 'local' ? 'bg-emerald-50 text-emerald-700' : (currentApiKind === 'prod' ? 'bg-indigo-50 text-indigo-700' : 'bg-amber-50 text-amber-700')">
-                        {{ currentApiKind === 'local' ? '本地' : (currentApiKind === 'prod' ? '公网' : '自定义') }}
-                    </span>
-                </div>
-                <div class="api-switch-segment mt-3 p-1 grid grid-cols-3 gap-1">
-                    <button @click="switchToLocalApi" :disabled="currentApiMode === 'local'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'local' ? 'active-local cursor-default' : ''">
-                        本地
-                    </button>
-                    <button @click="switchToProdApi" :disabled="currentApiMode === 'prod'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'prod' ? 'active-prod cursor-default' : ''">
-                        公网
-                    </button>
-                    <button @click="switchToAutoApi" :disabled="currentApiMode === 'auto'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'auto' ? 'active-auto cursor-default' : ''">
-                        自动
-                    </button>
-                </div>
-                <div class="mt-3 rounded-xl bg-white/80 px-3 py-2 text-[11px] text-slate-400 truncate border border-slate-100">
-                    {{ currentApiBaseUrl }}
-                </div>
+                </transition>
             </div>
+
+            <div v-else class="flex h-full items-center justify-center text-slate-300 text-2xl md:text-3xl tracking-[0.18em] uppercase">等待老师板书注入...</div>
+        </section>
+
+    </main>
+
+    <div class="fixed bottom-36 left-1/2 z-40 w-4/5 max-w-4xl -translate-x-1/2 pointer-events-none">
+        <div class="mx-auto h-20 w-full overflow-hidden">
+            <transition-group
+                name="subtitle-stack"
+                tag="div"
+                class="subtitle-stack flex h-full w-full flex-col justify-end gap-1 overflow-hidden text-center"
+            >
+                <p
+                    v-for="line in subtitleLines"
+                    :key="line.id"
+                    :class="line.tone === 'current'
+                        ? 'subtitle-mask max-w-full truncate px-4 text-lg font-medium tracking-wide text-gray-800 md:text-xl'
+                        : 'subtitle-mask max-w-full truncate px-4 text-base font-medium tracking-wide text-gray-400 md:text-lg'"
+                >
+                    {{ line.text }}
+                </p>
+            </transition-group>
         </div>
-    </aside>
+    </div>
 
-    <main class="flex-1 flex flex-col h-full min-w-0 bg-white">
-        <div class="md:hidden flex items-center gap-2 px-4 pt-4 pb-2 bg-white/90 backdrop-blur-sm border-b border-slate-100 flex-shrink-0">
-            <button @click="startNewChat" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-white border border-slate-200 shadow-sm rounded-xl text-slate-700 text-sm font-medium">
-                <i class="fa-solid fa-pen-to-square"></i> 新建
-            </button>
-            <button @click="openDashboard" :disabled="dashboardLoading" :class="dashboardLoading ? 'opacity-60 cursor-wait' : ''" class="report-trigger flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-white text-sm font-medium">
-                <i class="fa-solid fa-chart-column"></i> 报告
-            </button>
-            <button v-if="!isInClass" @click="startClass" :disabled="isInputLocked" :class="isInputLocked ? 'opacity-50 cursor-not-allowed' : 'bg-indigo-600'" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-white text-sm font-medium">
-                <i class="fa-solid fa-graduation-cap"></i> 微课
-            </button>
-            <button v-else @click="exitClass" class="flex-1 flex items-center justify-center gap-2 py-2.5 px-3 bg-red-500 rounded-xl text-white text-sm font-medium">
-                <i class="fa-solid fa-door-open"></i> 退出
-            </button>
+    <div class="fixed bottom-0 right-4 md:right-10 w-72 h-[30rem] z-30 flex items-end pointer-events-none">
+        <div class="live2d-card mb-6 w-full rounded-[2rem] px-6 py-8 text-center text-slate-700">
+            <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-full border border-sky-300/50 bg-sky-100 text-3xl">
+                📺
+            </div>
+            <p class="mt-5 text-lg font-semibold tracking-wide">Live2D 角色区</p>
+            <p class="mt-3 text-sm leading-6 text-slate-500">虚拟主播本体以后会站在这里，优雅地对你的语法事故发表意见。</p>
         </div>
-        <div class="md:hidden px-4 pb-3 bg-white/90 backdrop-blur-sm border-b border-slate-100 flex-shrink-0">
-            <div class="api-switch-card rounded-2xl px-3 py-3">
-                <div class="flex items-center justify-between gap-3">
-                    <div class="min-w-0">
-                        <div class="flex items-center gap-2">
-                            <span class="api-status-dot" :class="currentApiKind"></span>
-                            <span class="text-xs font-semibold" :class="currentApiKind === 'local' ? 'text-emerald-700' : (currentApiKind === 'prod' ? 'text-indigo-700' : 'text-amber-700')">
-                                {{ currentApiModeLabel }}
-                            </span>
-                        </div>
-                        <p class="mt-1 text-[11px] text-slate-500 truncate">{{ currentApiBaseUrl }}</p>
-                    </div>
-                    <div class="api-switch-segment p-1 flex gap-1 shrink-0">
-                        <button @click="switchToLocalApi" :disabled="currentApiMode === 'local'" class="api-switch-btn px-3 py-1.5 text-[11px] font-medium" :class="currentApiMode === 'local' ? 'active-local cursor-default' : ''">
-                            本地
-                        </button>
-                        <button @click="switchToProdApi" :disabled="currentApiMode === 'prod'" class="api-switch-btn px-3 py-1.5 text-[11px] font-medium" :class="currentApiMode === 'prod' ? 'active-prod cursor-default' : ''">
-                            公网
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth">
-            
-            <div v-if="messages.length === 0" class="flex flex-col items-center justify-center h-full text-center space-y-4 opacity-70">
-                <div class="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center text-indigo-500 text-2xl rotate-12">
-                    <i class="fa-solid fa-bolt"></i>
-                </div>
-                <h2 class="text-2xl font-bold text-slate-700">前后端已连通！</h2>
-                <p class="text-slate-500 max-w-md">现在你可以直接闲聊、提英语问题，或者开启微课，让老师按教材继续讲。</p>
-            </div>
+    </div>
 
-            <div v-for="(msg, index) in messages" :key="index" :class="['flex', msg.role === 'user' ? 'justify-end' : 'justify-start']">
-                
-                <div v-if="msg.role === 'ai'" class="w-8 h-8 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center text-white text-xs mt-1 mr-3">
-                    <i class="fa-solid fa-robot"></i>
-                </div>
-
-                <div :class="['max-w-[90%] md:max-w-[80%] rounded-2xl p-4', 
-                             msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-slate-50 border border-slate-100 rounded-bl-sm text-slate-800 shadow-sm']">
-                    
-                    <div v-if="msg.role === 'user'" class="leading-relaxed whitespace-pre-wrap">{{ msg.content }}</div>
-                    
-                    <div v-else-if="msg.isClass" class="space-y-4">
-                        <div class="bg-amber-50/80 p-4 rounded-xl border-l-4 border-amber-400">
-                            <h4 class="font-bold text-amber-900 text-sm mb-2 flex items-center gap-2">
-                                <i class="fa-solid fa-chalkboard-user text-amber-500"></i> AI 微课
-                            </h4>
-                            <div v-if="msg.systemStatus" class="mb-3 rounded-xl border border-slate-200 bg-slate-100/90 px-3 py-2 text-xs italic text-slate-500 animate-pulse">
-                                {{ msg.systemStatus }}
-                            </div>
-                            <div class="prose prose-sm prose-amber max-w-none text-slate-800" v-html="renderMarkdown(msg.content)"></div>
-                        </div>
-                    </div>
-                    <div v-else class="space-y-4">
-                        <div class="bg-indigo-50/50 p-4 rounded-xl border-l-4 border-indigo-400">
-                            <h4 class="font-bold text-indigo-900 text-sm mb-2 flex items-center gap-2">
-                                <i class="fa-solid fa-comments text-indigo-500"></i> AI 老师
-                            </h4>
-                            <div class="prose prose-sm prose-indigo max-w-none text-slate-700" v-html="renderMarkdown(msg.content)"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div v-if="isThinking" class="flex justify-start">
-                <div class="w-8 h-8 rounded-full bg-indigo-600 flex-shrink-0 flex items-center justify-center text-white text-xs mr-3 mt-1">
-                    <i class="fa-solid fa-robot"></i>
-                </div>
-                <div class="bg-slate-50 border border-slate-100 rounded-2xl rounded-bl-sm p-4 flex items-center gap-2 shadow-sm">
-                    <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce"></div>
-                    <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                    <div class="w-2 h-2 bg-indigo-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                    <span class="text-xs text-slate-500 ml-2">正在请求后端 FastAPI，请稍候...</span>
-                </div>
-            </div>
-            
-            <div class="h-4"></div>
-        </div>
-
-        <div class="p-4 bg-white border-t border-slate-100 flex-shrink-0">
-            <div class="max-w-4xl mx-auto relative bg-slate-50 border border-slate-200 rounded-2xl shadow-sm focus-within:ring-1 focus-within:ring-indigo-500 transition-all flex items-end pl-4 pr-2 py-2">
-                <textarea 
+    <div class="fixed inset-x-0 bottom-0 z-40 px-4 pb-4 md:px-8">
+        <div class="mx-auto max-w-5xl rounded-[2rem] border border-slate-200 bg-white/80 px-3 py-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
+            <div class="flex items-end gap-3 rounded-[1.6rem] border border-slate-200 bg-stone-50/90 px-4 py-3">
+                <textarea
                     id="message-input"
                     v-model="inputText"
                     :disabled="isInputLocked"
                     @input="autoResize"
                     @keydown.enter.prevent="handleEnter"
                     rows="1"
-                    placeholder="输入你想聊的话题、英语问题，或直接开启微课继续上课"
-                    class="flex-1 max-h-[150px] min-h-[40px] bg-transparent py-2.5 px-3 text-slate-800 placeholder-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
+                    placeholder="输入弹幕、提问，或者继续和这位不好惹的老师对线"
+                    class="flex-1 max-h-[150px] min-h-[40px] bg-transparent py-2.5 px-2 text-slate-800 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                 ></textarea>
-                <button 
+                <button
                     @click="sendMessage"
                     :disabled="!inputText.trim() || isThinking || isInputLocked"
-                    :class="['p-3 mb-1 rounded-xl flex items-center justify-center transition-all', 
-                            inputText.trim() && !isThinking && !isInputLocked ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md' : 'bg-slate-200 text-slate-400 cursor-not-allowed']">
+                    :class="['mb-1 flex h-12 w-12 items-center justify-center rounded-2xl transition-all',
+                        inputText.trim() && !isThinking && !isInputLocked ? 'bg-indigo-500 text-white hover:bg-indigo-400 shadow-lg shadow-indigo-500/20' : 'bg-slate-200 text-slate-400 cursor-not-allowed']">
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </div>
         </div>
-    </main>
+    </div>
 
     <div v-if="isDashboardOpen" class="dashboard-overlay fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6" @click.self="closeDashboard">
         <div class="dashboard-modal flex flex-col w-full max-w-5xl max-h-[90vh] rounded-[28px] overflow-hidden border border-white/80">
@@ -641,7 +752,9 @@
         }
     };
     const DASHBOARD_CACHE_KEY = 'aiTeacherDashboardCache';
-    const WHITEBOARD_DIRECTIVE_REGEX = /\[WHITEBOARD:\s*([\s\S]*?)\]/g;
+    const WHITEBOARD_EVENT_PACKET_REGEX = /<WBEVENT>([\s\S]*?)<\/WBEVENT>/g;
+    const WHITEBOARD_EVENT_OPEN = '<WBEVENT>';
+    const WHITEBOARD_EVENT_CLOSE = '</WBEVENT>';
     const DASHBOARD_PALETTE = {
         primary: '#4f46e5',
         secondary: '#6366f1',
@@ -652,13 +765,18 @@
         muted: '#64748b',
         grid: '#e2e8f0'
     };
-    const { createApp, ref, nextTick, watch, onMounted, onBeforeUnmount } = Vue;
+    const { createApp, ref, computed, nextTick, watch, onMounted, onBeforeUnmount } = Vue;
 
     createApp({
         setup() {
             const inputText = ref('');
             const isThinking = ref(false);
             const isInputLocked = ref(false);
+            const currentSubtitle = ref('老师正在准备教材...');
+            const subtitleLines = ref([{ id: 'subtitle-0', text: currentSubtitle.value, tone: 'current' }]);
+            const whiteboardPages = ref([]);
+            const currentPageIndex = ref(-1);
+            const hasUnreadWhiteboardUpdate = ref(false);
             const isDashboardOpen = ref(false);
             const currentApiBaseUrl = API_BASE_URL;
             const currentApiMode = API_ROUTE_MODE;
@@ -685,6 +803,401 @@
             watch(messages, (newVal) => {
                 localStorage.setItem('aiTeacherChatHistory', JSON.stringify(newVal));
             }, { deep: true }); // deep: true 意思是深度监听，连数组里面某个属性变了也能察觉到
+
+            const subtitleQueue = ref([]);
+            const subtitleTextBuffer = ref('');
+            const isSubtitlePlaying = ref(false);
+            const freshWhiteboardBlockKey = ref('');
+            const SUBTITLE_BASE_MS = 1000;
+            const SUBTITLE_CHAR_MS = 150;
+            const SUBTITLE_MAX_MS = 4000;
+            const SUBTITLE_DELIMITER_REGEX = /[，,。！？!?；;：:]/;
+            let subtitleHoldTimer = null;
+            let subtitleLineSeed = 1;
+            let whiteboardFlashTimer = null;
+            const SUBTITLE_MIN_WEAK_BREAK_CHARS = 8;
+            const STRONG_SUBTITLE_DELIMITER_REGEX = /[。！？!?]/;
+
+            const currentWhiteboardPage = computed(() => {
+                if (currentPageIndex.value < 0 || currentPageIndex.value >= whiteboardPages.value.length) {
+                    return null;
+                }
+                return whiteboardPages.value[currentPageIndex.value] || null;
+            });
+            const canGoPrevWhiteboardPage = computed(() => currentPageIndex.value > 0);
+            const canGoNextWhiteboardPage = computed(() => (
+                currentPageIndex.value >= 0 && currentPageIndex.value < (whiteboardPages.value.length - 1)
+            ));
+            const currentQuestionDisplayKey = computed(() => {
+                const page = currentWhiteboardPage.value;
+                if (!page?.question) {
+                    return '';
+                }
+                return `wb-question-${currentPageIndex.value}-${page.question}`;
+            });
+
+            const subtitleSanitize = (text) => String(text || '')
+                .replace(WHITEBOARD_EVENT_PACKET_REGEX, '')
+                .replace(/\[SYSTEM:\s*[^\]]+\]/g, '')
+                .replace(/\[动作：[^\]]+\]/g, '')
+                .replace(/\[TASK_COMPLETED\]/g, '')
+                .replace(/\r?\n+/g, ' ')
+                .replace(/\u00a0/g, ' ');
+
+            const normalizeSubtitleText = (text) => subtitleSanitize(text)
+                .replace(/\*{1,3}/g, '')
+                .replace(/_{1,3}/g, '')
+                .replace(/\s+/g, ' ')
+                .trim();
+
+            const buildSubtitleLine = (text, tone = 'current') => ({
+                id: `subtitle-${subtitleLineSeed++}`,
+                text,
+                tone
+            });
+
+            const syncSubtitleLines = (lines) => {
+                subtitleLines.value = lines
+                    .filter((line) => line && line.text)
+                    .slice(-2);
+
+                const currentLine = subtitleLines.value.find((line) => line.tone === 'current')
+                    || subtitleLines.value[subtitleLines.value.length - 1]
+                    || null;
+
+                currentSubtitle.value = currentLine ? currentLine.text : '';
+            };
+
+            const clearSubtitleTimers = () => {
+                if (subtitleHoldTimer) {
+                    clearTimeout(subtitleHoldTimer);
+                    subtitleHoldTimer = null;
+                }
+            };
+
+            const clearWhiteboardFxTimers = () => {
+                if (whiteboardFlashTimer) {
+                    clearTimeout(whiteboardFlashTimer);
+                    whiteboardFlashTimer = null;
+                }
+            };
+
+            const syncWhiteboardUnreadState = () => {
+                hasUnreadWhiteboardUpdate.value = (
+                    currentPageIndex.value >= 0
+                    && currentPageIndex.value < (whiteboardPages.value.length - 1)
+                );
+            };
+
+            const computeSubtitleDuration = (text) => {
+                const charCount = Array.from(String(text || '')).length;
+                return Math.min(SUBTITLE_MAX_MS, SUBTITLE_BASE_MS + (charCount * SUBTITLE_CHAR_MS));
+            };
+
+            const splitSubtitleChunks = (bufferText) => {
+                const chunks = [];
+                let cursor = 0;
+
+                for (let index = 0; index < bufferText.length; index += 1) {
+                    const currentChar = bufferText[index];
+                    if (!SUBTITLE_DELIMITER_REGEX.test(currentChar)) {
+                        continue;
+                    }
+
+                    let end = index + 1;
+                    while (end < bufferText.length && /["'”’）】]/.test(bufferText[end])) {
+                        end += 1;
+                    }
+
+                    const sentence = normalizeSubtitleText(bufferText.slice(cursor, end));
+                    const isStrongBreak = STRONG_SUBTITLE_DELIMITER_REGEX.test(currentChar);
+                    const sentenceLength = Array.from(sentence).length;
+
+                    if (!sentence) {
+                        cursor = end;
+                        index = end - 1;
+                        continue;
+                    }
+
+                    if (!isStrongBreak && sentenceLength < SUBTITLE_MIN_WEAK_BREAK_CHARS) {
+                        continue;
+                    }
+
+                    chunks.push(sentence);
+                    cursor = end;
+                    index = end - 1;
+                }
+
+                return {
+                    chunks,
+                    rest: bufferText.slice(cursor)
+                };
+            };
+
+            const resetSubtitleQueue = ({ keepCurrent = false } = {}) => {
+                clearSubtitleTimers();
+                subtitleQueue.value = [];
+                subtitleTextBuffer.value = '';
+                isSubtitlePlaying.value = false;
+                if (!keepCurrent) {
+                    syncSubtitleLines([]);
+                }
+            };
+
+            const pushSubtitleFrame = (text) => {
+                const cleaned = normalizeSubtitleText(text);
+                if (!cleaned) {
+                    return;
+                }
+
+                const currentLine = subtitleLines.value.find((line) => line.tone === 'current')
+                    || subtitleLines.value[subtitleLines.value.length - 1]
+                    || null;
+
+                const nextLines = [];
+                if (currentLine && currentLine.text && currentLine.text !== cleaned) {
+                    nextLines.push(buildSubtitleLine(currentLine.text, 'history'));
+                }
+                nextLines.push(buildSubtitleLine(cleaned, 'current'));
+                syncSubtitleLines(nextLines);
+            };
+
+            const playNextSubtitle = () => {
+                if (isSubtitlePlaying.value || subtitleQueue.value.length === 0) {
+                    return;
+                }
+
+                isSubtitlePlaying.value = true;
+                const nextSentence = subtitleQueue.value.shift();
+                pushSubtitleFrame(nextSentence);
+
+                subtitleHoldTimer = window.setTimeout(() => {
+                    isSubtitlePlaying.value = false;
+                    playNextSubtitle();
+                }, computeSubtitleDuration(nextSentence));
+            };
+
+            const enqueueSubtitleText = (text) => {
+                const cleaned = normalizeSubtitleText(text);
+                if (!cleaned) {
+                    return;
+                }
+
+                subtitleTextBuffer.value = `${subtitleTextBuffer.value}${cleaned}`.replace(/[ \t]{2,}/g, ' ');
+                const { chunks, rest } = splitSubtitleChunks(subtitleTextBuffer.value);
+                subtitleTextBuffer.value = rest;
+
+                chunks.forEach((chunk) => {
+                    subtitleQueue.value.push(chunk);
+                });
+
+                playNextSubtitle();
+            };
+
+            const flushSubtitleBuffer = () => {
+                const leftover = normalizeSubtitleText(subtitleTextBuffer.value);
+                subtitleTextBuffer.value = '';
+                if (!leftover) {
+                    return;
+                }
+                subtitleQueue.value.push(leftover);
+                playNextSubtitle();
+            };
+
+            const setImmediateSubtitle = (text, { clearQueue = true } = {}) => {
+                const cleaned = normalizeSubtitleText(text);
+                if (clearQueue) {
+                    resetSubtitleQueue({ keepCurrent: false });
+                }
+                if (!cleaned) {
+                    return;
+                }
+                syncSubtitleLines([buildSubtitleLine(cleaned, 'current')]);
+            };
+
+            const maybeShowStatusSubtitle = (text, fallback = '') => {
+                const cleaned = normalizeSubtitleText(text) || normalizeSubtitleText(fallback);
+                if (!cleaned) {
+                    return;
+                }
+                if (isSubtitlePlaying.value || subtitleQueue.value.length > 0 || normalizeSubtitleText(subtitleTextBuffer.value)) {
+                    return;
+                }
+                syncSubtitleLines([buildSubtitleLine(cleaned, 'current')]);
+            };
+
+            const triggerWhiteboardBlockFlash = (pageIndex, blockIndex) => {
+                if (pageIndex < 0 || blockIndex < 0) {
+                    return;
+                }
+
+                const blockKey = `${pageIndex}-${blockIndex}`;
+                freshWhiteboardBlockKey.value = blockKey;
+                clearWhiteboardFxTimers();
+                whiteboardFlashTimer = window.setTimeout(() => {
+                    if (freshWhiteboardBlockKey.value === blockKey) {
+                        freshWhiteboardBlockKey.value = '';
+                    }
+                    whiteboardFlashTimer = null;
+                }, 1800);
+            };
+
+            const normalizeWhiteboardPage = (payload = {}) => {
+                const title = String(payload?.title || '').trim();
+                const question = String(payload?.question || '').trim();
+                const nodeKey = String(payload?.node_key || payload?.nodeKey || title).trim();
+                const rawContents = Array.isArray(payload?.contents)
+                    ? payload.contents
+                    : [payload?.content].filter(Boolean);
+                const contents = rawContents
+                    .map((item) => String(item || '').trim())
+                    .filter(Boolean);
+
+                if (!title && contents.length === 0 && !question) {
+                    return null;
+                }
+
+                return {
+                    title: title || '当前知识点',
+                    contents,
+                    question,
+                    nodeKey
+                };
+            };
+
+            const applyWhiteboardUpdate = (payload = {}) => {
+                const action = String(payload?.action || '').trim();
+                const nodeKey = String(payload?.node_key || payload?.nodeKey || '').trim();
+                const title = String(payload?.title || '').trim();
+                const content = String(payload?.content || '').trim();
+                const question = String(payload?.question || '').trim();
+
+                if (!action) {
+                    return;
+                }
+
+                if (action === 'new_page') {
+                    if (!title) {
+                        return;
+                    }
+
+                    const wasViewingLatest = (
+                        currentPageIndex.value === -1
+                        || currentPageIndex.value >= (whiteboardPages.value.length - 1)
+                    );
+
+                    whiteboardPages.value.push({
+                        title,
+                        contents: [],
+                        question: '',
+                        nodeKey: nodeKey || title
+                    });
+
+                    if (wasViewingLatest) {
+                        currentPageIndex.value = whiteboardPages.value.length - 1;
+                        hasUnreadWhiteboardUpdate.value = false;
+                    } else {
+                        hasUnreadWhiteboardUpdate.value = true;
+                    }
+                    return;
+                }
+
+                const latestIndex = whiteboardPages.value.length - 1;
+                if (latestIndex < 0) {
+                    return;
+                }
+
+                const latestPage = whiteboardPages.value[latestIndex];
+                if (
+                    nodeKey
+                    && latestPage?.nodeKey
+                    && latestPage.nodeKey !== nodeKey
+                ) {
+                    return;
+                }
+
+                const wasViewingLatest = (
+                    currentPageIndex.value === -1
+                    || currentPageIndex.value >= latestIndex
+                );
+
+                if (action === 'append') {
+                    if (!content) {
+                        return;
+                    }
+                    latestPage.contents.push(content);
+                    if (wasViewingLatest) {
+                        currentPageIndex.value = latestIndex;
+                        hasUnreadWhiteboardUpdate.value = false;
+                    } else {
+                        hasUnreadWhiteboardUpdate.value = true;
+                    }
+                    triggerWhiteboardBlockFlash(latestIndex, latestPage.contents.length - 1);
+                    return;
+                }
+
+                if (action === 'question') {
+                    if (!question && !content) {
+                        return;
+                    }
+                    latestPage.question = question || content;
+                    if (wasViewingLatest) {
+                        currentPageIndex.value = latestIndex;
+                        hasUnreadWhiteboardUpdate.value = false;
+                    } else {
+                        hasUnreadWhiteboardUpdate.value = true;
+                    }
+                    return;
+                }
+
+                const nextPage = normalizeWhiteboardPage(payload?.page || payload);
+                if (!nextPage) {
+                    return;
+                }
+
+                const shouldReplaceLatest = Boolean(
+                    latestPage
+                    && latestPage.nodeKey
+                    && nextPage.nodeKey
+                    && latestPage.nodeKey === nextPage.nodeKey
+                );
+
+                if (shouldReplaceLatest) {
+                    whiteboardPages.value.splice(latestIndex, 1, nextPage);
+                } else {
+                    whiteboardPages.value.push(nextPage);
+                }
+
+                const targetIndex = shouldReplaceLatest ? latestIndex : (whiteboardPages.value.length - 1);
+                if (wasViewingLatest || shouldReplaceLatest) {
+                    currentPageIndex.value = targetIndex;
+                    hasUnreadWhiteboardUpdate.value = false;
+                } else {
+                    hasUnreadWhiteboardUpdate.value = true;
+                }
+
+                if (nextPage.contents.length > 0) {
+                    triggerWhiteboardBlockFlash(targetIndex, nextPage.contents.length - 1);
+                } else {
+                    freshWhiteboardBlockKey.value = '';
+                }
+            };
+
+            const goToPrevWhiteboardPage = () => {
+                if (!canGoPrevWhiteboardPage.value) {
+                    return;
+                }
+                currentPageIndex.value -= 1;
+                syncWhiteboardUnreadState();
+            };
+
+            const goToNextWhiteboardPage = () => {
+                if (!canGoNextWhiteboardPage.value) {
+                    return;
+                }
+                currentPageIndex.value += 1;
+                syncWhiteboardUnreadState();
+            };
             
             // 🌟 网页刚加载完时，如果发现有历史记录，自动滚动到最底部
             const scheduleRadarResize = () => {
@@ -745,14 +1258,13 @@
             };
 
             onMounted(() => {
-                if (messages.value.length > 0) {
-                    scrollToBottom();
-                }
                 window.addEventListener('resize', resizeRadarChart);
             });
             onBeforeUnmount(() => {
                 window.removeEventListener('resize', resizeRadarChart);
                 disconnectRadarObserver();
+                clearSubtitleTimers();
+                clearWhiteboardFxTimers();
                 if (radarResizeFrame) {
                     cancelAnimationFrame(radarResizeFrame);
                     radarResizeFrame = null;
@@ -1006,15 +1518,6 @@
                 textarea.style.height = Math.min(textarea.scrollHeight, 150) + 'px';
             };
 
-            const scrollToBottom = () => {
-                setTimeout(() => {
-                    const container = document.getElementById('chat-container');
-                    if(container) {
-                        container.scrollTop = container.scrollHeight;
-                    }
-                }, 50);
-            };
-
             const handleEnter = (e) => {
                 if (e.shiftKey) { inputText.value += '\n'; autoResize(); } 
                 else { sendMessage(); }
@@ -1059,26 +1562,60 @@
             const extractWhiteboardPayload = (rawText, carryBuffer = '') => {
                 let text = (carryBuffer || '') + (rawText || '');
                 let nextCarry = '';
-                const whiteboardItems = [];
+                const lastDirectiveStart = text.lastIndexOf(WHITEBOARD_EVENT_OPEN);
 
-                const lastDirectiveStart = text.lastIndexOf('[WHITEBOARD:');
                 if (lastDirectiveStart !== -1) {
-                    const closingBracketIndex = text.indexOf(']', lastDirectiveStart);
-                    if (closingBracketIndex === -1) {
+                    const closingTagIndex = text.indexOf(WHITEBOARD_EVENT_CLOSE, lastDirectiveStart);
+                    if (closingTagIndex === -1) {
                         nextCarry = text.slice(lastDirectiveStart);
                         text = text.slice(0, lastDirectiveStart);
                     }
                 }
 
-                const visibleText = text.replace(WHITEBOARD_DIRECTIVE_REGEX, (_, payload) => {
-                    const boardText = String(payload || '').trim();
-                    if (boardText) {
-                        whiteboardItems.push(boardText);
-                    }
-                    return '';
-                });
+                if (!nextCarry) {
+                    const partialTokens = [WHITEBOARD_EVENT_OPEN, WHITEBOARD_EVENT_CLOSE];
+                    let partialCarry = '';
 
-                return { visibleText, whiteboardItems, nextCarry };
+                    for (const token of partialTokens) {
+                        const maxProbe = Math.min(token.length - 1, text.length);
+                        for (let size = maxProbe; size > 0; size -= 1) {
+                            const tail = text.slice(-size);
+                            if (token.startsWith(tail)) {
+                                partialCarry = tail;
+                                break;
+                            }
+                        }
+                        if (partialCarry) {
+                            break;
+                        }
+                    }
+
+                    if (partialCarry) {
+                        nextCarry = partialCarry;
+                        text = text.slice(0, text.length - partialCarry.length);
+                    }
+                }
+
+                const packetMatches = Array.from(text.matchAll(WHITEBOARD_EVENT_PACKET_REGEX));
+                for (const match of packetMatches) {
+                    const payloadText = String(match?.[1] || '').trim();
+                    if (!payloadText) {
+                        continue;
+                    }
+
+                    try {
+                        const payload = JSON.parse(payloadText);
+                        applyWhiteboardUpdate(payload);
+                    } catch (error) {
+                        console.error('❌ 白板更新包 JSON 解析失败，已忽略该事件：', error, payloadText);
+                    }
+                }
+
+                const visibleText = text
+                    .replace(WHITEBOARD_EVENT_PACKET_REGEX, '')
+                    .replace(/<\/?WBEVENT>/g, '');
+
+                return { visibleText, nextCarry };
             };
 
             const readStreamIntoMessage = async (url, payload, messageIndex) => {
@@ -1118,25 +1655,18 @@
 
                     chunkText = chunkText.replace(/\[SYSTEM:\s*([^\]]+)\]/g, (_, statusText) => {
                         messages.value[messageIndex].systemStatus = statusText.trim();
+                        maybeShowStatusSubtitle(statusText.trim(), '老师正在准备下一段讲解...');
                         return '';
                     });
 
                     const whiteboardResult = extractWhiteboardPayload(chunkText, whiteboardBuffer);
                     whiteboardBuffer = whiteboardResult.nextCarry;
 
-                    if (whiteboardResult.whiteboardItems.length > 0) {
-                        // TODO: 后续这里可以直接派发给独立白板 UI 组件，而不是只打控制台。
-                        whiteboardResult.whiteboardItems.forEach((item) => {
-                            console.log('[WHITEBOARD]', item);
-                        });
-                    }
-
                     if (whiteboardResult.visibleText) {
                         messages.value[messageIndex].systemStatus = '';
                         messages.value[messageIndex].content += whiteboardResult.visibleText;
+                        enqueueSubtitleText(whiteboardResult.visibleText);
                     }
-
-                    scrollToBottom();
                 };
 
                 while (true) {
@@ -1150,6 +1680,7 @@
                 if (finalChunk) {
                     appendClassStreamChunk(finalChunk);
                 }
+                flushSubtitleBuffer();
             };
 
             const streamClassMessage = async (text, action) => {
@@ -1163,6 +1694,7 @@
 
                 if (messages.value[aiMessageIndex].content.includes(CLASS_COMPLETED_HINT)) {
                     isInClass.value = false;
+                    setImmediateSubtitle('本轮微课结束。要么喘口气，要么继续被语法教育。');
                 } else {
                     isInClass.value = true;
                 }
@@ -1187,7 +1719,6 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder("utf-8");
                 let buffer = "";
-                let whiteboardBuffer = "";
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -1195,36 +1726,18 @@
 
                     buffer += decoder.decode(value, { stream: true });
                     if (buffer) {
-                        const whiteboardResult = extractWhiteboardPayload(buffer, whiteboardBuffer);
-                        whiteboardBuffer = whiteboardResult.nextCarry;
-
-                        if (whiteboardResult.whiteboardItems.length > 0) {
-                            // TODO: 后续这里可以直接派发给独立白板 UI 组件，而不是只打控制台。
-                            whiteboardResult.whiteboardItems.forEach((item) => {
-                                console.log('[WHITEBOARD]', item);
-                            });
-                        }
-
-                        messages.value[messageIndex].content += whiteboardResult.visibleText;
+                        messages.value[messageIndex].content += buffer;
+                        enqueueSubtitleText(buffer);
                         buffer = "";
-                        scrollToBottom();
                     }
                 }
 
                 buffer += decoder.decode();
                 if (buffer) {
-                    const whiteboardResult = extractWhiteboardPayload(buffer, whiteboardBuffer);
-                    whiteboardBuffer = whiteboardResult.nextCarry;
-
-                    if (whiteboardResult.whiteboardItems.length > 0) {
-                        whiteboardResult.whiteboardItems.forEach((item) => {
-                            console.log('[WHITEBOARD]', item);
-                        });
-                    }
-
-                    messages.value[messageIndex].content += whiteboardResult.visibleText;
-                    scrollToBottom();
+                    messages.value[messageIndex].content += buffer;
+                    enqueueSubtitleText(buffer);
                 }
+                flushSubtitleBuffer();
             };
 
             const switchToLocalApi = () => window.aiTeacherApi.useLocal();
@@ -1234,18 +1747,23 @@
             const startClass = async () => {
                 if (isInputLocked.value) return;
 
+                whiteboardPages.value = [];
+                currentPageIndex.value = -1;
+                hasUnreadWhiteboardUpdate.value = false;
+                freshWhiteboardBlockKey.value = '';
+                clearWhiteboardFxTimers();
                 messages.value.push({ role: 'user', content: '👨‍🎓 老师好，我准备好上课了！' });
+                setImmediateSubtitle('老师正在步入教室...');
                 isInputLocked.value = true;
                 isThinking.value = true;
-                scrollToBottom();
                 try {
                     await streamClassMessage("", "start");
                 } catch (error) {
                     messages.value.push({ role: 'ai', content: "❌ 唤醒老师失败，请检查后端。" });
+                    setImmediateSubtitle('老师没有成功上线，请检查后端。');
                 } finally {
                     isInputLocked.value = false;
                     isThinking.value = false;
-                    scrollToBottom();
                 }
             };
 
@@ -1264,11 +1782,12 @@
                         role: 'ai', 
                         content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算先喘口气了？很好，微课模式关闭。现在回到闲聊和答疑通道，你要是还有问题，就继续开口。' 
                     });
-                    scrollToBottom();
+                    setImmediateSubtitle('微课模式已关闭，直播间回到闲聊答疑。');
                 } catch (error) {
                     // 🌟 这一句极其关键，它会在浏览器的控制台里打印出真正的死因！
                     console.error("❌ 退出报错详情：", error);
                     messages.value.push({ role: 'ai', content: "❌ 退出请求失败，请按 F12 打开开发者工具查看 Console 日志。" });
+                    setImmediateSubtitle('退出微课失败，请检查网络或后端日志。');
                 }
             };
 
@@ -1277,11 +1796,10 @@
                 if (!text || isThinking.value || isInputLocked.value) return;
 
                 messages.value.push({ role: 'user', content: text });
+                setImmediateSubtitle(isInClass.value ? '老师正在继续这场折磨教育...' : '老师正在接收新的弹幕...');
                 resetInputBox();
                 isInputLocked.value = true;
-                scrollToBottom();
                 isThinking.value = true;
-                scrollToBottom();
 
                 try {
                     if (isInClass.value) {
@@ -1295,10 +1813,10 @@
                     }
                 } catch (error) {
                     messages.value.push({ role: 'ai', content: "❌ 请求失败！请检查后端网络。" });
+                    setImmediateSubtitle('网络出了点毛病，老师暂时没接到这条消息。');
                 } finally {
                     isInputLocked.value = false;
                     isThinking.value = false;
-                    scrollToBottom();
                 }
             };
 
@@ -1307,15 +1825,22 @@
                 isInClass.value = false; 
                 isInputLocked.value = false;
                 isThinking.value = false;
+                setImmediateSubtitle('老师正在准备教材...');
+                whiteboardPages.value = [];
+                currentPageIndex.value = -1;
+                hasUnreadWhiteboardUpdate.value = false;
+                freshWhiteboardBlockKey.value = '';
+                clearWhiteboardFxTimers();
                 resetInputBox();
                 localStorage.removeItem('aiTeacherChatHistory');
             };
 
             return {
                 inputText, messages, isThinking, isInClass, isInputLocked,
+                currentSubtitle, subtitleLines, whiteboardPages, currentPageIndex, currentWhiteboardPage, canGoPrevWhiteboardPage, canGoNextWhiteboardPage, hasUnreadWhiteboardUpdate, currentQuestionDisplayKey, freshWhiteboardBlockKey,
                 currentApiBaseUrl, currentApiMode, currentApiKind, currentApiModeLabel, currentApiStatusText,
                 isDashboardOpen, dashboardLoading, dashboardError, dashboardData, latestDashboardTime,
-                autoResize, handleEnter, sendMessage, startNewChat, startClass, exitClass, renderMarkdown,
+                autoResize, handleEnter, sendMessage, startNewChat, startClass, exitClass, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage,
                 openDashboard, closeDashboard, formatDashboardTime,
                 switchToLocalApi, switchToProdApi, switchToAutoApi
             };
