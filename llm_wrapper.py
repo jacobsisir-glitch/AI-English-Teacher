@@ -133,14 +133,31 @@ STREAM_PROTOCOL_BLOCK_PATTERNS = (
         r"```[\s\S]*?(?:function_calls?|invoke\s+name\s*=|<\s*\|\s*DSML\s*\|)[\s\S]*?```",
         re.IGNORECASE,
     ),
+    re.compile(r"`?\[(?:WHITEBOARD|WB_APPEND|WB_TOOL)(?:\s*:\s*[^\]]*)?\]`?", re.IGNORECASE),
 )
 STREAM_PROTOCOL_LINE_PATTERN = re.compile(
-    r"(<\s*\|\s*DSML\s*\||function_calls?|invoke\s+name\s*=|tool_calls?)",
+    r"(<\s*\|\s*DSML\s*\||function_calls?|invoke\s+name\s*=|tool_calls?|\[(?:WHITEBOARD|WB_APPEND|WB_TOOL))",
     re.IGNORECASE,
 )
 STREAM_PROTOCOL_CODE_SHAPE_PATTERN = re.compile(
     r"^\s*(?:<[^>]+>|[{[].*(?:function|arguments|tool_calls?).*[}\]])\s*$",
     re.IGNORECASE | re.DOTALL,
+)
+INLINE_LEGACY_WHITEBOARD_PATTERN = re.compile(
+    r"`?\[(?:WHITEBOARD|WB_APPEND|WB_TOOL)(?:\s*:\s*|\s+)?(.*?)\]`?",
+    re.IGNORECASE,
+)
+BOARD_FORMULA_SEGMENT_PATTERN = re.compile(
+    r"(?:【[^】]+】\s*)?[^。！？\n]*=[^。！？\n]*",
+    re.IGNORECASE,
+)
+BOARD_EXAMPLE_SEGMENT_PATTERN = re.compile(
+    r"(?:[-*]\s*)?(?:比如|例如|像这样|像这种|比如说)\s*[：:]\s*`[^`]*[A-Za-z][^`]*`(?:\s*[（(][^）)]*[）)])?",
+    re.IGNORECASE,
+)
+INLINE_ENGLISH_EXAMPLE_PATTERN = re.compile(
+    r"`[^`]*[A-Za-z][^`]*`(?:\s*[（(][^）)]*[）)])?",
+    re.IGNORECASE,
 )
 
 
@@ -180,6 +197,57 @@ def _sanitize_model_output_text(text: str, *, trim_edges: bool = True) -> str:
     return cleaned.strip() if trim_edges else cleaned
 
 
+def _normalize_guard_text(text: str) -> str:
+    return re.sub(r"[\W_]+", "", str(text or "")).lower()
+
+
+def _extract_whiteboard_guard_phrases(reference_text: str) -> list[str]:
+    phrases: list[str] = []
+    for raw_line in str(reference_text or "").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        line = INLINE_LEGACY_WHITEBOARD_PATTERN.sub(lambda match: match.group(1).strip(), line)
+        line = re.sub(r"^[-*]\s+", "", line).strip()
+        line = line.strip("`").strip()
+        normalized = _normalize_guard_text(line)
+        if len(normalized) >= 10:
+            phrases.append(normalized)
+    return phrases
+
+
+def _sanitize_class_spoken_text(text: str, task_info: dict | None, *, trim_edges: bool = True) -> str:
+    cleaned = _sanitize_model_output_text(text, trim_edges=False)
+    if not cleaned:
+        return ""
+
+    cleaned = INLINE_LEGACY_WHITEBOARD_PATTERN.sub("", cleaned)
+    cleaned = BOARD_EXAMPLE_SEGMENT_PATTERN.sub("", cleaned)
+    cleaned = INLINE_ENGLISH_EXAMPLE_PATTERN.sub("", cleaned)
+    cleaned = BOARD_FORMULA_SEGMENT_PATTERN.sub("", cleaned)
+
+    guard_phrases = _extract_whiteboard_guard_phrases(
+        (task_info or {}).get("reference") or ""
+    )
+    safe_lines: list[str] = []
+    for raw_line in cleaned.splitlines(keepends=True):
+        line_without_action = re.sub(r"\[动作：[^\]]+\]", "", raw_line).strip()
+        if line_without_action.startswith(("-", "*", "###", "【")):
+            continue
+        normalized_line = _normalize_guard_text(line_without_action)
+        if normalized_line and any(
+            phrase in normalized_line or normalized_line in phrase
+            for phrase in guard_phrases
+        ):
+            continue
+        safe_lines.append(raw_line)
+
+    cleaned = "".join(safe_lines)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return cleaned.strip() if trim_edges else cleaned
+
+
 class _StreamLeakSanitizer:
     def __init__(self, tail_size: int = STREAM_PROTOCOL_GUARD_TAIL):
         self.tail_size = tail_size
@@ -202,6 +270,33 @@ class _StreamLeakSanitizer:
             return ""
 
         trailing_text = _sanitize_model_output_text(self.buffer, trim_edges=False)
+        self.buffer = ""
+        return trailing_text
+
+
+class _ClassSpeechSanitizer:
+    def __init__(self, task_info: dict, tail_size: int = STREAM_PROTOCOL_GUARD_TAIL):
+        self.task_info = task_info
+        self.tail_size = tail_size
+        self.buffer = ""
+
+    def push(self, chunk: str) -> str:
+        if not chunk:
+            return ""
+
+        self.buffer += chunk
+        if len(self.buffer) <= self.tail_size:
+            return ""
+
+        visible_text = self.buffer[:-self.tail_size]
+        self.buffer = self.buffer[-self.tail_size:]
+        return _sanitize_class_spoken_text(visible_text, self.task_info, trim_edges=False)
+
+    def finalize(self) -> str:
+        if not self.buffer:
+            return ""
+
+        trailing_text = _sanitize_class_spoken_text(self.buffer, self.task_info, trim_edges=False)
         self.buffer = ""
         return trailing_text
 
@@ -409,13 +504,14 @@ def _build_class_opening_directive(task_info: dict, weakness_summary: str | None
     weakness_text = weakness_summary or "目前还没有足够的错题记录。你可以嘲讽他连像样的黑历史都没攒够，但依旧要给出学习起点。"
     next_focus = task_info.get("next_focus") or "下一轮默认先从五大基本句型开始。"
     return f"""
-# 微课开场强制流程
-学生现在刚刚点击了“开启微课”。这一轮是微课的开场白，你必须严格执行以下顺序：
-1. 先用傲娇、毒舌、带英式冷幽默的语气，对学生“终于肯来上课”进行阴阳怪气的欢迎。
-2. 学生最近最显眼的薄弱点是：{weakness_text}
-3. 你只需要概括本节微课路线，不要展开任何具体语法讲解，不要提前偷跑到第一关的正文。
-4. 最后一行只留下一个冷冰冰的确认问题，把话语权交给学生。下一步重点：{next_focus}
-""".strip()
+    # 微课开场强制流程
+    学生现在刚刚点击了“开启微课”。这一轮是微课的开场白，你必须严格执行以下顺序：
+    1. 先用傲娇、毒舌、带英式冷幽默的语气，对学生“终于肯来上课”进行阴阳怪气的欢迎。
+    2. 学生最近最显眼的薄弱点是：{weakness_text}
+    3. 你只需要概括本节微课路线，不要展开任何具体语法讲解，不要提前偷跑到第一关的正文。
+    4. 全程最多 2 到 3 句话，不要提问，不要让学生确认，不要等待回复。
+    5. 最后用一句很短的过桥话，直接把节奏切到第一关。下一步重点：{next_focus}
+    """.strip()
 
 
 def _build_class_state_guardrails() -> str:
@@ -474,34 +570,35 @@ def _build_class_state_guardrails() -> str:
 
 
 def _build_class_system_prompt(task_info: dict, weakness_summary: str | None = None) -> str:
-    profile_block = weakness_summary or "?????????"
-    reference_source = task_info.get("reference_source") or "????????????"
+    profile_block = weakness_summary or "暂无额外学情信息。"
+    reference_source = task_info.get("reference_source") or "当前节点内置教材"
     return _compose_system_prompt(
         _build_variety_directive(),
         _build_class_opening_directive(task_info, weakness_summary),
         _build_class_state_guardrails(),
         f"""
-# ?????????????????
-???????? B ??????? AI ?????
-??????????????????????????????????????????????????
-???????????????????????????????????????????????????????
+# 微课模式身份
+你现在是 B 站直播间风格的 AI 英语老师。
+系统已经提前把当前知识点的白板板书准备好了，学生会一边看黑板一边听你讲。
+你的职责不是再写一遍黑板，而是用中文把黑板内容解释清楚。
 
-# ????
-- ???????????????????
-- ???????????????????????????
-- ???????????????????????????????????????????????
-- ??????????????????????????????
-- ??????????????????? Markdown????????????????????
+# 字幕输出规则
+- 只输出适合当字幕的中文口语讲解。
+- 不要输出 Markdown 标题、项目符号、JSON、XML、协议标签或任何系统提示词。
+- 不要直接朗读黑板上的标题、公式、等号表达式、缩写结构。
+- 不要逐字复述黑板上的英文例句、对错例句、示范句。
+- 如果黑板上有公式或例句，你要改成中文解释“它是什么意思、为什么这样、错在哪里”。
+- 默认每轮最多 3 句话，简洁，像主播在讲，不像教材在念。
 
-# ??????
-- ???????{task_info.get('node_name') or task_info['task_name']}
-- ?????????{task_info['goal']}
+# 当前任务
+- 知识点：{task_info.get('node_name') or task_info['task_name']}
+- 本轮目标：{task_info['goal']}
 
-# ????????????????????
-- ???????{reference_source}
-{task_info['reference']}
+# 讲解参考
+- 教材来源：{reference_source}
+{task_info.get('llm_reference') or task_info['reference']}
 
-# ??????
+# 学情
 {profile_block}
 """.strip(),
     )
@@ -575,10 +672,40 @@ def _build_agent_class_messages(
     user_message: str,
     history: list[dict] | None = None,
     weakness_summary: str | None = None,
+    response_mode: str = "teach",
 ) -> list[dict]:
     system_prompt = _build_class_system_prompt(task_info, weakness_summary)
     effective_history = history if history else chat_history
-    return _build_messages(system_prompt, user_message, effective_history)
+    messages = _build_messages(system_prompt, user_message, effective_history)
+    task_name = str(task_info.get("task_name") or task_info.get("node_name") or "").strip()
+    if response_mode == "feedback" and task_name and task_name != "课程导读与开场白":
+        messages.insert(
+            1,
+            {
+                "role": "system",
+                "content": (
+                    "学生刚刚已经对当前知识点作答。你这一轮只做简短点评："
+                    "先判断对错，再给一句必要纠正或强化，最多 2 到 3 句话。"
+                    "不要继续扩展新知识，不要在当前节点追问第二轮。"
+                    "点评完就自然收住，系统会负责切到下一个知识点。"
+                ),
+            },
+        )
+    elif response_mode == "teach" and task_name and task_name != "课程导读与开场白":
+        floating_question = str(task_info.get("whiteboard_question") or "").strip()
+        messages.insert(
+            1,
+            {
+                "role": "system",
+                "content": (
+                    "系统会在白板上方用悬浮窗展示当前提问和作答要求。"
+                    "你只负责讲解当前知识点，不要完整复述题目文本。"
+                    "讲解结尾只需要用一句很短的话提醒学生看上方题目作答。"
+                    + (f" 当前悬浮题目是：{floating_question}" if floating_question else "")
+                ),
+            },
+        )
+    return messages
 
 
 def generate_agent_class_reply(
@@ -587,11 +714,20 @@ def generate_agent_class_reply(
     user_message: str,
     history: list[dict] | None = None,
     weakness_summary: str | None = None,
+    response_mode: str = "teach",
 ) -> str:
-    messages = _build_agent_class_messages(task_info, chat_history, user_message, history, weakness_summary)
+    messages = _build_agent_class_messages(
+        task_info,
+        chat_history,
+        user_message,
+        history,
+        weakness_summary,
+        response_mode=response_mode,
+    )
 
     try:
-        return _generate_final_answer(messages, temperature=0.7)
+        answer = _generate_final_answer(messages, temperature=0.7)
+        return _sanitize_class_spoken_text(answer, task_info, trim_edges=True)
     except Exception:
         return "老师的麦克风好像坏了，稍等。"
 
@@ -602,10 +738,25 @@ def generate_agent_class_reply_stream(
     user_message: str,
     history: list[dict] | None = None,
     weakness_summary: str | None = None,
+    response_mode: str = "teach",
 ):
-    messages = _build_agent_class_messages(task_info, chat_history, user_message, history, weakness_summary)
+    messages = _build_agent_class_messages(
+        task_info,
+        chat_history,
+        user_message,
+        history,
+        weakness_summary,
+        response_mode=response_mode,
+    )
 
     try:
-        yield from _stream_final_answer(messages, temperature=0.7)
+        sanitizer = _ClassSpeechSanitizer(task_info)
+        for chunk in _stream_final_answer(messages, temperature=0.7):
+            cleaned_chunk = sanitizer.push(chunk)
+            if cleaned_chunk:
+                yield cleaned_chunk
+        trailing_chunk = sanitizer.finalize()
+        if trailing_chunk:
+            yield trailing_chunk
     except Exception:
         yield "老师的麦克风好像坏了，稍等。"

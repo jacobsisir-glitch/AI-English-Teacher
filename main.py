@@ -27,7 +27,7 @@ from llm_wrapper import (
 COURSE_TASKS = [
     {
         "task_name": "课程导读与开场白",
-        "goal": "只做微课开场和路线宣读，不讲具体知识点。最后确认学生是否准备好进入第一关，等学生确认后再输出 [TASK_COMPLETED]。",
+        "goal": "只做微课开场和路线宣读，不讲具体知识点。简短说完后立刻进入第一关，不等待学生确认。",
         "reference_text": "微课路线：五大基本句型 -> 动词的时间 -> 动词的状态 -> 核心时态精讲。开场阶段只做课程导览，不展开任何细节知识点。",
     },
     {
@@ -246,6 +246,7 @@ student_state = {
     "is_in_class": False,
     "current_task_index": 0,
     "class_history": [],
+    "awaiting_answer": False,
 }
 stream_state = {"session_summary": ""}
 stream_state_lock = threading.Lock()
@@ -253,6 +254,7 @@ stream_state_lock = threading.Lock()
 TASK_COMPLETED_MARKER = "[TASK_COMPLETED]"
 CLASS_COMPLETED_MESSAGE = "🎉 恭喜你！我们所有的语法特训任务都通关啦！现在退出微课模式咯~"
 NEXT_TASK_NUDGE = "好，进入下一个知识点。请直接开始当前节点的正文讲解。"
+OPENING_TASK_NAME = "课程导读与开场白"
 CLASS_DB_LOG_START = "===CLASS_DB_START==="
 CLASS_DB_LOG_END = "===CLASS_DB_END==="
 KNOWLEDGE_MASTERY_BASELINE = 50
@@ -267,6 +269,25 @@ TEXTBOOK_SLICE_CACHE: dict[tuple[str, str, int, int, int], str] = {}
 WHITEBOARD_EVENT_OPEN = "<WBEVENT>"
 WHITEBOARD_EVENT_CLOSE = "</WBEVENT>"
 WHITEBOARD_WRAPPER_PATTERN = re.compile(r"^`?\[WHITEBOARD:\s*(.*?)\]`?$")
+LEGACY_WHITEBOARD_DIRECTIVE_PATTERN = re.compile(
+    r"`?\[(?:WHITEBOARD|WB_APPEND|WB_TOOL)(?:\s*:\s*|\s+)?(.*?)\]`?",
+    re.IGNORECASE,
+)
+
+
+def _is_opening_task(task_info: dict | None) -> bool:
+    if not task_info:
+        return False
+    task_name = str(task_info.get("task_name") or task_info.get("node_name") or "").strip()
+    return task_name == OPENING_TASK_NAME
+
+
+def _should_auto_advance_class_task(request_action: str, task_info: dict | None, user_msg: str) -> bool:
+    if request_action == "start":
+        return _is_opening_task(task_info)
+    if _is_opening_task(task_info):
+        return False
+    return bool(student_state.get("awaiting_answer")) and bool(str(user_msg or "").strip())
 
 
 def _extract_markdown_section(markdown_text: str, heading_title: str) -> str:
@@ -362,6 +383,117 @@ def _read_precise_textbook_slice(file_name: str, section_heading: str, max_chars
     return precise_slice
 
 
+def _sanitize_reference_for_llm(reference_text: str) -> str:
+    cleaned_lines: list[str] = []
+    for raw_line in str(reference_text or "").splitlines():
+        cleaned_line = LEGACY_WHITEBOARD_DIRECTIVE_PATTERN.sub(lambda match: match.group(1).strip(), raw_line)
+        cleaned_lines.append(cleaned_line)
+    return "\n".join(cleaned_lines).strip()
+
+
+def _extract_reference_section_lines(reference_text: str) -> tuple[list[str], list[str], list[str]]:
+    formula_lines: list[str] = []
+    example_lines: list[str] = []
+    note_lines: list[str] = []
+    section = ""
+
+    for raw_line in str(reference_text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            continue
+        if "白板核心公式" in line:
+            section = "formula"
+            continue
+        if "经典对错对比" in line:
+            section = "example"
+            continue
+        if "AI 主播话术" in line or "Trigger" in line:
+            section = "note"
+            continue
+
+        cleaned_line = _clean_whiteboard_markdown_line(line)
+        if not cleaned_line:
+            continue
+
+        if section == "formula":
+            formula_lines.append(cleaned_line)
+        elif section == "example":
+            example_lines.append(cleaned_line)
+        else:
+            note_lines.append(cleaned_line)
+
+    return formula_lines, example_lines, note_lines
+
+
+def _extract_backtick_text(line: str) -> str:
+    text = str(line or "").strip()
+    matches = re.findall(r"`([^`]+)`", text)
+    if matches:
+        return matches[-1].strip()
+
+    text = re.sub(r"^-\s+", "", text)
+    text = re.sub(r"^[❌✅]\s*", "", text)
+    text = re.sub(r"^(?:弹幕常犯错误|常犯错误|错误|错句|正确标准答案|正确答案|标准答案)\s*[：:]\s*", "", text)
+    if "：" in text:
+        text = text.split("：", 1)[-1].strip()
+    if ":" in text:
+        text = text.split(":", 1)[-1].strip()
+    return text.strip("` ").strip()
+
+
+def _build_whiteboard_question(task_info: dict) -> str:
+    if _is_opening_task(task_info):
+        return ""
+
+    task_name = str(task_info.get("node_name") or task_info.get("task_name") or "当前知识点").strip()
+    goal = str(task_info.get("goal") or "").strip()
+    formula_lines, example_lines, _ = _extract_reference_section_lines(task_info.get("reference") or "")
+
+    wrong_line = next((line for line in example_lines if "❌" in line or "错误" in line), "")
+    correct_line = next((line for line in example_lines if "✅" in line or "正确" in line), "")
+    formula_focus = re.sub(r"^-\s+", "", formula_lines[0]).strip() if formula_lines else task_name
+
+    if wrong_line:
+        wrong_example = _extract_backtick_text(wrong_line)
+        requirement = "作答要求：直接给出正确句子，再用中文说一句你为什么这样改。"
+        if correct_line:
+            requirement = "作答要求：先改正这句，再用中文说明它错在什么地方。"
+        return f"老师提问：请你改正 `{wrong_example}`。\n{requirement}"
+
+    if any(keyword in goal for keyword in ("造一个", "造出", "造句")):
+        return (
+            f"老师提问：请你用“{formula_focus}”自己造一个句子。\n"
+            "作答要求：直接给句子，再用中文点出你用到的关键结构。"
+        )
+
+    return (
+        f"老师提问：请你围绕“{task_name}”说一个正确句子。\n"
+        "作答要求：先给答案，再用中文解释你抓住了哪条判断依据。"
+    )
+
+
+def _build_spoken_reference_summary(reference_text: str) -> str:
+    formula_lines, example_lines, note_lines = _extract_reference_section_lines(reference_text)
+
+    summary_lines: list[str] = []
+    if formula_lines:
+        summary_lines.append("黑板上已经写好了当前知识点的核心公式。你只需要用中文解释它表示什么、怎么判断、什么时候容易错。")
+        for line in formula_lines[:2]:
+            focus = re.sub(r"^-\s+", "", line).strip()
+            if "=" in focus:
+                focus = focus.split("=", 1)[0].strip()
+            if focus:
+                summary_lines.append(f"- 当前板书关键词：{focus}")
+    if example_lines:
+        summary_lines.append("黑板上已经给了对错对比。你只解释错因、修改理由和判断依据，不要把英文例句原文重新念一遍。")
+    if note_lines:
+        summary_lines.append("黑板补充只用于帮助你组织解释，不要把板书条目逐条复述成字幕。")
+
+    return "\n".join(summary_lines).strip()
+
+
 def _build_runtime_course_task(task_index: int) -> dict:
     base_task = dict(COURSE_TASKS[task_index])
     reference_text = str(base_task.get("reference_text") or "").strip()
@@ -378,6 +510,11 @@ def _build_runtime_course_task(task_index: int) -> dict:
         base_task["reference_source"] = f"{textbook_file} :: {section_heading}"
 
     base_task["reference"] = reference_text
+    base_task["llm_reference"] = (
+        _build_spoken_reference_summary(reference_text)
+        or _sanitize_reference_for_llm(reference_text)
+    )
+    base_task["whiteboard_question"] = _build_whiteboard_question(base_task)
     base_task["node_name"] = base_task.get("task_name", "当前知识点")
     return base_task
 
@@ -400,38 +537,7 @@ def _clean_whiteboard_markdown_line(raw_line: str) -> str:
 
 
 def _build_whiteboard_contents(reference_text: str) -> list[str]:
-    formula_lines: list[str] = []
-    example_lines: list[str] = []
-    note_lines: list[str] = []
-    section = ""
-
-    for raw_line in str(reference_text or "").splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-
-        if line.startswith("#"):
-            continue
-        if "白板核心公式" in line:
-            section = "formula"
-            continue
-        if "经典对错对比" in line:
-            section = "example"
-            continue
-        if "AI 主播话术" in line or "Trigger" in line:
-            section = ""
-            continue
-
-        cleaned_line = _clean_whiteboard_markdown_line(line)
-        if not cleaned_line:
-            continue
-
-        if section == "formula":
-            formula_lines.append(cleaned_line)
-        elif section == "example":
-            example_lines.append(cleaned_line)
-        else:
-            note_lines.append(cleaned_line)
+    formula_lines, example_lines, note_lines = _extract_reference_section_lines(reference_text)
 
     contents: list[str] = []
     if formula_lines:
@@ -460,7 +566,7 @@ def _build_whiteboard_update_payload(task_info: dict) -> dict:
         "node_key": str(task_info.get("task_name") or task_info.get("node_name") or "").strip(),
         "title": str(task_info.get("node_name") or task_info.get("task_name") or "当前知识点").strip(),
         "contents": _build_whiteboard_contents(task_info.get("reference") or ""),
-        "question": "",
+        "question": str(task_info.get("whiteboard_question") or "").strip(),
     }
 
 
@@ -476,6 +582,7 @@ def _iter_whiteboard_events(task_info: dict):
     node_key = str(task_info.get("task_name") or task_info.get("node_name") or "").strip()
     title = str(task_info.get("node_name") or task_info.get("task_name") or "微课板书").strip()
     contents = _build_whiteboard_contents(task_info.get("reference") or "")
+    question = str(task_info.get("whiteboard_question") or "").strip()
 
     yield _serialize_whiteboard_update(
         {
@@ -495,6 +602,16 @@ def _iter_whiteboard_events(task_info: dict):
                 "node_key": node_key,
                 "title": title,
                 "content": cleaned_content,
+            }
+        )
+
+    if question:
+        yield _serialize_whiteboard_update(
+            {
+                "action": "question",
+                "node_key": node_key,
+                "title": title,
+                "question": question,
             }
         )
 
@@ -1170,6 +1287,7 @@ async def exit_course():
     student_state["is_in_class"] = False
     student_state["current_task_index"] = 0
     student_state["class_history"] = []
+    student_state["awaiting_answer"] = False
     return {"status": "success", "message": "已成功重置微课状态"}
 
 
@@ -1197,12 +1315,14 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             student_state["is_in_class"] = True
             student_state["current_task_index"] = 0
             student_state["class_history"] = []
+            student_state["awaiting_answer"] = False
             user_msg = "老师好，我准备好上课了！"
         else:
             user_msg = request.text
 
         if student_state["current_task_index"] >= len(COURSE_TASKS):
             student_state["is_in_class"] = False
+            student_state["awaiting_answer"] = False
             yield CLASS_COMPLETED_MESSAGE
             return
 
@@ -1219,6 +1339,11 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             user_msg,
             history=prompt_history,
             weakness_summary=student_profile_summary,
+            response_mode=(
+                "feedback"
+                if request.action != "start" and student_state.get("awaiting_answer")
+                else "teach"
+            ),
         ):
             visible_chunk = class_db_buffer.push(current_filter.push(chunk))
             if visible_chunk:
@@ -1247,9 +1372,15 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
         student_state["class_history"].append({"role": "assistant", "content": clean_reply})
         _trim_class_history()
 
-        if not current_filter.detected:
+        should_advance = current_filter.detected or _should_auto_advance_class_task(
+            request.action,
+            current_task,
+            user_msg,
+        )
+        if not should_advance:
             return
 
+        student_state["awaiting_answer"] = False
         mastery_point = _resolve_course_mastery_point(student_state["current_task_index"])
         if mastery_point:
             _update_knowledge_mastery(
@@ -1263,12 +1394,14 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
 
         if student_state["current_task_index"] >= len(COURSE_TASKS):
             student_state["is_in_class"] = False
+            student_state["awaiting_answer"] = False
             yield "\n\n" + CLASS_COMPLETED_MESSAGE
             return
 
         next_task = _build_runtime_course_task(student_state["current_task_index"])
         for event_str in _iter_whiteboard_events(next_task):
             yield event_str
+        student_state["awaiting_answer"] = bool(str(next_task.get("whiteboard_question") or "").strip())
         yield "\n\n"
 
         next_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
@@ -1277,6 +1410,7 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             student_state["class_history"],
             NEXT_TASK_NUDGE,
             weakness_summary=student_profile_summary,
+            response_mode="teach",
         ):
             visible_chunk = next_filter.push(chunk)
             if visible_chunk:
