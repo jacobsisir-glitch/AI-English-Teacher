@@ -139,7 +139,7 @@
 - ✅ 正确标准答案：`He went to Tokyo yesterday.` / `He has gone to Tokyo.`
 
 **【AI 主播话术与人设 Trigger】**
-- 主播台词建议：“现在完成时最烦你这种一边写 `yesterday`，一边还装作和现在有暧昧关系。要么老老实实一般过去时，要么别带明确过去时间，别两头骗。”
+- 主播台词建议：“现在完成时最烦你这种一边写 `yesterday`，一边还硬装作和现在还有牵连。要么老老实实一般过去时，要么别带明确过去时间，别两头骗。”
 
 #### have been to vs have gone to
 **【白板核心公式】**

@@ -105,16 +105,26 @@
         .wb-block-flash {
             animation: wbBlockFlash 1.8s ease-out forwards;
         }
-        .wb-question-enter-active {
-            animation: wbQuestionIn 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+        .wb-question-drawer {
+            transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+            will-change: transform, opacity;
         }
-        .wb-question-leave-active {
-            transition: opacity 0.22s ease, transform 0.22s ease;
+        .wb-question-drawer.is-open {
+            opacity: 1;
+            transform: translateY(0);
         }
-        .wb-question-enter-from,
-        .wb-question-leave-to {
-            opacity: 0;
-            transform: translateY(18px) scale(0.98);
+        .wb-question-drawer.is-collapsed {
+            opacity: 1;
+            transform: translateY(calc(-100% + 18px));
+        }
+        .wb-question-handle {
+            transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+        }
+        .wb-question-handle:hover {
+    /* 修复原先 translateY(50%) 导致的剧烈位移，改成稍微下压 2px 增加点击质感 */
+    transform: translateX(-50%) translateY(2px) scale(1.02);
+    box-shadow: 0 16px 30px rgba(245, 158, 11, 0.18);
+    background: #fffbeb; /* 统一成实色的暖黄底 */
         }
         @keyframes wbBlockFlash {
             0% {
@@ -126,20 +136,6 @@
                 background-color: rgba(255, 255, 255, 0.7);
                 border-color: rgba(226, 232, 240, 0.9);
                 box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-            }
-        }
-        @keyframes wbQuestionIn {
-            0% {
-                opacity: 0;
-                transform: translateY(26px) scale(0.96);
-            }
-            65% {
-                opacity: 1;
-                transform: translateY(-4px) scale(1.01);
-            }
-            100% {
-                opacity: 1;
-                transform: translateY(0) scale(1);
             }
         }
         .live2d-card {
@@ -360,33 +356,54 @@
                 &gt;
             </button>
 
-            <transition name="wb-question" mode="out-in">
-                <div
-                    v-if="currentWhiteboardPage?.question"
-                    :key="currentQuestionDisplayKey"
-                    class="pointer-events-none absolute left-1/2 top-16 z-30 w-[min(90%,42rem)] -translate-x-1/2"
-                >
-                    <div class="rounded-[1.6rem] border border-amber-300/90 bg-white/96 px-5 py-4 shadow-[0_22px_55px_rgba(245,158,11,0.18)] backdrop-blur-xl">
-                        <div class="flex items-center gap-3">
-                            <div class="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600 shadow-inner">
-                                <i class="fa-solid fa-bell"></i>
-                            </div>
-                            <div>
-                                <div class="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-600">Teacher Prompt</div>
-                                <div class="mt-1 text-sm text-slate-500">请根据这条题目作答，老师会按你的回答继续推进。</div>
-                            </div>
-                        </div>
-                        <div class="mt-3 whitespace-pre-line rounded-2xl bg-amber-50/80 px-4 py-3 text-left text-sm font-medium leading-7 text-slate-800 md:text-base">{{ currentWhiteboardPage.question }}</div>
-                    </div>
+            <div
+    v-if="isQuestionDrawerAvailable"
+    :class="[
+        'pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center overflow-hidden transition-[height,padding] duration-500 ease-out',
+        /* 👇 修改点 1：微调父容器高度，展开给 h-[17.5rem]，收起给 h-14，保证挂在外面的把手不被 overflow-hidden 切掉 */
+        isQuestionDrawerOpen ? 'h-[17.5rem] pt-16' : 'h-14 pt-0'
+    ]"
+>
+    <div
+        :key="currentQuestionDisplayKey"
+        :class="[
+            'wb-question-drawer relative w-[min(90%,42rem)] pointer-events-auto',
+            isQuestionDrawerOpen ? 'is-open' : 'is-collapsed'
+        ]"
+        @mouseenter="handleQuestionDrawerMouseEnter"
+        @mouseleave="handleQuestionDrawerMouseLeave"
+    >
+        <div class="rounded-[1.6rem] border border-amber-300 bg-white px-5 py-4 shadow-[0_22px_55px_rgba(245,158,11,0.25)] backdrop-blur-xl">
+            <div class="flex items-center gap-3">
+                <div class="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600 shadow-inner">
+                    <i class="fa-solid fa-bell"></i>
                 </div>
-            </transition>
+                <div>
+                    <div class="text-[11px] font-semibold uppercase tracking-[0.28em] text-amber-600">Teacher Prompt</div>
+                    <div class="mt-1 text-sm text-slate-500">请根据这条题目作答，老师会按你的回答继续推进。</div>
+                </div>
+            </div>
+            <div class="mt-3 whitespace-pre-line rounded-2xl bg-amber-50 px-4 py-3 text-left text-sm font-medium leading-7 text-slate-800 md:text-base">{{ currentWhiteboardPage.question }}</div>
+        </div>
+        
+        <button
+            type="button"
+            class="wb-question-handle absolute left-1/2 top-full z-10 flex -translate-x-1/2 -mt-px items-center gap-2 rounded-full border border-amber-300 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-700 shadow-[0_14px_28px_rgba(245,158,11,0.16)]"
+            @click="toggleQuestionDrawer"
+            @mouseenter="handleQuestionDrawerMouseEnter"
+        >
+            <span class="inline-block h-1.5 w-8 rounded-full bg-amber-300"></span>
+            <span>{{ isQuestionDrawerOpen ? '收起题目' : '展开题目' }}</span>
+        </button>
+    </div>
+</div>
 
             <div v-if="currentWhiteboardPage" class="relative z-10 flex h-full flex-col px-10 pb-10 pt-32 md:px-14">
                 <div class="border-b border-slate-200/90 pb-5">
                     <h2 class="text-2xl font-semibold tracking-wide text-slate-800 md:text-3xl">{{ currentWhiteboardPage.title || '当前知识点' }}</h2>
                 </div>
 
-                <div class="mt-6 flex-1 overflow-y-auto pr-2">
+                <div class="mt-6 flex-1 overflow-hidden pr-2">
                     <transition-group name="wb-block" tag="div" class="flex flex-col gap-5">
                         <div
                             v-for="(content, index) in currentWhiteboardPage.contents"
@@ -398,7 +415,7 @@
                                     : 'border-slate-200/90 bg-white/70'
                             ]"
                         >
-                            <div class="prose prose-slate prose-lg md:prose-xl max-w-none text-left" v-html="renderMarkdown(content)"></div>
+                            <div class="prose prose-slate md:prose-lg max-w-none text-left" v-html="renderMarkdown(content)"></div>
                         </div>
                     </transition-group>
                 </div>
@@ -819,6 +836,8 @@
             const subtitleTextBuffer = ref('');
             const isSubtitlePlaying = ref(false);
             const freshWhiteboardBlockKey = ref('');
+            const questionDrawerOpen = ref(false);
+            const questionDrawerActiveKey = ref('');
             const SUBTITLE_BASE_MS = 1000;
             const SUBTITLE_CHAR_MS = 150;
             const SUBTITLE_MAX_MS = 4000;
@@ -826,8 +845,20 @@
             let subtitleHoldTimer = null;
             let subtitleLineSeed = 1;
             let whiteboardFlashTimer = null;
+            let questionDrawerAutoHideTimer = null;
+            let questionDrawerHoverCollapseTimer = null;
+            const pendingWhiteboardStages = [];
+            const activatedWhiteboardStageKeys = new Set();
             const SUBTITLE_MIN_WEAK_BREAK_CHARS = 8;
+            const SUBTITLE_HARD_BREAK_CHARS = 26;
             const STRONG_SUBTITLE_DELIMITER_REGEX = /[。！？!?]/;
+            const buildQuestionDisplayKey = (pageIndex, question) => {
+                const normalizedQuestion = String(question || '').trim();
+                if (pageIndex < 0 || !normalizedQuestion) {
+                    return '';
+                }
+                return `wb-question-${pageIndex}-${normalizedQuestion}`;
+            };
 
             const currentWhiteboardPage = computed(() => {
                 if (currentPageIndex.value < 0 || currentPageIndex.value >= whiteboardPages.value.length) {
@@ -844,7 +875,18 @@
                 if (!page?.question) {
                     return '';
                 }
-                return `wb-question-${currentPageIndex.value}-${page.question}`;
+                return buildQuestionDisplayKey(currentPageIndex.value, page.question);
+            });
+            const isQuestionDrawerAvailable = computed(() => Boolean(currentWhiteboardPage.value?.question));
+            const isQuestionDrawerOpen = computed(() => (
+                isQuestionDrawerAvailable.value
+                && questionDrawerOpen.value
+                && questionDrawerActiveKey.value === currentQuestionDisplayKey.value
+            ));
+            watch(currentQuestionDisplayKey, (nextKey) => {
+                if (!nextKey) {
+                    collapseQuestionDrawer();
+                }
             });
 
             const subtitleSanitize = (text) => String(text || '')
@@ -854,6 +896,10 @@
                 .replace(/\[TASK_COMPLETED\]/g, '')
                 .replace(/\r?\n+/g, ' ')
                 .replace(/\u00a0/g, ' ');
+
+            const sanitizeSubtitleChunk = (text) => subtitleSanitize(text)
+                .replace(/\*{1,3}/g, '')
+                .replace(/_{1,3}/g, '');
 
             const normalizeSubtitleText = (text) => subtitleSanitize(text)
                 .replace(/\*{1,3}/g, '')
@@ -866,6 +912,11 @@
                 text,
                 tone
             });
+
+            const normalizeSubtitleDedupKey = (text) => String(text || '')
+                .replace(/\s+/g, '')
+                .replace(/[，。！？；：“”"'`、,.!?;:()\[\]（）【】\-—]/g, '')
+                .trim();
 
             const syncSubtitleLines = (lines) => {
                 subtitleLines.value = lines
@@ -892,6 +943,61 @@
                     whiteboardFlashTimer = null;
                 }
             };
+            const clearQuestionDrawerTimers = () => {
+                if (questionDrawerAutoHideTimer) {
+                    clearTimeout(questionDrawerAutoHideTimer);
+                    questionDrawerAutoHideTimer = null;
+                }
+                if (questionDrawerHoverCollapseTimer) {
+                    clearTimeout(questionDrawerHoverCollapseTimer);
+                    questionDrawerHoverCollapseTimer = null;
+                }
+            };
+            const collapseQuestionDrawer = () => {
+                clearQuestionDrawerTimers();
+                questionDrawerOpen.value = false;
+                questionDrawerActiveKey.value = currentQuestionDisplayKey.value || '';
+            };
+            const openQuestionDrawer = ({ autoHideMs = 0 } = {}) => {
+                const displayKey = currentQuestionDisplayKey.value;
+                if (!displayKey) {
+                    return;
+                }
+                clearQuestionDrawerTimers();
+                questionDrawerActiveKey.value = displayKey;
+                questionDrawerOpen.value = true;
+                if (autoHideMs > 0) {
+                    questionDrawerAutoHideTimer = window.setTimeout(() => {
+                        if (questionDrawerActiveKey.value === displayKey) {
+                            questionDrawerOpen.value = false;
+                        }
+                        questionDrawerAutoHideTimer = null;
+                    }, autoHideMs);
+                }
+            };
+            const handleQuestionDrawerMouseEnter = () => {
+                if (!currentQuestionDisplayKey.value) {
+                    return;
+                }
+                openQuestionDrawer();
+            };
+            const handleQuestionDrawerMouseLeave = () => {
+                if (!currentQuestionDisplayKey.value) {
+                    return;
+                }
+                clearQuestionDrawerTimers();
+                questionDrawerHoverCollapseTimer = window.setTimeout(() => {
+                    questionDrawerOpen.value = false;
+                    questionDrawerHoverCollapseTimer = null;
+                }, 260);
+            };
+            const toggleQuestionDrawer = () => {
+                if (isQuestionDrawerOpen.value) {
+                    collapseQuestionDrawer();
+                    return;
+                }
+                openQuestionDrawer();
+            };
 
             const syncWhiteboardUnreadState = () => {
                 hasUnreadWhiteboardUpdate.value = (
@@ -911,17 +1017,20 @@
 
                 for (let index = 0; index < bufferText.length; index += 1) {
                     const currentChar = bufferText[index];
-                    if (!SUBTITLE_DELIMITER_REGEX.test(currentChar)) {
+                    const reachedHardBreak = (index - cursor + 1) >= SUBTITLE_HARD_BREAK_CHARS;
+                    if (!SUBTITLE_DELIMITER_REGEX.test(currentChar) && !reachedHardBreak) {
                         continue;
                     }
 
                     let end = index + 1;
-                    while (end < bufferText.length && /["'”’）】]/.test(bufferText[end])) {
-                        end += 1;
+                    if (SUBTITLE_DELIMITER_REGEX.test(currentChar)) {
+                        while (end < bufferText.length && /["'”’）】]/.test(bufferText[end])) {
+                            end += 1;
+                        }
                     }
 
                     const sentence = normalizeSubtitleText(bufferText.slice(cursor, end));
-                    const isStrongBreak = STRONG_SUBTITLE_DELIMITER_REGEX.test(currentChar);
+                    const isStrongBreak = STRONG_SUBTITLE_DELIMITER_REGEX.test(currentChar) || reachedHardBreak;
                     const sentenceLength = Array.from(sentence).length;
 
                     if (!sentence) {
@@ -954,6 +1063,27 @@
                     syncSubtitleLines([]);
                 }
             };
+            const activatePendingWhiteboardStage = (pageKey = '') => {
+                const normalizedPageKey = String(pageKey || '').trim();
+                if (!normalizedPageKey) {
+                    return false;
+                }
+                if (activatedWhiteboardStageKeys.has(normalizedPageKey)) {
+                    return true;
+                }
+                const stageIndex = pendingWhiteboardStages.findIndex((stage) => stage.pageKey === normalizedPageKey);
+                if (stageIndex === -1) {
+                    console.warn('[WhiteboardSelfHeal] missing pending stage activation.', {
+                        pageKey: normalizedPageKey,
+                        pendingPageKeys: pendingWhiteboardStages.map((stage) => stage.pageKey || stage.nodeKey || 'unknown')
+                    });
+                    return false;
+                }
+                const [stage] = pendingWhiteboardStages.splice(stageIndex, 1);
+                stage.payloads.forEach((payload) => applyWhiteboardUpdate(payload));
+                activatedWhiteboardStageKeys.add(normalizedPageKey);
+                return true;
+            };
 
             const pushSubtitleFrame = (text) => {
                 const cleaned = normalizeSubtitleText(text);
@@ -980,38 +1110,70 @@
 
                 isSubtitlePlaying.value = true;
                 const nextSentence = subtitleQueue.value.shift();
-                pushSubtitleFrame(nextSentence);
+                if (nextSentence?.stagePageKey) {
+                    activatePendingWhiteboardStage(nextSentence.stagePageKey);
+                }
+                pushSubtitleFrame(nextSentence?.text || '');
 
                 subtitleHoldTimer = window.setTimeout(() => {
                     isSubtitlePlaying.value = false;
                     playNextSubtitle();
-                }, computeSubtitleDuration(nextSentence));
+                }, computeSubtitleDuration(nextSentence?.text || ''));
             };
 
-            const enqueueSubtitleText = (text) => {
-                const cleaned = normalizeSubtitleText(text);
+            const enqueueSubtitleText = (text, { stagePageKey = '' } = {}) => {
+                const cleaned = sanitizeSubtitleChunk(text);
                 if (!cleaned) {
                     return;
                 }
+                const normalizedStagePageKey = String(stagePageKey || '').trim();
 
-                subtitleTextBuffer.value = `${subtitleTextBuffer.value}${cleaned}`.replace(/[ \t]{2,}/g, ' ');
+                subtitleTextBuffer.value = `${subtitleTextBuffer.value}${cleaned}`;
                 const { chunks, rest } = splitSubtitleChunks(subtitleTextBuffer.value);
                 subtitleTextBuffer.value = rest;
 
                 chunks.forEach((chunk) => {
-                    subtitleQueue.value.push(chunk);
+                    const chunkKey = normalizeSubtitleDedupKey(chunk);
+                    if (!chunkKey) {
+                        return;
+                    }
+                    const currentLine = subtitleLines.value.find((line) => line.tone === 'current')
+                        || subtitleLines.value[subtitleLines.value.length - 1]
+                        || null;
+                    const currentKey = normalizeSubtitleDedupKey(currentLine?.text || '');
+                    const lastQueuedKey = normalizeSubtitleDedupKey(subtitleQueue.value[subtitleQueue.value.length - 1]?.text || '');
+                    if (chunkKey === currentKey || chunkKey === lastQueuedKey) {
+                        return;
+                    }
+                    subtitleQueue.value.push({
+                        text: chunk,
+                        stagePageKey: normalizedStagePageKey
+                    });
                 });
 
                 playNextSubtitle();
             };
 
-            const flushSubtitleBuffer = () => {
+            const flushSubtitleBuffer = ({ stagePageKey = '' } = {}) => {
                 const leftover = normalizeSubtitleText(subtitleTextBuffer.value);
                 subtitleTextBuffer.value = '';
                 if (!leftover) {
                     return;
                 }
-                subtitleQueue.value.push(leftover);
+                const normalizedStagePageKey = String(stagePageKey || '').trim();
+                const leftoverKey = normalizeSubtitleDedupKey(leftover);
+                const currentLine = subtitleLines.value.find((line) => line.tone === 'current')
+                    || subtitleLines.value[subtitleLines.value.length - 1]
+                    || null;
+                const currentKey = normalizeSubtitleDedupKey(currentLine?.text || '');
+                const lastQueuedKey = normalizeSubtitleDedupKey(subtitleQueue.value[subtitleQueue.value.length - 1]?.text || '');
+                if (!leftoverKey || leftoverKey === currentKey || leftoverKey === lastQueuedKey) {
+                    return;
+                }
+                subtitleQueue.value.push({
+                    text: leftover,
+                    stagePageKey: normalizedStagePageKey
+                });
                 playNextSubtitle();
             };
 
@@ -1057,6 +1219,7 @@
                 const title = String(payload?.title || '').trim();
                 const question = String(payload?.question || '').trim();
                 const nodeKey = String(payload?.node_key || payload?.nodeKey || title).trim();
+                const pageKey = String(payload?.page_key || payload?.pageKey || '').trim();
                 const rawContents = Array.isArray(payload?.contents)
                     ? payload.contents
                     : [payload?.content].filter(Boolean);
@@ -1072,13 +1235,75 @@
                     title: title || '当前知识点',
                     contents,
                     question,
-                    nodeKey
+                    nodeKey,
+                    pageKey
                 };
+            };
+            const findWhiteboardPageIndex = ({ pageKey = '', nodeKey = '' } = {}) => {
+                if (pageKey) {
+                    const exactIndex = whiteboardPages.value.findIndex((page) => page?.pageKey === pageKey);
+                    if (exactIndex !== -1) {
+                        return exactIndex;
+                    }
+                }
+                if (nodeKey) {
+                    for (let index = whiteboardPages.value.length - 1; index >= 0; index -= 1) {
+                        if (whiteboardPages.value[index]?.nodeKey === nodeKey) {
+                            return index;
+                        }
+                    }
+                }
+                return -1;
+            };
+            const createWhiteboardFallbackPage = ({ title = '', nodeKey = '', pageKey = '', reason = '' } = {}) => {
+                const fallbackPage = {
+                    title: title || nodeKey || '当前知识点',
+                    contents: [],
+                    question: '',
+                    nodeKey: nodeKey || title || '当前知识点',
+                    pageKey: pageKey || nodeKey || title || `fallback-${Date.now()}`
+                };
+                whiteboardPages.value.push(fallbackPage);
+                console.warn('[WhiteboardSelfHeal] missing page for update, created fallback page.', {
+                    reason,
+                    title,
+                    nodeKey,
+                    pageKey,
+                    pageCount: whiteboardPages.value.length
+                });
+                return whiteboardPages.value.length - 1;
+            };
+            const enqueueWhiteboardPayload = (payload = {}) => {
+                const action = String(payload?.action || '').trim();
+                const nodeKey = String(payload?.node_key || payload?.nodeKey || '').trim();
+                const pageKey = String(payload?.page_key || payload?.pageKey || '').trim();
+                if (action === 'new_page') {
+                    pendingWhiteboardStages.push({
+                        pageKey,
+                        nodeKey,
+                        payloads: [payload]
+                    });
+                    return;
+                }
+
+                const targetStage = [...pendingWhiteboardStages]
+                    .reverse()
+                    .find((stage) => (
+                        (pageKey && stage.pageKey === pageKey)
+                        || (!pageKey && nodeKey && stage.nodeKey === nodeKey)
+                    ));
+                if (targetStage) {
+                    targetStage.payloads.push(payload);
+                    return;
+                }
+
+                applyWhiteboardUpdate(payload);
             };
 
             const applyWhiteboardUpdate = (payload = {}) => {
                 const action = String(payload?.action || '').trim();
                 const nodeKey = String(payload?.node_key || payload?.nodeKey || '').trim();
+                const pageKey = String(payload?.page_key || payload?.pageKey || '').trim();
                 const title = String(payload?.title || '').trim();
                 const content = String(payload?.content || '').trim();
                 const question = String(payload?.question || '').trim();
@@ -1091,7 +1316,6 @@
                     if (!title) {
                         return;
                     }
-
                     const wasViewingLatest = (
                         currentPageIndex.value === -1
                         || currentPageIndex.value >= (whiteboardPages.value.length - 1)
@@ -1101,7 +1325,8 @@
                         title,
                         contents: [],
                         question: '',
-                        nodeKey: nodeKey || title
+                        nodeKey: nodeKey || title,
+                        pageKey: pageKey || nodeKey || title
                     });
 
                     if (wasViewingLatest) {
@@ -1117,15 +1342,20 @@
                 if (latestIndex < 0) {
                     return;
                 }
-
-                const latestPage = whiteboardPages.value[latestIndex];
-                if (
-                    nodeKey
-                    && latestPage?.nodeKey
-                    && latestPage.nodeKey !== nodeKey
-                ) {
-                    return;
+                let resolvedTargetIndex = findWhiteboardPageIndex({ pageKey, nodeKey });
+                if (resolvedTargetIndex === -1 && (action === 'append' || action === 'question')) {
+                    resolvedTargetIndex = createWhiteboardFallbackPage({
+                        title,
+                        nodeKey,
+                        pageKey,
+                        reason: action
+                    });
                 }
+                if (resolvedTargetIndex === -1) {
+                    resolvedTargetIndex = latestIndex;
+                }
+
+                const targetPage = whiteboardPages.value[resolvedTargetIndex];
 
                 const wasViewingLatest = (
                     currentPageIndex.value === -1
@@ -1136,14 +1366,14 @@
                     if (!content) {
                         return;
                     }
-                    latestPage.contents.push(content);
-                    if (wasViewingLatest) {
-                        currentPageIndex.value = latestIndex;
+                    targetPage.contents.push(content);
+                    if (wasViewingLatest || currentPageIndex.value === resolvedTargetIndex) {
+                        currentPageIndex.value = resolvedTargetIndex;
                         hasUnreadWhiteboardUpdate.value = false;
                     } else {
                         hasUnreadWhiteboardUpdate.value = true;
                     }
-                    triggerWhiteboardBlockFlash(latestIndex, latestPage.contents.length - 1);
+                    triggerWhiteboardBlockFlash(resolvedTargetIndex, targetPage.contents.length - 1);
                     return;
                 }
 
@@ -1151,13 +1381,15 @@
                     if (!question && !content) {
                         return;
                     }
-                    latestPage.question = question || content;
-                    if (wasViewingLatest) {
-                        currentPageIndex.value = latestIndex;
+                    targetPage.question = question || content;
+                    if (wasViewingLatest || currentPageIndex.value === resolvedTargetIndex) {
+                        currentPageIndex.value = resolvedTargetIndex;
                         hasUnreadWhiteboardUpdate.value = false;
                     } else {
                         hasUnreadWhiteboardUpdate.value = true;
                     }
+                    questionDrawerActiveKey.value = buildQuestionDisplayKey(resolvedTargetIndex, targetPage.question);
+                    openQuestionDrawer({ autoHideMs: 5200 });
                     return;
                 }
 
@@ -1166,6 +1398,7 @@
                     return;
                 }
 
+                const latestPage = whiteboardPages.value[latestIndex] || null;
                 const shouldReplaceLatest = Boolean(
                     latestPage
                     && latestPage.nodeKey
@@ -1179,16 +1412,16 @@
                     whiteboardPages.value.push(nextPage);
                 }
 
-                const targetIndex = shouldReplaceLatest ? latestIndex : (whiteboardPages.value.length - 1);
+                const finalTargetIndex = shouldReplaceLatest ? latestIndex : (whiteboardPages.value.length - 1);
                 if (wasViewingLatest || shouldReplaceLatest) {
-                    currentPageIndex.value = targetIndex;
+                    currentPageIndex.value = finalTargetIndex;
                     hasUnreadWhiteboardUpdate.value = false;
                 } else {
                     hasUnreadWhiteboardUpdate.value = true;
                 }
 
                 if (nextPage.contents.length > 0) {
-                    triggerWhiteboardBlockFlash(targetIndex, nextPage.contents.length - 1);
+                    triggerWhiteboardBlockFlash(finalTargetIndex, nextPage.contents.length - 1);
                 } else {
                     freshWhiteboardBlockKey.value = '';
                 }
@@ -1616,7 +1849,7 @@
 
                     try {
                         const payload = JSON.parse(payloadText);
-                        applyWhiteboardUpdate(payload);
+                        enqueueWhiteboardPayload(payload);
                     } catch (error) {
                         console.error('❌ 白板更新包 JSON 解析失败，已忽略该事件：', error, payloadText);
                     }
@@ -1648,6 +1881,7 @@
                 const decoder = new TextDecoder("utf-8");
                 let systemBuffer = '';
                 let whiteboardBuffer = '';
+                let activeSubtitleStagePageKey = '';
 
                 const appendClassStreamChunk = (rawText) => {
                     if (!messages.value[messageIndex]) return;
@@ -1664,19 +1898,45 @@
                         }
                     }
 
-                    chunkText = chunkText.replace(/\[SYSTEM:\s*([^\]]+)\]/g, (_, statusText) => {
-                        messages.value[messageIndex].systemStatus = statusText.trim();
-                        maybeShowStatusSubtitle(statusText.trim(), '老师正在准备下一段讲解...');
-                        return '';
-                    });
-
                     const whiteboardResult = extractWhiteboardPayload(chunkText, whiteboardBuffer);
                     whiteboardBuffer = whiteboardResult.nextCarry;
-
-                    if (whiteboardResult.visibleText) {
+                    const visibleText = whiteboardResult.visibleText;
+                    const markerRegex = /\[SYSTEM:\s*([^\]]+)\]/g;
+                    let cursor = 0;
+                    let match = null;
+                    const pushVisibleSegment = (segmentText) => {
+                        if (!segmentText) {
+                            return;
+                        }
+                        if (activeSubtitleStagePageKey && /\S/.test(segmentText)) {
+                            activatePendingWhiteboardStage(activeSubtitleStagePageKey);
+                        }
                         messages.value[messageIndex].systemStatus = '';
-                        messages.value[messageIndex].content += whiteboardResult.visibleText;
-                        enqueueSubtitleText(whiteboardResult.visibleText);
+                        messages.value[messageIndex].content += segmentText;
+                        enqueueSubtitleText(segmentText, { stagePageKey: activeSubtitleStagePageKey });
+                    };
+
+                    while ((match = markerRegex.exec(visibleText)) !== null) {
+                        const segmentText = visibleText.slice(cursor, match.index);
+                        if (segmentText) {
+                            pushVisibleSegment(segmentText);
+                        }
+
+                        const normalizedStatus = String(match[1] || '').trim();
+                        if (normalizedStatus.startsWith('WB_STAGE_READY::')) {
+                            flushSubtitleBuffer({ stagePageKey: activeSubtitleStagePageKey });
+                            messages.value[messageIndex].systemStatus = '';
+                            activeSubtitleStagePageKey = normalizedStatus.slice('WB_STAGE_READY::'.length).trim();
+                        } else {
+                            messages.value[messageIndex].systemStatus = normalizedStatus;
+                            maybeShowStatusSubtitle(normalizedStatus, '老师正在准备下一段讲解...');
+                        }
+                        cursor = match.index + match[0].length;
+                    }
+
+                    const trailingText = visibleText.slice(cursor);
+                    if (trailingText) {
+                        pushVisibleSegment(trailingText);
                     }
                 };
 
@@ -1691,7 +1951,12 @@
                 if (finalChunk) {
                     appendClassStreamChunk(finalChunk);
                 }
-                flushSubtitleBuffer();
+                flushSubtitleBuffer({ stagePageKey: activeSubtitleStagePageKey });
+                if (pendingWhiteboardStages.length > 0) {
+                    console.warn('[WhiteboardSelfHeal] pending whiteboard stages remained after stream end.', {
+                        pendingPageKeys: pendingWhiteboardStages.map((stage) => stage.pageKey || stage.nodeKey || 'unknown')
+                    });
+                }
             };
 
             const streamClassMessage = async (text, action) => {
@@ -1758,11 +2023,16 @@
             const startClass = async () => {
                 if (isInputLocked.value) return;
 
+                pendingWhiteboardStages.length = 0;
+                activatedWhiteboardStageKeys.clear();
                 whiteboardPages.value = [];
                 currentPageIndex.value = -1;
                 hasUnreadWhiteboardUpdate.value = false;
                 freshWhiteboardBlockKey.value = '';
                 clearWhiteboardFxTimers();
+                clearQuestionDrawerTimers();
+                questionDrawerOpen.value = false;
+                questionDrawerActiveKey.value = '';
                 messages.value.push({ role: 'user', content: '👨‍🎓 老师好，我准备好上课了！' });
                 setImmediateSubtitle('老师正在步入教室...');
                 isInputLocked.value = true;
@@ -1789,6 +2059,11 @@
                     
                     console.log("后端已成功响应退出请求！");
                     isInClass.value = false;
+                    pendingWhiteboardStages.length = 0;
+                    activatedWhiteboardStageKeys.clear();
+                    clearQuestionDrawerTimers();
+                    questionDrawerOpen.value = false;
+                    questionDrawerActiveKey.value = '';
                     messages.value.push({ 
                         role: 'ai', 
                         content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算先喘口气了？很好，微课模式关闭。现在回到闲聊和答疑通道，你要是还有问题，就继续开口。' 
@@ -1837,21 +2112,26 @@
                 isInputLocked.value = false;
                 isThinking.value = false;
                 setImmediateSubtitle('老师正在准备教材...');
+                pendingWhiteboardStages.length = 0;
+                activatedWhiteboardStageKeys.clear();
                 whiteboardPages.value = [];
                 currentPageIndex.value = -1;
                 hasUnreadWhiteboardUpdate.value = false;
                 freshWhiteboardBlockKey.value = '';
                 clearWhiteboardFxTimers();
+                clearQuestionDrawerTimers();
+                questionDrawerOpen.value = false;
+                questionDrawerActiveKey.value = '';
                 resetInputBox();
                 localStorage.removeItem('aiTeacherChatHistory');
             };
 
             return {
                 inputText, messages, isThinking, isInClass, isInputLocked,
-                currentSubtitle, subtitleLines, whiteboardPages, currentPageIndex, currentWhiteboardPage, canGoPrevWhiteboardPage, canGoNextWhiteboardPage, hasUnreadWhiteboardUpdate, currentQuestionDisplayKey, freshWhiteboardBlockKey,
+                currentSubtitle, subtitleLines, whiteboardPages, currentPageIndex, currentWhiteboardPage, canGoPrevWhiteboardPage, canGoNextWhiteboardPage, hasUnreadWhiteboardUpdate, currentQuestionDisplayKey, isQuestionDrawerAvailable, isQuestionDrawerOpen, freshWhiteboardBlockKey,
                 currentApiBaseUrl, currentApiMode, currentApiKind, currentApiModeLabel, currentApiStatusText,
                 isDashboardOpen, dashboardLoading, dashboardError, dashboardData, latestDashboardTime,
-                autoResize, handleEnter, sendMessage, startNewChat, startClass, exitClass, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage,
+                autoResize, handleEnter, sendMessage, startNewChat, startClass, exitClass, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage, toggleQuestionDrawer, handleQuestionDrawerMouseEnter, handleQuestionDrawerMouseLeave,
                 openDashboard, closeDashboard, formatDashboardTime,
                 switchToLocalApi, switchToProdApi, switchToAutoApi
             };

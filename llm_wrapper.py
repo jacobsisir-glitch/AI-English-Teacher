@@ -28,7 +28,7 @@ STREAM_PROTOCOL_GUARD_TAIL = 256
 MOOD_SWINGS = (
     "极其不耐烦",
     "略带嘲讽",
-    "急着去约会",
+    "像刚被人打断备课",
     "像刚喝完一杯苦得要命的黑咖啡",
     "表面克制但心里已经开始翻白眼",
 )
@@ -40,6 +40,7 @@ BASE_SYSTEM_PROMPT = """
 # Personality & Tone
 - 可以阴阳怪气、可以轻微讽刺，但不能胡说八道，更不能变成人身攻击。
 - 讲解必须专业、锋利、简洁，带一点“恨铁不成钢”的英式冷幽默。
+- 不要使用“约会、恋爱、暧昧、私人感情生活”这类老师私人情感人设，不要把这类设定说进字幕。
 - 默认用中文作答，必要时保留英文术语和例句。
 
 # Live2D 标签规则
@@ -151,16 +152,6 @@ BOARD_FORMULA_SEGMENT_PATTERN = re.compile(
     r"(?:【[^】]+】\s*)?[^。！？\n]*=[^。！？\n]*",
     re.IGNORECASE,
 )
-BOARD_EXAMPLE_SEGMENT_PATTERN = re.compile(
-    r"(?:[-*]\s*)?(?:比如|例如|像这样|像这种|比如说)\s*[：:]\s*`[^`]*[A-Za-z][^`]*`(?:\s*[（(][^）)]*[）)])?",
-    re.IGNORECASE,
-)
-INLINE_ENGLISH_EXAMPLE_PATTERN = re.compile(
-    r"`[^`]*[A-Za-z][^`]*`(?:\s*[（(][^）)]*[）)])?",
-    re.IGNORECASE,
-)
-
-
 def _looks_like_protocol_leak(text: str) -> bool:
     if not text:
         return False
@@ -207,6 +198,20 @@ def _extract_whiteboard_guard_phrases(reference_text: str) -> list[str]:
         line = raw_line.strip()
         if not line or line.startswith("#"):
             continue
+        if any(
+            marker in line
+            for marker in (
+                "弹幕常犯错误",
+                "正确标准答案",
+                "测试题建议",
+                "作答要求建议",
+                "系统场控隐藏指令",
+                "Step 1",
+                "Step 2",
+                "Step 3",
+            )
+        ):
+            continue
         line = INLINE_LEGACY_WHITEBOARD_PATTERN.sub(lambda match: match.group(1).strip(), line)
         line = re.sub(r"^[-*]\s+", "", line).strip()
         line = line.strip("`").strip()
@@ -222,9 +227,8 @@ def _sanitize_class_spoken_text(text: str, task_info: dict | None, *, trim_edges
         return ""
 
     cleaned = INLINE_LEGACY_WHITEBOARD_PATTERN.sub("", cleaned)
-    cleaned = BOARD_EXAMPLE_SEGMENT_PATTERN.sub("", cleaned)
-    cleaned = INLINE_ENGLISH_EXAMPLE_PATTERN.sub("", cleaned)
     cleaned = BOARD_FORMULA_SEGMENT_PATTERN.sub("", cleaned)
+    cleaned = cleaned.replace("`", "")
 
     guard_phrases = _extract_whiteboard_guard_phrases(
         (task_info or {}).get("reference") or ""
@@ -235,10 +239,7 @@ def _sanitize_class_spoken_text(text: str, task_info: dict | None, *, trim_edges
         if line_without_action.startswith(("-", "*", "###", "【")):
             continue
         normalized_line = _normalize_guard_text(line_without_action)
-        if normalized_line and any(
-            phrase in normalized_line or normalized_line in phrase
-            for phrase in guard_phrases
-        ):
+        if normalized_line and normalized_line in guard_phrases:
             continue
         safe_lines.append(raw_line)
 
@@ -505,67 +506,67 @@ def _build_class_opening_directive(task_info: dict, weakness_summary: str | None
     next_focus = task_info.get("next_focus") or "下一轮默认先从五大基本句型开始。"
     return f"""
     # 微课开场强制流程
-    学生现在刚刚点击了“开启微课”。这一轮是微课的开场白，你必须严格执行以下顺序：
-    1. 先用傲娇、毒舌、带英式冷幽默的语气，对学生“终于肯来上课”进行阴阳怪气的欢迎。
+    学生现在刚刚点击了“开启微课”。这一轮是第一节的开场导读，你必须严格执行以下顺序：
+    1. 先用傲娇、毒舌、带英式冷幽默的语气做章节开场，但开场话术必须贴合“第一节：五大基本句型”的主题，不要反复套用“终于肯来上课”“哦，终于肯”这种老开头。
     2. 学生最近最显眼的薄弱点是：{weakness_text}
-    3. 你只需要概括本节微课路线，不要展开任何具体语法讲解，不要提前偷跑到第一关的正文。
-    4. 全程最多 2 到 3 句话，不要提问，不要让学生确认，不要等待回复。
-    5. 最后用一句很短的过桥话，直接把节奏切到第一关。下一步重点：{next_focus}
+    3. 你需要围绕白板上的导读内容，讲清“英语简单句的底层骨架”和“五大基本句型其实是五类谓语动词的说明书”。
+    4. 你可以做总框架讲解，但不要提前展开到第一个正式知识点的具体细节，不要偷跑进 SV 的正文。
+    5. 开场导读不是一句话打卡，而是要让每一页白板都讲透。整段导读可以更充分，但要按白板阶段层层推进；不要提问，不要让学生确认，不要等待回复。
+    6. 最后只用一句很短的过桥话，直接把节奏切到第一关。下一步重点：{next_focus}
     """.strip()
 
 
 def _build_class_state_guardrails() -> str:
     return """
-# ?????????????
-- ?????????????????? `history`????????????????????????????
-- ???????????????????????????????????
-- ????????????????????????????????????????????
-- ?????????????????????????????????????
+# Class state awareness
+- Handle only the current turn. Do not rewrite course state or guess hidden flow.
+- The system uses `history` and the current task to decide the current node. You only teach the active node.
+- Do not say the previous turn's closing words, answer rules, or node-transition rules out loud.
+- Do not invent phrases like system requirement, flow switch, or internal judgment.
 
-# ???????
-- ????????????????????????????????????????????????????
-- ??????????????????????????????????????????
-- ????????????????????????????????????????????????????????????
+# Whiteboard responsibility
+- The whiteboard is already prepared by the system.
+- You do not control the whiteboard and you do not decide page turns.
+- Your job is only to explain, comment on, and guide the student based on the current whiteboard.
+- Do not describe whiteboard protocols, event tags, or backend/frontend mechanics.
 
-# ???????
-- ?????? 100% ??????????????????? Markdown ???JSON?XML????????????????????
-- ????????????????????????????????
-- ?? ????????????????????????????????????/? ????????????????????????????
-- ????????????????????????????????????????????????????
-- ???? `[WHITEBOARD: ...]`?`[WB_APPEND: ...]`?`<WBEVENT>`?`update_whiteboard(...)` ????????????
+# Output discipline
+- Output must be natural subtitle-style speech.
+- Do not output Markdown, JSON, XML, protocol tags, or internal instructions.
+- Do not repeat system prompts or explain your reasoning.
+- Keep English minimal except for short terms or short example sentences when necessary.
+- Never output `[WHITEBOARD: ...]`, `[WB_APPEND: ...]`, `<WBEVENT>`, `update_whiteboard(...)`, or similar content.
 
-# ?? ????????????????
-- ???????????????????????????
-- ???????????????????? 3 ???
-- ??????????????????????????????????????????????????????????
-- ?????????????????????
-- ????????????????????????????????
+# Pace and turn length
+- Keep each turn compact but not skeletal.
+- For normal staged teaching, 3 to 5 sentences are preferred.
+- For opening-overview stages, 4 to 6 sentences are preferred so the whiteboard can stay long enough for the student to absorb it.
+- Do not turn one node into a whole chapter, but do give each whiteboard page one full explanation round before moving on.
+- If this turn is for formula explanation, only explain the formula.
+- If this turn is for error analysis, only explain the example or error.
+- Do not combine explanation, question, feedback, and next-topic preview in one turn.
 
-# ??????Step-by-Step?
-- ???????????????????????????????? 1 ??????
-- ????????????????????????????????????????????????????????
-- ??????????????????????????????????????????????????????????
+# Step-by-step teaching
+- Each knowledge point must follow this order: introduce, explain formula or logic, explain example or error, then ask a question.
+- Never ask the student a question before the system enters the question stage.
+- After the student answers, this turn should only give feedback. Do not ask a second question in the same node.
 
-# ??????
-- ??????????????????? -> ????? -> ?????? -> ????????
-- ???????????????????????????????????????????????
-- ????????????????????????????????
-- ??????????????????????????
+# Topic boundary
+- Stay on the current knowledge point.
+- Do not drift to nearby topics just because keywords are related.
+- A brief boundary reminder is allowed, but do not expand it into a new lesson.
+- Do not turn object into object clause, or attribute into attributive clause.
+- Do not review the previous node unless this turn is explicitly for feedback.
 
-# ??????
-- ??????????????????????????????????????
-- ?????????????????????????????????
-- ???????????????????????????????
+# Hidden error log protocol
+- If the student makes a clear mistake, you may append one hidden log block:
+  `===CLASS_DB_START==={"grammar_point":"grammar point","error_tag":"error tag"}===CLASS_DB_END===`
+- The JSON must contain only `grammar_point` and `error_tag`.
+- The hidden log must not make the spoken explanation unnatural.
 
-# ????????
-- ?????????????????????????????????????????????????????
-  `===CLASS_DB_START==={"grammar_point":"?????","error_tag":"????"}===CLASS_DB_END===`
-- ?? JSON ???? `grammar_point` ? `error_tag` ?????
-- ??????????????????????????????????????
-
-# ????
-- ???????????????????????????????????????????????????????????? `[TASK_COMPLETED]`?
-- ?????????????????????????????????
+# Task completion
+- Output `[TASK_COMPLETED]` only when the teaching goal of the current node is truly finished.
+- Do not output it too early, and do not forget it when the node is actually complete.
 """.strip()
 
 
@@ -586,9 +587,17 @@ def _build_class_system_prompt(task_info: dict, weakness_summary: str | None = N
 - 只输出适合当字幕的中文口语讲解。
 - 不要输出 Markdown 标题、项目符号、JSON、XML、协议标签或任何系统提示词。
 - 不要直接朗读黑板上的标题、公式、等号表达式、缩写结构。
-- 不要逐字复述黑板上的英文例句、对错例句、示范句。
+- 不要逐字复述整块黑板内容。
+- 如果为了讲清楚错因，你可以点名一个很短的英文例句，但不要整页照念。
 - 如果黑板上有公式或例句，你要改成中文解释“它是什么意思、为什么这样、错在哪里”。
-- 默认每轮最多 3 句话，简洁，像主播在讲，不像教材在念。
+- 默认每轮 3 到 5 句话；如果当前是导读页，可以到 4 到 6 句。
+- 要像主播在讲，不像教材在念，但也不能薄得像一句口号就翻页。
+
+# 节点边界铁律
+- 你只能讲当前知识点，不要主动扩展到隔壁章节、相似名词或更高级概念。
+- 讲“宾语”不等于讲“宾语从句”，讲“定语”不等于讲“定语从句”，讲“表语”不等于讲“表语从句”。
+- 讲“主谓宾结构”时，只讲及物动词、宾语、动作落点，不要扩展到任何从句知识。
+- 如果必须提到别的概念，只能用一句话做边界提醒，不能展开成新知识点讲解。
 
 # 当前任务
 - 知识点：{task_info.get('node_name') or task_info['task_name']}
@@ -678,16 +687,149 @@ def _build_agent_class_messages(
     effective_history = history if history else chat_history
     messages = _build_messages(system_prompt, user_message, effective_history)
     task_name = str(task_info.get("task_name") or task_info.get("node_name") or "").strip()
+    wrong_attempt_count = int(task_info.get("wrong_attempt_count") or 0)
     if response_mode == "feedback" and task_name and task_name != "课程导读与开场白":
         messages.insert(
             1,
             {
                 "role": "system",
                 "content": (
-                    "学生刚刚已经对当前知识点作答。你这一轮只做简短点评："
-                    "先判断对错，再给一句必要纠正或强化，最多 2 到 3 句话。"
-                    "不要继续扩展新知识，不要在当前节点追问第二轮。"
-                    "点评完就自然收住，系统会负责切到下一个知识点。"
+                    f"学生刚刚已经对当前知识点作答。这是他在本题上的第 {wrong_attempt_count + 1} 次作答。"
+                    "先判断答案是否可接受。学生不必死改老师给的原句，也可以自己重新造一个符合当前知识点要求的正确句子；"
+                    "只要结构正确、表达符合题意，就算答对。"
+                    "如果答案正确或基本正确：先给一句符合人设的点评，再做一句简短强化，然后在最后一行单独输出 `[TASK_COMPLETED]`。"
+                    "如果答案错误，并且这是第一次答错：你必须先按人设冷嘲热讽一句，再解释一个关键错误点，再明确要求学生重答一次；"
+                    "这时不要直接给完整标准答案，并且在最后一行单独输出 `[RETRY_REQUIRED]`。"
+                    "如果答案错误，并且这已经是第二次答错：你必须先按人设嘲讽一句，再直接给出一个标准答案，"
+                    "再附一句符合当前语境的点评，然后在最后一行单独输出 `[TASK_COMPLETED]`。"
+                    "只要判断为错误，就必须附带 CLASS_DB 隐藏错误记录。"
+                    "不要继续扩展新知识，不要在当前节点追问第二轮，不要预告下一个知识点，不要说“现在进入下一关/欢迎来到下一节”这类过桥话。"
+                ),
+            },
+        )
+    elif response_mode == "teach_opening_formula" and task_name == "课程导读与开场白":
+        messages.insert(
+            1,
+            {
+                "role": "system",
+                "content": (
+                    "你现在只讲导读白板上的第一部分：英语简单句的底层骨架，以及为什么五大基本句型本质上是在看谓语动词的类型。"
+                    "先把总框架讲清，不要展开到 SV 的具体规则。"
+                    "这一轮控制在 4 到 6 句，第一句必须很短，像主播开题一样利落，后面几句要把概念真正讲开。"
+                ),
+            },
+        )
+    elif response_mode == "teach_opening_example" and task_name == "课程导读与开场白":
+        messages.insert(
+            1,
+            {
+                "role": "system",
+                "content": (
+                    "你现在只讲导读白板上的第二部分：学生学语法时最常见的误区，是一上来扑向枝叶规则，却不先抓住句子的核心骨架。"
+                    "继续保持傲娇名师口吻，但不要提问，不要让学生作答。"
+                    "这一轮控制在 4 到 6 句，最后用一句很短的过桥话把节奏切到主谓结构。"
+                ),
+            },
+        )
+    elif response_mode == "teach_stage" and task_name:
+        active_stage = task_info.get("active_stage") or {}
+        stage_kind = str(active_stage.get("stage_kind") or "").strip().lower()
+        stage_title = str(active_stage.get("title") or "").strip()
+        stage_rule = str(active_stage.get("stage_rule") or "").strip()
+        transition_hint = str(active_stage.get("transition_hint") or "").strip()
+        voice_guidance = [
+            str(line or "").strip()
+            for line in active_stage.get("voice_guidance") or []
+            if str(line or "").strip()
+        ]
+        guidance_block = "\n".join(f"- {line}" for line in voice_guidance[:6])
+        stage_focus_map = {
+            "hook": "你现在只负责开场定调、把学生注意力拉到当前知识点，不展开后面的正式规则。",
+            "frame": "你现在只负责搭总框架，不要提前偷跑到下一个小点。",
+            "core": "你现在只负责讲当前白板上的核心公式和判断逻辑。",
+            "error": "你现在只负责讲当前白板上的对错对比、错因和改法。",
+            "reinforce": "你现在只负责做关键加固和边界提醒，不要提前出题。",
+            "preview": "你现在只负责做章节预告式总览，不要提前把后面每一个知识点讲透。",
+            "quiz": "你现在不要复述整道题，只能用一句很短的话提醒学生看悬浮题目作答。",
+        }
+        stage_focus = stage_focus_map.get(stage_kind, "你现在只负责讲当前阶段，不要偷跑到别的阶段。")
+        is_opening_task = task_name == "课程导读与开场白"
+        if stage_kind == "quiz":
+            stage_length_rule = "这一轮只用 1 句话提醒学生看悬浮题目，不要把题面整段念出来。"
+        elif is_opening_task:
+            stage_length_rule = (
+                "这一轮要讲满 4 到 6 句话。第一句必须短而利落，后面至少用 2 到 3 句把当前页真正讲开，"
+                "不要只丢一个结论就匆匆翻页。"
+            )
+        else:
+            stage_length_rule = (
+                "这一轮要讲满 3 到 5 句话。第一句可以短一些做切题，后面要把当前页的逻辑、比喻或错因展开说清楚。"
+            )
+        messages.insert(
+            1,
+            {
+                "role": "system",
+                "content": (
+                    f"当前知识点：{task_name}。当前舞台阶段：{stage_title or stage_kind or '当前阶段'}。"
+                    f"{stage_focus}"
+                    "这一轮只讲当前阶段对应的白板内容，不要抢跑到后面阶段。"
+                    f"{stage_length_rule}"
+                    "如果这一阶段带了人设话术，请把其中至少一到两条自然化地说进字幕里，而不是只给一个空泛总结。"
+                    "不要再端出固定开场套话；章节换了，切入角度和比喻也要跟着换。"
+                    + (f" 当前阶段额外规则：{stage_rule}" if stage_rule else "")
+                    + (f" 当前阶段过桥提示：{transition_hint}" if transition_hint else "")
+                    + (f"\n可以借用这些话术与比喻：\n{guidance_block}" if guidance_block else "")
+                ),
+            },
+        )
+    elif response_mode == "teach_formula" and task_name and task_name != "课程导读与开场白":
+        messages.insert(
+            1,
+            {
+                "role": "system",
+                "content": (
+                    f"本轮严格锁定知识点：{task_name}。"
+                    "你现在只讲白板上已经出现的核心公式。"
+                    "默认直接开讲，不要先复盘上一关，不要先夸学生，不要重复过桥欢迎语。"
+                    "不要借关键词联想到同名或近名的其他概念，更不要扩展到从句。"
+                    "不要提前展开例句，不要提前抛题，不要预告太多后续内容。"
+                    "这一轮的目标只是把公式含义和判断方法讲清楚。"
+                ),
+            },
+        )
+        messages.insert(
+            2,
+            {
+                "role": "system",
+                "content": (
+                    "Formula-stage pacing rule: the first sentence must be very short, self-contained, "
+                    "and immediately point at the current formula. End that first sentence with a full stop."
+                ),
+            },
+        )
+    elif response_mode == "teach_example" and task_name and task_name != "课程导读与开场白":
+        floating_question = str(task_info.get("whiteboard_question") or "").strip()
+        messages.insert(
+            1,
+            {
+                "role": "system",
+                "content": (
+                    f"本轮严格锁定知识点：{task_name}。"
+                    "白板上刚刚追加了典型错误/对错对比，现在你只讲这一部分。"
+                    "重点解释错因、改法和判断依据，不要回头重讲公式。"
+                    "不要从‘宾语/定语/表语’这些词联想到对应从句，不要擅自扩展到隔壁知识点。"
+                    "结尾只用一句很短的话提醒学生看上方悬浮题目作答。"
+                    + (f" 当前悬浮题目是：{floating_question}" if floating_question else "")
+                ),
+            },
+        )
+        messages.insert(
+            2,
+            {
+                "role": "system",
+                "content": (
+                    "Example-stage pacing rule: start with one short sentence that clearly signals "
+                    "you are now explaining the error pair, then continue with the explanation."
                 ),
             },
         )

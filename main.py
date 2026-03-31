@@ -27,14 +27,17 @@ from llm_wrapper import (
 COURSE_TASKS = [
     {
         "task_name": "课程导读与开场白",
-        "goal": "只做微课开场和路线宣读，不讲具体知识点。简短说完后立刻进入第一关，不等待学生确认。",
-        "reference_text": "微课路线：五大基本句型 -> 动词的时间 -> 动词的状态 -> 核心时态精讲。开场阶段只做课程导览，不展开任何细节知识点。",
+        "goal": "只做第一节的总导读与开场白，先搭建五大基本句型的总框架，不展开具体单点操练。简短说完后立刻进入第一关，不等待学生确认。",
+        "textbook_file": "00_Grammar_Overview.md",
+        "section_heading": "### 五大基本句型导读 (Opening Overview)",
+        "reference_chars": 2200,
     },
     {
         "task_name": "主谓结构（SV）",
         "goal": "只讲主谓结构与不及物动词，引导学生造一个标准 SV 句。",
         "textbook_file": "00_Grammar_Overview.md",
         "section_heading": "### 主谓结构 (SV Pattern)",
+        "reference_chars": 1400,
         "mastery_point": "不及物动词与主谓结构",
     },
     {
@@ -42,6 +45,7 @@ COURSE_TASKS = [
         "goal": "只讲主谓宾结构与及物动词，让学生说清为什么宾语不能缺席。",
         "textbook_file": "00_Grammar_Overview.md",
         "section_heading": "### 主谓宾结构 (SVO Pattern)",
+        "reference_chars": 1400,
         "mastery_point": "及物动词与宾语",
     },
     {
@@ -49,6 +53,7 @@ COURSE_TASKS = [
         "goal": "只讲双宾结构，强调“先给人，再给物”的顺序。",
         "textbook_file": "00_Grammar_Overview.md",
         "section_heading": "### 主谓双宾结构 (SVOO Pattern)",
+        "reference_chars": 1400,
         "mastery_point": "双及物动词",
     },
     {
@@ -56,6 +61,7 @@ COURSE_TASKS = [
         "goal": "只讲主谓宾补结构，让学生分清宾补和双宾不是同一回事。",
         "textbook_file": "00_Grammar_Overview.md",
         "section_heading": "### 主谓宾补结构 (SVOC Pattern)",
+        "reference_chars": 1400,
         "mastery_point": "复合及物动词与宾补",
     },
     {
@@ -63,6 +69,7 @@ COURSE_TASKS = [
         "goal": "只讲系动词与表语，让学生理解系动词不是动作动词。",
         "textbook_file": "00_Grammar_Overview.md",
         "section_heading": "### 主系表结构 (SVC / SVP Pattern)",
+        "reference_chars": 1400,
         "mastery_point": "系动词与表语",
     },
     {
@@ -247,13 +254,18 @@ student_state = {
     "current_task_index": 0,
     "class_history": [],
     "awaiting_answer": False,
+    "pending_question_node_key": "",
+    "pending_question_text": "",
+    "pending_question_wrong_attempts": 0,
+    "last_consumed_answer_fingerprint": "",
 }
 stream_state = {"session_summary": ""}
 stream_state_lock = threading.Lock()
 
 TASK_COMPLETED_MARKER = "[TASK_COMPLETED]"
+RETRY_REQUIRED_MARKER = "[RETRY_REQUIRED]"
 CLASS_COMPLETED_MESSAGE = "🎉 恭喜你！我们所有的语法特训任务都通关啦！现在退出微课模式咯~"
-NEXT_TASK_NUDGE = "好，进入下一个知识点。请直接开始当前节点的正文讲解。"
+NEXT_TASK_NUDGE = "直接开始当前知识点的正文讲解。不要复盘上一关，不要欢迎开场，不要重复过桥话。"
 OPENING_TASK_NAME = "课程导读与开场白"
 CLASS_DB_LOG_START = "===CLASS_DB_START==="
 CLASS_DB_LOG_END = "===CLASS_DB_END==="
@@ -265,6 +277,8 @@ MASTERY_DELTA_CLASS_SUCCESS = 8
 CURRENT_STUDENT_ID = DEFAULT_STUDENT_ID
 TEXTBOOKS_DIR = Path(__file__).resolve().parent / "data" / "textbooks"
 MARKDOWN_HEADING_PATTERN = re.compile(r"^(#{2,4})\s+(.+?)\s*$")
+STAGED_SECTION_HEADING_PATTERN = re.compile(r"^#{4,6}\s*\[STAGE:([A-Z_]+)\]\s*$")
+STAGED_SECTION_FIELD_PATTERN = re.compile(r"^\[([A-Z_]+)\]\s*(.*)$")
 TEXTBOOK_SLICE_CACHE: dict[tuple[str, str, int, int, int], str] = {}
 WHITEBOARD_EVENT_OPEN = "<WBEVENT>"
 WHITEBOARD_EVENT_CLOSE = "</WBEVENT>"
@@ -287,7 +301,31 @@ def _should_auto_advance_class_task(request_action: str, task_info: dict | None,
         return _is_opening_task(task_info)
     if _is_opening_task(task_info):
         return False
-    return bool(student_state.get("awaiting_answer")) and bool(str(user_msg or "").strip())
+    if not bool(student_state.get("awaiting_answer")):
+        return False
+
+    normalized_user_msg = re.sub(r"\s+", " ", str(user_msg or "")).strip()
+    if not normalized_user_msg:
+        return False
+
+    pending_node_key = str(student_state.get("pending_question_node_key") or "").strip()
+    current_node_key = str((task_info or {}).get("task_name") or (task_info or {}).get("node_name") or "").strip()
+    if pending_node_key and current_node_key and pending_node_key != current_node_key:
+        return False
+
+    pending_question_text = re.sub(
+        r"\s+",
+        " ",
+        str(student_state.get("pending_question_text") or ""),
+    ).strip()
+    if pending_question_text and normalized_user_msg == pending_question_text:
+        return False
+
+    answer_fingerprint = f"{current_node_key}::{normalized_user_msg}"
+    if answer_fingerprint == str(student_state.get("last_consumed_answer_fingerprint") or ""):
+        return False
+
+    return True
 
 
 def _extract_markdown_section(markdown_text: str, heading_title: str) -> str:
@@ -391,6 +429,144 @@ def _sanitize_reference_for_llm(reference_text: str) -> str:
     return "\n".join(cleaned_lines).strip()
 
 
+def _parse_explicit_stage_plan(reference_text: str) -> list[dict]:
+    stages: list[dict] = []
+    current_stage: dict | None = None
+    current_field = ""
+
+    def finalize_stage(stage: dict | None) -> None:
+        if not stage:
+            return
+        fields = stage.get("fields") or {}
+        wb_title = " ".join(fields.get("WB_TITLE", [])).strip()
+        wb_lines = [line.strip() for line in fields.get("WB_LINES", []) if line.strip()]
+        voice_guidance = [line.strip() for line in fields.get("VOICE_GUIDE", []) if line.strip()]
+        stage_rule = " ".join(fields.get("STAGE_RULE", [])).strip()
+        question_text = " ".join(fields.get("QUESTION", [])).strip()
+        answer_rule = " ".join(fields.get("ANSWER_RULE", [])).strip()
+        transition_hint = " ".join(fields.get("TRANSITION", [])).strip()
+        expects_answer = str(stage.get("stage_kind") or "").upper() == "QUIZ"
+
+        if not (wb_title or wb_lines or voice_guidance or question_text or answer_rule):
+            return
+
+        stages.append(
+            {
+                "stage_kind": str(stage.get("stage_kind") or "").strip().lower(),
+                "wb_title": wb_title,
+                "wb_lines": wb_lines,
+                "voice_guidance": voice_guidance,
+                "stage_rule": stage_rule,
+                "question_text": question_text,
+                "answer_rule": answer_rule,
+                "transition_hint": transition_hint,
+                "expects_answer": expects_answer,
+            }
+        )
+
+    for raw_line in str(reference_text or "").splitlines():
+        stripped_line = raw_line.strip()
+        stage_match = STAGED_SECTION_HEADING_PATTERN.match(stripped_line)
+        if stage_match:
+            finalize_stage(current_stage)
+            current_stage = {"stage_kind": stage_match.group(1).strip(), "fields": {}}
+            current_field = ""
+            continue
+
+        if current_stage is None:
+            continue
+
+        field_match = STAGED_SECTION_FIELD_PATTERN.match(stripped_line)
+        if field_match:
+            current_field = field_match.group(1).strip().upper()
+            field_bucket = current_stage["fields"].setdefault(current_field, [])
+            first_line = field_match.group(2).strip()
+            if first_line:
+                field_bucket.append(first_line)
+            continue
+
+        if not current_field:
+            continue
+
+        if not stripped_line:
+            continue
+
+        current_stage["fields"].setdefault(current_field, []).append(stripped_line)
+
+    finalize_stage(current_stage)
+    return stages
+
+
+def _build_stage_plan_from_reference(task_info: dict, reference_text: str) -> list[dict]:
+    parsed_stages = _parse_explicit_stage_plan(reference_text)
+    if not parsed_stages:
+        return []
+
+    task_label = str(task_info.get("task_name") or task_info.get("node_name") or "当前知识点").strip()
+    stage_plan: list[dict] = []
+
+    for index, stage in enumerate(parsed_stages):
+        stage_kind = str(stage.get("stage_kind") or "").strip().lower() or f"stage_{index + 1}"
+        raw_lines = [str(line or "").strip() for line in stage.get("wb_lines") or []]
+        cleaned_lines = [(_clean_whiteboard_markdown_line(line) or line.strip()) for line in raw_lines if line.strip()]
+        cleaned_lines = [line for line in cleaned_lines if line]
+        wb_title = str(stage.get("wb_title") or "").strip() or f"{task_label} · {stage_kind.upper()}"
+        question_text = str(stage.get("question_text") or "").strip()
+        answer_rule = str(stage.get("answer_rule") or "").strip()
+        stage_rule = str(stage.get("stage_rule") or "").strip()
+        transition_hint = str(stage.get("transition_hint") or "").strip()
+        voice_guidance = [str(line or "").strip() for line in stage.get("voice_guidance") or [] if str(line or "").strip()]
+        content_markdown = "\n".join(cleaned_lines).strip()
+
+        stage_plan.append(
+            {
+                "stage_kind": stage_kind,
+                "page_key": _build_whiteboard_page_key(task_info, f"{index + 1}_{stage_kind}"),
+                "title": wb_title,
+                "content": content_markdown,
+                "voice_guidance": voice_guidance,
+                "stage_rule": stage_rule,
+                "transition_hint": transition_hint,
+                "question_text": question_text,
+                "answer_rule": answer_rule,
+                "expects_answer": bool(stage.get("expects_answer")),
+            }
+        )
+
+    return stage_plan
+
+
+def _build_stage_plan_reference_summary(stage_plan: list[dict]) -> str:
+    if not stage_plan:
+        return ""
+
+    summary_lines = ["当前知识点已经按舞台阶段拆分，老师要跟着阶段推进，不要抢跑。"]
+    for stage in stage_plan[:6]:
+        stage_kind = str(stage.get("stage_kind") or "").strip().upper()
+        title = str(stage.get("title") or "").strip()
+        voice_guidance = [str(line or "").strip() for line in stage.get("voice_guidance") or [] if str(line or "").strip()]
+        line = f"- {stage_kind}: {title}" if title else f"- {stage_kind}"
+        if voice_guidance:
+            line += f"；可借用话术：{' / '.join(voice_guidance[:3])}"
+        stage_rule = str(stage.get("stage_rule") or "").strip()
+        if stage_rule:
+            line += f"；阶段要求：{stage_rule}"
+        summary_lines.append(line)
+    return "\n".join(summary_lines).strip()
+
+
+def _build_stage_plan_question_text(stage_plan: list[dict]) -> str:
+    for stage in reversed(stage_plan):
+        question_text = str(stage.get("question_text") or "").strip()
+        if not question_text:
+            continue
+        answer_rule = str(stage.get("answer_rule") or "").strip()
+        if answer_rule:
+            return f"老师提问：{question_text}\n作答要求：{answer_rule}"
+        return f"老师提问：{question_text}"
+    return ""
+
+
 def _extract_reference_section_lines(reference_text: str) -> tuple[list[str], list[str], list[str]]:
     formula_lines: list[str] = []
     example_lines: list[str] = []
@@ -457,20 +633,26 @@ def _build_whiteboard_question(task_info: dict) -> str:
 
     if wrong_line:
         wrong_example = _extract_backtick_text(wrong_line)
-        requirement = "作答要求：直接给出正确句子，再用中文说一句你为什么这样改。"
+        requirement = (
+            "作答要求：你可以直接改这句，也可以自己另外造一个符合当前知识点的正确句子；"
+            "然后再用中文说明你为什么这样改。"
+        )
         if correct_line:
-            requirement = "作答要求：先改正这句，再用中文说明它错在什么地方。"
+            requirement = (
+                "作答要求：你可以改正这句，也可以自己另外造一个符合当前知识点的正确句子；"
+                "然后再用中文说明原句错在什么地方。"
+            )
         return f"老师提问：请你改正 `{wrong_example}`。\n{requirement}"
 
     if any(keyword in goal for keyword in ("造一个", "造出", "造句")):
         return (
             f"老师提问：请你用“{formula_focus}”自己造一个句子。\n"
-            "作答要求：直接给句子，再用中文点出你用到的关键结构。"
+            "作答要求：你可以参考老师刚才的例句，但不必照搬；直接给句子，再用中文点出你用到的关键结构。"
         )
 
     return (
         f"老师提问：请你围绕“{task_name}”说一个正确句子。\n"
-        "作答要求：先给答案，再用中文解释你抓住了哪条判断依据。"
+        "作答要求：你可以参考老师给的例句，也可以自己重新造句；先给答案，再用中文解释你抓住了哪条判断依据。"
     )
 
 
@@ -487,9 +669,13 @@ def _build_spoken_reference_summary(reference_text: str) -> str:
             if focus:
                 summary_lines.append(f"- 当前板书关键词：{focus}")
     if example_lines:
-        summary_lines.append("黑板上已经给了对错对比。你只解释错因、修改理由和判断依据，不要把英文例句原文重新念一遍。")
+        summary_lines.append("黑板上已经给了对错对比。你只解释错因、修改理由和判断依据。必要时可以点一个很短的英文例句，但不要整段照念。")
     if note_lines:
-        summary_lines.append("黑板补充只用于帮助你组织解释，不要把板书条目逐条复述成字幕。")
+        summary_lines.append("你可以借用下面这些人设钩子、比喻或讲解节奏，但要自然说人话，不要逐条朗读提示词。")
+        for line in note_lines[:6]:
+            cue = re.sub(r"^-\s+", "", line).strip()
+            if cue:
+                summary_lines.append(f"- 可借用话术：{cue}")
 
     return "\n".join(summary_lines).strip()
 
@@ -500,6 +686,8 @@ def _build_runtime_course_task(task_index: int) -> dict:
     textbook_file = str(base_task.get("textbook_file") or "").strip()
     section_heading = str(base_task.get("section_heading") or "").strip()
     reference_chars = int(base_task.get("reference_chars") or 420)
+    if textbook_file == "00_Grammar_Overview.md" and not base_task.get("reference_chars"):
+        reference_chars = 1400
 
     if textbook_file and section_heading:
         reference_text = _read_precise_textbook_slice(
@@ -510,11 +698,17 @@ def _build_runtime_course_task(task_index: int) -> dict:
         base_task["reference_source"] = f"{textbook_file} :: {section_heading}"
 
     base_task["reference"] = reference_text
+    stage_plan = _build_stage_plan_from_reference(base_task, reference_text)
+    base_task["stage_plan"] = stage_plan
     base_task["llm_reference"] = (
-        _build_spoken_reference_summary(reference_text)
+        _build_stage_plan_reference_summary(stage_plan)
+        or _build_spoken_reference_summary(reference_text)
         or _sanitize_reference_for_llm(reference_text)
     )
-    base_task["whiteboard_question"] = _build_whiteboard_question(base_task)
+    base_task["whiteboard_question"] = (
+        _build_stage_plan_question_text(stage_plan)
+        or _build_whiteboard_question(base_task)
+    )
     base_task["node_name"] = base_task.get("task_name", "当前知识点")
     return base_task
 
@@ -541,11 +735,9 @@ def _build_whiteboard_contents(reference_text: str) -> list[str]:
 
     contents: list[str] = []
     if formula_lines:
-        contents.append("### 核心公式\n" + "\n".join(formula_lines))
+        contents.append("### 核心公式\n" + "\n".join(formula_lines[:2]))
     if example_lines:
-        contents.append("### 经典对错对比\n" + "\n".join(example_lines))
-    if note_lines:
-        contents.append("### 板书补充\n" + "\n".join(note_lines))
+        contents.append("### 经典对错对比\n" + "\n".join(example_lines[:3]))
 
     if contents:
         return contents
@@ -558,6 +750,112 @@ def _build_whiteboard_contents(reference_text: str) -> list[str]:
     if not fallback_lines:
         return []
     return ["### 当前板书\n" + "\n".join(fallback_lines)]
+
+
+def _build_whiteboard_formula_content(reference_text: str) -> str:
+    formula_lines, _, _ = _extract_reference_section_lines(reference_text)
+    if formula_lines:
+        return "### 核心公式\n" + "\n".join(formula_lines[:2])
+
+    fallback_lines = [
+        cleaned_line
+        for line in str(reference_text or "").splitlines()
+        if (cleaned_line := _clean_whiteboard_markdown_line(line))
+    ]
+    if not fallback_lines:
+        return ""
+    return "### 当前板书\n" + "\n".join(fallback_lines[:2])
+
+
+def _build_whiteboard_example_content(reference_text: str) -> str:
+    _, example_lines, _ = _extract_reference_section_lines(reference_text)
+    if not example_lines:
+        return ""
+    return "### 经典对错对比\n" + "\n".join(example_lines[:3])
+
+
+def _build_whiteboard_stage_title(task_info: dict, stage_kind: str = "") -> str:
+    base_title = str(task_info.get("node_name") or task_info.get("task_name") or "微课板书").strip()
+    stage_kind = str(stage_kind or "").strip().lower()
+    if stage_kind == "formula":
+        return f"{base_title} · 核心公式"
+    if stage_kind == "example":
+        return f"{base_title} · 经典对错对比"
+    return base_title
+
+
+def _build_whiteboard_page_key(task_info: dict, stage_kind: str = "") -> str:
+    node_key = str(task_info.get("task_name") or task_info.get("node_name") or "node").strip()
+    stage_kind = str(stage_kind or "").strip().lower() or "default"
+    return f"{node_key}::{stage_kind}"
+
+
+def _build_whiteboard_stage_system_notice(task_info: dict, stage_kind: str = "") -> str:
+    page_key = _build_whiteboard_page_key(task_info, stage_kind)
+    return f"[SYSTEM:WB_STAGE_READY::{page_key}]"
+
+
+def _iter_whiteboard_stage_events(
+    task_info: dict,
+    *,
+    include_new_page: bool = False,
+    include_formula: bool = False,
+    include_example: bool = False,
+    include_question: bool = False,
+    stage_kind: str = "",
+):
+    node_key = str(task_info.get("task_name") or task_info.get("node_name") or "").strip()
+    title = _build_whiteboard_stage_title(task_info, stage_kind)
+    page_key = _build_whiteboard_page_key(task_info, stage_kind)
+
+    if include_new_page:
+        yield _serialize_whiteboard_update(
+            {
+                "action": "new_page",
+                "node_key": node_key,
+                "page_key": page_key,
+                "title": title,
+            }
+        )
+
+    if include_formula:
+        formula_content = _build_whiteboard_formula_content(task_info.get("reference") or "")
+        if formula_content:
+            yield _serialize_whiteboard_update(
+                {
+                    "action": "append",
+                    "node_key": node_key,
+                    "page_key": page_key,
+                    "title": title,
+                    "content": formula_content,
+                }
+            )
+
+    if include_example:
+        example_content = _build_whiteboard_example_content(task_info.get("reference") or "")
+        if example_content:
+            yield _serialize_whiteboard_update(
+                {
+                    "action": "append",
+                    "node_key": node_key,
+                    "page_key": page_key,
+                    "title": title,
+                    "content": example_content,
+                }
+            )
+
+    if include_question:
+        question = str(task_info.get("whiteboard_question") or "").strip()
+        if question:
+            yield _serialize_whiteboard_update(
+                {
+                    "action": "question",
+                    "node_key": node_key,
+                    "page_key": page_key,
+                    "title": title,
+                    "question": question,
+                }
+            )
 
 
 def _build_whiteboard_update_payload(task_info: dict) -> dict:
@@ -581,6 +879,7 @@ def _serialize_whiteboard_update(payload: dict) -> str:
 def _iter_whiteboard_events(task_info: dict):
     node_key = str(task_info.get("task_name") or task_info.get("node_name") or "").strip()
     title = str(task_info.get("node_name") or task_info.get("task_name") or "微课板书").strip()
+    page_key = _build_whiteboard_page_key(task_info, "default")
     contents = _build_whiteboard_contents(task_info.get("reference") or "")
     question = str(task_info.get("whiteboard_question") or "").strip()
 
@@ -588,6 +887,7 @@ def _iter_whiteboard_events(task_info: dict):
         {
             "action": "new_page",
             "node_key": node_key,
+            "page_key": page_key,
             "title": title,
         }
     )
@@ -600,6 +900,7 @@ def _iter_whiteboard_events(task_info: dict):
             {
                 "action": "append",
                 "node_key": node_key,
+                "page_key": page_key,
                 "title": title,
                 "content": cleaned_content,
             }
@@ -610,6 +911,7 @@ def _iter_whiteboard_events(task_info: dict):
             {
                 "action": "question",
                 "node_key": node_key,
+                "page_key": page_key,
                 "title": title,
                 "question": question,
             }
@@ -617,11 +919,19 @@ def _iter_whiteboard_events(task_info: dict):
 
 
 class TaskCompletedBuffer:
-    def __init__(self, marker: str):
-        self.marker = marker
+    def __init__(self, markers: str | list[str] | tuple[str, ...]):
+        if isinstance(markers, str):
+            markers = [markers]
+        self.markers = tuple(
+            sorted(
+                {str(marker) for marker in markers if str(marker)},
+                key=len,
+                reverse=True,
+            )
+        )
         self.buffer = ""
         self.visible_parts = []
-        self.detected = False
+        self.detected_markers: set[str] = set()
 
     def push(self, chunk: str) -> str:
         if not chunk:
@@ -630,11 +940,17 @@ class TaskCompletedBuffer:
         released_chars = []
         for char in chunk:
             self.buffer += char
-            if self.buffer == self.marker:
-                self.detected = True
+            matched_marker = next(
+                (marker for marker in self.markers if self.buffer == marker),
+                None,
+            )
+            if matched_marker:
+                self.detected_markers.add(matched_marker)
                 self.buffer = ""
                 continue
-            while self.buffer and not self.marker.startswith(self.buffer):
+            while self.buffer and not any(
+                marker.startswith(self.buffer) for marker in self.markers
+            ):
                 released_chars.append(self.buffer[0])
                 self.visible_parts.append(self.buffer[0])
                 self.buffer = self.buffer[1:]
@@ -651,6 +967,13 @@ class TaskCompletedBuffer:
     @property
     def clean_text(self) -> str:
         return "".join(self.visible_parts)
+
+    @property
+    def detected(self) -> bool:
+        return bool(self.detected_markers)
+
+    def saw(self, marker: str) -> bool:
+        return marker in self.detected_markers
 
 
 class AnalyzeDBLogBuffer:
@@ -1123,10 +1446,27 @@ def _trim_class_history():
         student_state["class_history"] = student_state["class_history"][-12:]
 
 
-def _strip_task_completed(text: str) -> tuple[str, bool]:
-    has_marker = TASK_COMPLETED_MARKER in text
-    clean_text = text.replace(TASK_COMPLETED_MARKER, "").strip()
-    return clean_text, has_marker
+def _reset_pending_question_state() -> None:
+    student_state["awaiting_answer"] = False
+    student_state["pending_question_node_key"] = ""
+    student_state["pending_question_text"] = ""
+    student_state["pending_question_wrong_attempts"] = 0
+
+
+def _arm_pending_question(task_info: dict) -> bool:
+    question_text = str(task_info.get("whiteboard_question") or "").strip()
+    has_question = bool(question_text)
+    if not has_question:
+        _reset_pending_question_state()
+        return False
+
+    student_state["awaiting_answer"] = True
+    student_state["pending_question_node_key"] = str(
+        task_info.get("task_name") or task_info.get("node_name") or ""
+    ).strip()
+    student_state["pending_question_text"] = re.sub(r"\s+", " ", question_text).strip()
+    student_state["pending_question_wrong_attempts"] = 0
+    return True
 
 
 app = FastAPI(title="AI English Teacher API")
@@ -1287,7 +1627,8 @@ async def exit_course():
     student_state["is_in_class"] = False
     student_state["current_task_index"] = 0
     student_state["class_history"] = []
-    student_state["awaiting_answer"] = False
+    _reset_pending_question_state()
+    student_state["last_consumed_answer_fingerprint"] = ""
     return {"status": "success", "message": "已成功重置微课状态"}
 
 
@@ -1315,22 +1656,222 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             student_state["is_in_class"] = True
             student_state["current_task_index"] = 0
             student_state["class_history"] = []
-            student_state["awaiting_answer"] = False
+            _reset_pending_question_state()
+            student_state["last_consumed_answer_fingerprint"] = ""
             user_msg = "老师好，我准备好上课了！"
         else:
             user_msg = request.text
 
         if student_state["current_task_index"] >= len(COURSE_TASKS):
             student_state["is_in_class"] = False
-            student_state["awaiting_answer"] = False
+            _reset_pending_question_state()
             yield CLASS_COMPLETED_MESSAGE
             return
 
         current_task = _build_runtime_course_task(student_state["current_task_index"])
-        if request.action == "start":
-            for event_str in _iter_whiteboard_events(current_task):
+        is_answer_turn = _should_auto_advance_class_task(
+            request.action,
+            current_task,
+            user_msg,
+        )
+        current_task["wrong_attempt_count"] = int(
+            student_state.get("pending_question_wrong_attempts") or 0
+        )
+
+        def stream_teach_stage(
+            task_info: dict,
+            cue_text: str,
+            response_mode: str,
+            stage_kind: str = "",
+        ):
+            stage_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
+            yield _build_whiteboard_stage_system_notice(task_info, stage_kind)
+            for chunk in generate_agent_class_reply_stream(
+                task_info,
+                student_state["class_history"],
+                cue_text,
+                history=[],
+                weakness_summary=student_profile_summary,
+                response_mode=response_mode,
+            ):
+                visible_chunk = stage_filter.push(chunk)
+                if visible_chunk:
+                    yield visible_chunk
+
+            remaining_text = stage_filter.finalize()
+            if remaining_text:
+                yield remaining_text
+
+            stage_reply = stage_filter.clean_text.strip()
+            if stage_reply:
+                student_state["class_history"].append({"role": "assistant", "content": stage_reply})
+                _trim_class_history()
+
+        def stream_lesson_stages(
+            task_info: dict,
+            *,
+            formula_cue: str,
+            formula_mode: str,
+            example_cue: str,
+            example_mode: str,
+            include_question: bool = True,
+        ):
+            stage_plan = list(task_info.get("stage_plan") or [])
+            if stage_plan:
+                last_stage_page_key = ""
+                last_stage_title = ""
+                for stage in stage_plan:
+                    stage_kind = str(stage.get("stage_kind") or "").strip().lower()
+                    stage_title = str(stage.get("title") or task_info.get("node_name") or task_info.get("task_name") or "当前知识点").strip()
+                    stage_page_key = str(stage.get("page_key") or "").strip()
+                    stage_content = str(stage.get("content") or "").strip()
+                    stage_question = str(stage.get("question_text") or "").strip()
+                    answer_rule = str(stage.get("answer_rule") or "").strip()
+                    combined_question = (
+                        f"老师提问：{stage_question}\n作答要求：{answer_rule}"
+                        if stage_question and answer_rule
+                        else (f"老师提问：{stage_question}" if stage_question else "")
+                    )
+
+                    if stage_content:
+                        yield _serialize_whiteboard_update(
+                            {
+                                "action": "new_page",
+                                "node_key": str(task_info.get("task_name") or task_info.get("node_name") or "").strip(),
+                                "page_key": stage_page_key,
+                                "title": stage_title,
+                            }
+                        )
+                        yield _serialize_whiteboard_update(
+                            {
+                                "action": "append",
+                                "node_key": str(task_info.get("task_name") or task_info.get("node_name") or "").strip(),
+                                "page_key": stage_page_key,
+                                "title": stage_title,
+                                "content": stage_content,
+                            }
+                        )
+                        yield "\n\n"
+
+                        stage_task_info = dict(task_info)
+                        stage_task_info["active_stage"] = stage
+                        stage_task_info["whiteboard_question"] = combined_question
+                        stage_cue = str(stage.get("transition_hint") or formula_cue).strip() or formula_cue
+                        yield from stream_teach_stage(
+                            stage_task_info,
+                            stage_cue,
+                            "teach_stage",
+                            stage_page_key.split("::", 1)[-1] if stage_page_key else stage_kind,
+                        )
+                        last_stage_page_key = stage_page_key
+                        last_stage_title = stage_title
+
+                    if include_question and combined_question and stage.get("expects_answer"):
+                        question_page_key = last_stage_page_key or stage_page_key or _build_whiteboard_page_key(task_info, f"question_{stage_kind or 'quiz'}")
+                        question_title = last_stage_title or stage_title
+                        yield _serialize_whiteboard_update(
+                            {
+                                "action": "question",
+                                "node_key": str(task_info.get("task_name") or task_info.get("node_name") or "").strip(),
+                                "page_key": question_page_key,
+                                "title": question_title,
+                                "question": combined_question,
+                            }
+                        )
+                        task_with_question = dict(task_info)
+                        task_with_question["whiteboard_question"] = combined_question
+                        if _arm_pending_question(task_with_question):
+                            yield "\n\n看上方悬浮题目，按要求作答。"
+                        return
+                return
+
+            for event_str in _iter_whiteboard_stage_events(
+                task_info,
+                include_new_page=True,
+                include_formula=True,
+                stage_kind="formula",
+            ):
                 yield event_str
-        current_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
+            yield "\n\n"
+            yield from stream_teach_stage(
+                task_info,
+                formula_cue,
+                formula_mode,
+                "formula",
+            )
+
+            example_content = _build_whiteboard_example_content(task_info.get("reference") or "")
+            if example_content:
+                for event_str in _iter_whiteboard_stage_events(
+                    task_info,
+                    include_new_page=True,
+                    include_example=True,
+                    stage_kind="example",
+                ):
+                    yield event_str
+                yield "\n\n"
+                yield from stream_teach_stage(
+                    task_info,
+                    example_cue,
+                    example_mode,
+                    "example",
+                )
+                if include_question:
+                    for event_str in _iter_whiteboard_stage_events(
+                        task_info,
+                        include_question=True,
+                        stage_kind="example",
+                    ):
+                        yield event_str
+                    if _arm_pending_question(task_info):
+                        yield "\n\n看上方悬浮题目，按要求作答。"
+                return
+
+            if include_question:
+                for event_str in _iter_whiteboard_stage_events(
+                    task_info,
+                    include_question=True,
+                    stage_kind="formula",
+                ):
+                    yield event_str
+                if _arm_pending_question(task_info):
+                    yield "\n\n看上方悬浮题目，按要求作答。"
+
+        if request.action == "start" and _is_opening_task(current_task):
+            student_state["class_history"].append({"role": "user", "content": user_msg})
+            _trim_class_history()
+            yield from stream_lesson_stages(
+                current_task,
+                formula_cue="先根据当前白板讲清英语简单句的底层骨架，以及五大基本句型为什么本质上是五类谓语动词的说明书。",
+                formula_mode="teach_opening_formula",
+                example_cue="继续根据当前白板点破学生最常见的误区：不要一上来就扑向枝叶规则，要先抓住句子的核心骨架。",
+                example_mode="teach_opening_example",
+                include_question=False,
+            )
+
+            student_state["current_task_index"] += 1
+            if student_state["current_task_index"] >= len(COURSE_TASKS):
+                student_state["is_in_class"] = False
+                _reset_pending_question_state()
+                yield "\n\n" + CLASS_COMPLETED_MESSAGE
+                return
+
+            next_task = _build_runtime_course_task(student_state["current_task_index"])
+            yield from stream_lesson_stages(
+                next_task,
+                formula_cue=NEXT_TASK_NUDGE,
+                formula_mode="teach_formula",
+                example_cue="继续讲刚刚追加到白板上的典型错误和对错对比，然后再提醒学生看悬浮题目作答。",
+                example_mode="teach_example",
+                include_question=True,
+            )
+            return
+
+        current_filter = TaskCompletedBuffer(
+            [TASK_COMPLETED_MARKER, RETRY_REQUIRED_MARKER]
+            if is_answer_turn
+            else TASK_COMPLETED_MARKER
+        )
         class_db_buffer = AnalyzeDBLogBuffer(CLASS_DB_LOG_START, CLASS_DB_LOG_END)
 
         for chunk in generate_agent_class_reply_stream(
@@ -1341,7 +1882,7 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             weakness_summary=student_profile_summary,
             response_mode=(
                 "feedback"
-                if request.action != "start" and student_state.get("awaiting_answer")
+                if is_answer_turn
                 else "teach"
             ),
         ):
@@ -1360,7 +1901,8 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             yield class_db_remaining
 
         clean_reply = class_db_buffer.ai_comment.strip()
-        if class_db_buffer.detected and class_db_buffer.completed:
+        answer_has_error_log = class_db_buffer.detected and class_db_buffer.completed
+        if answer_has_error_log:
             _save_error_book_entry(
                 db=db,
                 user_input=user_msg,
@@ -1372,17 +1914,41 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
         student_state["class_history"].append({"role": "assistant", "content": clean_reply})
         _trim_class_history()
 
-        should_advance = current_filter.detected or _should_auto_advance_class_task(
-            request.action,
-            current_task,
-            user_msg,
-        )
+        inferred_retry_required = False
+        inferred_task_completed = False
+        if is_answer_turn and not current_filter.detected and clean_reply:
+            wrong_attempt_count = int(current_task.get("wrong_attempt_count") or 0)
+            if answer_has_error_log:
+                inferred_retry_required = wrong_attempt_count < 1
+                inferred_task_completed = wrong_attempt_count >= 1
+            else:
+                inferred_task_completed = True
+
+        should_advance = current_filter.saw(TASK_COMPLETED_MARKER) or inferred_task_completed
         if not should_advance:
+            if is_answer_turn and (
+                current_filter.saw(RETRY_REQUIRED_MARKER) or inferred_retry_required
+            ):
+                student_state["pending_question_wrong_attempts"] = int(
+                    student_state.get("pending_question_wrong_attempts") or 0
+                ) + 1
+                yield "\n\n看上方悬浮题目，再答一次。"
             return
 
-        student_state["awaiting_answer"] = False
+        if is_answer_turn:
+            normalized_user_msg = re.sub(r"\s+", " ", str(user_msg or "")).strip()
+            current_node_key = str(
+                current_task.get("task_name") or current_task.get("node_name") or ""
+            ).strip()
+            student_state["last_consumed_answer_fingerprint"] = (
+                f"{current_node_key}::{normalized_user_msg}"
+            )
+        _reset_pending_question_state()
         mastery_point = _resolve_course_mastery_point(student_state["current_task_index"])
-        if mastery_point:
+        answer_was_student_success = not (
+            is_answer_turn and answer_has_error_log
+        )
+        if mastery_point and answer_was_student_success:
             _update_knowledge_mastery(
                 db,
                 grammar_point=mastery_point,
@@ -1394,36 +1960,19 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
 
         if student_state["current_task_index"] >= len(COURSE_TASKS):
             student_state["is_in_class"] = False
-            student_state["awaiting_answer"] = False
+            _reset_pending_question_state()
             yield "\n\n" + CLASS_COMPLETED_MESSAGE
             return
 
         next_task = _build_runtime_course_task(student_state["current_task_index"])
-        for event_str in _iter_whiteboard_events(next_task):
-            yield event_str
-        student_state["awaiting_answer"] = bool(str(next_task.get("whiteboard_question") or "").strip())
-        yield "\n\n"
-
-        next_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
-        for chunk in generate_agent_class_reply_stream(
+        yield from stream_lesson_stages(
             next_task,
-            student_state["class_history"],
-            NEXT_TASK_NUDGE,
-            weakness_summary=student_profile_summary,
-            response_mode="teach",
-        ):
-            visible_chunk = next_filter.push(chunk)
-            if visible_chunk:
-                yield visible_chunk
-
-        next_remaining_text = next_filter.finalize()
-        if next_remaining_text:
-            yield next_remaining_text
-
-        next_reply = next_filter.clean_text.strip()
-        if next_reply:
-            student_state["class_history"].append({"role": "assistant", "content": next_reply})
-            _trim_class_history()
+            formula_cue=NEXT_TASK_NUDGE,
+            formula_mode="teach_formula",
+            example_cue="继续讲刚刚追加到白板上的典型错误和对错对比，然后再提醒学生看悬浮题目作答。",
+            example_mode="teach_example",
+            include_question=True,
+        )
 
     return StreamingResponse(
         generate(),
