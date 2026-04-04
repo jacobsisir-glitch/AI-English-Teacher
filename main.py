@@ -6,7 +6,7 @@ from datetime import datetime
 from pathlib import Path
 
 import uvicorn
-from fastapi import BackgroundTasks, Depends, FastAPI
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -18,6 +18,9 @@ import database.models
 from config import DEFAULT_STUDENT_ID
 from database.database import Base, SessionLocal, engine, get_db
 from database.models import ErrorBook, KnowledgeMastery, Student, StudentQuestion
+from livekit_utils import create_livekit_participant_token, livekit_is_configured
+from voice.livekit_room_bridge import VoiceWorkerManager
+from voice.session_state import structured_voice_log
 from llm_wrapper import (
     bg_summarize_chat_history,
     chat_with_teacher_stream,
@@ -1471,6 +1474,7 @@ def _arm_pending_question(task_info: dict) -> bool:
 
 app = FastAPI(title="AI English Teacher API")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
+voice_worker_manager = VoiceWorkerManager()
 
 
 @app.on_event("startup")
@@ -1479,6 +1483,11 @@ def on_startup():
     _ensure_student_question_schema()
     _ensure_knowledge_mastery_schema()
     _load_session_summary_from_db(CURRENT_STUDENT_ID)
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await voice_worker_manager.stop_all()
 
 
 app.add_middleware(
@@ -1512,6 +1521,12 @@ class ClassInput(BaseModel):
     text: str
     action: str = "chat"
     history: list[dict] = Field(default_factory=list)
+
+
+class LiveKitTokenRequest(BaseModel):
+    roomName: str | None = None
+    userId: str | None = None
+    displayName: str | None = None
 
 
 @app.post("/chat_stream")
@@ -1619,6 +1634,46 @@ async def get_dashboard_data(db: Session = Depends(get_db)):
         "recent_questions": recent_questions,
         "mastery_snapshot": mastery_snapshot,
     }
+
+
+@app.post("/api/livekit/token")
+async def create_livekit_token(request: LiveKitTokenRequest):
+    if not livekit_is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "LiveKit is not configured. "
+                "Please set LIVEKIT_WS_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and VOICE_DEFAULT_ROOM."
+            ),
+        )
+
+    try:
+        token_payload = create_livekit_participant_token(
+            room_name=request.roomName,
+            user_id=request.userId,
+            display_name=request.displayName,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to create LiveKit token: {exc}") from exc
+
+    structured_voice_log(
+        "voice.token_worker_ensure_start",
+        room_id=token_payload.room_name,
+        room_name=token_payload.room_name,
+        user_identity=token_payload.identity,
+    )
+    try:
+        await voice_worker_manager.ensure_session(token_payload.room_name)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=f"Voice worker startup failed: {exc}") from exc
+    return token_payload.as_response()
+
+
+@app.get("/api/livekit/worker-status")
+async def get_livekit_worker_status(roomName: str):
+    return voice_worker_manager.get_status(roomName)
 
 
 @app.post("/course/exit")

@@ -276,7 +276,7 @@
     <div class="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-amber-100/70 to-transparent pointer-events-none"></div>
     <div class="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-stone-100/80 via-stone-50/70 to-transparent pointer-events-none"></div>
 
-    <div class="control-deck fixed left-4 top-4 z-40 w-[calc(100vw-2rem)] max-w-sm rounded-3xl p-4 md:left-6 md:top-6 md:w-80">
+    <div class="control-deck fixed left-4 top-4 z-40 w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] max-w-sm overflow-y-auto rounded-3xl p-4 md:left-6 md:top-6 md:w-80 md:max-h-[calc(100vh-3rem)]">
         <div class="flex items-start justify-between gap-3">
             <div>
                 <p class="text-[11px] uppercase tracking-[0.34em] text-sky-600/80">Immersive Live</p>
@@ -315,6 +315,35 @@
                 <button @click="switchToAutoApi" :disabled="currentApiMode === 'auto'" class="api-switch-btn px-2 py-2 text-xs font-medium" :class="currentApiMode === 'auto' ? 'active-auto cursor-default' : ''">自动</button>
             </div>
             <div class="mt-3 truncate rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-[11px] text-slate-500">{{ currentApiBaseUrl }}</div>
+        </div>
+
+        <div class="mt-4 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 shadow-xl">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">历史对话</p>
+                    <p class="mt-1 text-[11px] leading-5 text-slate-500">这里保留最近几轮学生提问和老师回复。</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
+                    {{ recentHistoryMessages.length }} 条
+                </span>
+            </div>
+            <div class="mt-3 max-h-64 overflow-y-auto space-y-3 pr-1">
+                <div v-if="recentHistoryMessages.length === 0" class="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-3 py-4 text-xs leading-5 text-slate-400">
+                    还没有历史消息。等学生开口后，这里会开始积累最近对话。
+                </div>
+                <div v-for="(message, idx) in recentHistoryMessages" :key="`history-${idx}-${message.role}-${message.content}`" :class="message.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                    <div :class="message.role === 'user'
+                        ? 'max-w-[92%] rounded-[1.2rem] bg-sky-100 px-3 py-2 text-xs leading-5 text-sky-900 whitespace-pre-wrap shadow-sm'
+                        : 'max-w-[92%] rounded-[1.2rem] border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-700 shadow-sm'">
+                        <template v-if="message.role === 'user'">
+                            {{ message.content }}
+                        </template>
+                        <template v-else>
+                            <div class="prose prose-sm prose-slate max-w-none text-left" v-html="renderMarkdown(message.content || '')"></div>
+                        </template>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -427,7 +456,7 @@
 
     </main>
 
-    <div class="fixed bottom-36 left-1/2 z-40 w-4/5 max-w-4xl -translate-x-1/2 pointer-events-none">
+    <div class="fixed bottom-48 left-1/2 z-40 w-4/5 max-w-4xl -translate-x-1/2 pointer-events-none">
         <div class="mx-auto h-20 w-full overflow-hidden">
             <transition-group
                 name="subtitle-stack"
@@ -471,6 +500,30 @@
                     class="flex-1 max-h-[150px] min-h-[40px] bg-transparent py-2.5 px-2 text-slate-800 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                 ></textarea>
                 <button
+                    @click="startVoice"
+                    :disabled="voiceState === 'connecting' || voiceState === 'connected'"
+                    :class="[
+                        'mb-1 inline-flex h-12 items-center justify-center rounded-2xl px-4 text-sm font-medium transition-all',
+                        voiceState === 'connecting' || voiceState === 'connected'
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-sky-100 text-sky-700 hover:bg-sky-50 border border-sky-200'
+                    ]">
+                    <i class="fa-solid fa-microphone mr-2"></i>
+                    <span class="whitespace-nowrap">开始语音</span>
+                </button>
+                <button
+                    @click="stopVoice"
+                    :disabled="voiceState === 'idle'"
+                    :class="[
+                        'mb-1 inline-flex h-12 items-center justify-center rounded-2xl px-4 text-sm font-medium transition-all',
+                        voiceState === 'idle'
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                    ]">
+                    <i class="fa-solid fa-microphone-slash mr-2"></i>
+                    <span class="whitespace-nowrap">结束语音</span>
+                </button>
+                <button
                     @click="sendMessage"
                     :disabled="!inputText.trim() || isThinking || isInputLocked"
                     :class="['mb-1 flex h-12 w-12 items-center justify-center rounded-2xl transition-all',
@@ -478,6 +531,46 @@
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </div>
+            <div class="mt-2 flex items-center justify-between gap-3 px-2 text-xs">
+                <div v-if="shouldShowVoiceSummary" class="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-slate-500">
+                    <p class="truncate">Voice: <span class="font-medium text-slate-700">{{ voiceState }}</span> · STT: <span class="font-medium text-slate-700">{{ voiceBackendState }}</span></p>
+                    <p class="truncate">Partial: <span class="text-slate-700">{{ voicePartialTranscript || '...' }}</span></p>
+                    <p class="truncate">Final: <span class="text-slate-700">{{ voiceFinalTranscript || '...' }}</span></p>
+                </div>
+                <button
+                    type="button"
+                    @click="toggleVoiceDebugPanel"
+                    class="inline-flex shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-sky-300 hover:text-sky-700"
+                >
+                    {{ isVoiceDebugExpanded ? '收起调试' : '展开调试' }}
+                </button>
+            </div>
+            <div v-if="isVoiceDebugExpanded" class="mt-2 rounded-2xl border border-slate-200 bg-white/70 px-3 py-3 text-[11px] leading-5 text-slate-500 space-y-1">
+                <p class="font-semibold uppercase tracking-[0.2em] text-slate-600">Voice Debug</p>
+                <p>worker 入房：{{ voiceDebug.workerJoined ? 'yes' : 'no' }}</p>
+                <p>已订阅用户音轨：{{ voiceDebug.trackSubscribed ? 'yes' : 'no' }}</p>
+                <p>收到第一帧音频：{{ voiceDebug.firstAudioFrame ? 'yes' : 'no' }}</p>
+                <p>最近 speech_start：{{ voiceDebug.lastSpeechStartAt || '--' }}</p>
+                <p>最近 speech_end：{{ voiceDebug.lastSpeechEndAt || '--' }}</p>
+                <p>最近 partial：{{ voiceDebug.lastPartialAt || '--' }}</p>
+                <p>最近 final：{{ voiceDebug.lastFinalAt || '--' }}</p>
+                <p>最近 audio_chunk_sent：{{ voiceDebug.lastAudioChunkSentAt || '--' }}</p>
+                <p>最近 flush_sent：{{ voiceDebug.lastFlushSentAt || '--' }}</p>
+                <p>最近 force_flush_on_stop：{{ voiceDebug.lastForceFlushOnStopAt || '--' }}</p>
+                <p>最近 funasr_message：{{ voiceDebug.lastFunasrMessageAt || '--' }}</p>
+                <p>当前 vad_state：{{ voiceDebug.vadState || '--' }}</p>
+                <p>worker last_vad_event：{{ voiceDebug.workerLastVadEvent || '--' }}</p>
+                <p>worker last_audio_chunk_sent：{{ voiceDebug.workerLastAudioChunkSent || '--' }}</p>
+                <p>worker last_flush_sent：{{ voiceDebug.workerLastFlushSent || '--' }}</p>
+                <p>worker last_funasr_message：{{ voiceDebug.workerLastFunasrMessage || '--' }}</p>
+                <p>worker last_funasr_final：{{ voiceDebug.workerLastFunasrFinal || '--' }}</p>
+                <p>worker last_stage：{{ voiceDebug.workerLastStage || '--' }}</p>
+                <p>browser_disconnected：{{ voiceBrowserDisconnected ? 'yes' : 'no' }}</p>
+                <p>disconnect_reason：{{ voiceDisconnectReason || '--' }}</p>
+                <p>last_disconnect_source：{{ voiceLastDisconnectSource || '--' }}</p>
+                <p>worker_error：{{ voiceWorkerError || '--' }}</p>
+            </div>
+            <p v-if="voiceError" class="mt-2 px-2 text-xs leading-5 text-rose-600">{{ voiceError }}</p>
         </div>
     </div>
 
@@ -811,6 +904,39 @@
             const currentApiKind = ACTIVE_API_KIND;
             const currentApiModeLabel = API_MODE_LABEL;
             const currentApiStatusText = API_STATUS_TEXT;
+            const voiceState = ref('idle');
+            const voiceError = ref('');
+            const voiceRoomName = ref('');
+            const voiceIdentity = ref('');
+            const voiceBackendState = ref('idle');
+            const voiceWorkerError = ref('');
+            const voiceBrowserDisconnected = ref(false);
+            const voiceDisconnectReason = ref('');
+            const voiceLastDisconnectSource = ref('');
+            const voicePartialTranscript = ref('');
+            const voiceFinalTranscript = ref('');
+            const isVoiceDebugExpanded = ref(false);
+            const chatFeedRef = ref(null);
+            const voiceDebug = ref({
+                workerJoined: false,
+                trackSubscribed: false,
+                firstAudioFrame: false,
+                lastSpeechStartAt: '',
+                lastSpeechEndAt: '',
+                lastPartialAt: '',
+                lastFinalAt: '',
+                lastAudioChunkSentAt: '',
+                lastFlushSentAt: '',
+                lastForceFlushOnStopAt: '',
+                lastFunasrMessageAt: '',
+                vadState: 'idle',
+                workerLastVadEvent: '',
+                workerLastAudioChunkSent: '',
+                workerLastFlushSent: '',
+                workerLastFunasrMessage: '',
+                workerLastFunasrFinal: '',
+                workerLastStage: ''
+            });
             const dashboardLoading = ref(false);
             const dashboardError = ref('');
             const dashboardData = ref({
@@ -827,9 +953,35 @@
             // 🌟 读取本地小仓库：如果有历史记录就加载，没有就为空数组
             const savedHistory = localStorage.getItem('aiTeacherChatHistory');
             const messages = ref(savedHistory ? JSON.parse(savedHistory) : []);
+            const recentHistoryMessages = computed(() => messages.value.slice(-8));
+            const shouldShowVoiceSummary = computed(() => {
+                if (isVoiceDebugExpanded.value) {
+                    return true;
+                }
+                if (voiceError.value || voiceWorkerError.value) {
+                    return true;
+                }
+                if (voiceState.value !== 'idle') {
+                    return true;
+                }
+                if (voiceBackendState.value && voiceBackendState.value !== 'idle') {
+                    return true;
+                }
+                return false;
+            });
+            const scrollChatFeedToBottom = () => {
+                nextTick(() => {
+                    const container = chatFeedRef.value;
+                    if (!container) {
+                        return;
+                    }
+                    container.scrollTop = container.scrollHeight;
+                });
+            };
             // 🌟 开启自动存档雷达：只要 messages 发生任何变化，立刻写进硬盘！
             watch(messages, (newVal) => {
                 localStorage.setItem('aiTeacherChatHistory', JSON.stringify(newVal));
+                scrollChatFeedToBottom();
             }, { deep: true }); // deep: true 意思是深度监听，连数组里面某个属性变了也能察觉到
 
             const subtitleQueue = ref([]);
@@ -847,6 +999,12 @@
             let whiteboardFlashTimer = null;
             let questionDrawerAutoHideTimer = null;
             let questionDrawerHoverCollapseTimer = null;
+            let livekitRoom = null;
+            let workerStatusPollTimer = null;
+            let livekitClientModulePromise = null;
+            let activeAssistantAbortController = null;
+            let pendingDisconnectMeta = null;
+            let pendingVoiceStopWaiter = null;
             const pendingWhiteboardStages = [];
             const activatedWhiteboardStageKeys = new Set();
             const SUBTITLE_MIN_WEAK_BREAK_CHARS = 8;
@@ -883,6 +1041,21 @@
                 && questionDrawerOpen.value
                 && questionDrawerActiveKey.value === currentQuestionDisplayKey.value
             ));
+            const voiceStatusDotClass = computed(() => {
+                if (voiceState.value === 'connected') return 'bg-emerald-500';
+                if (voiceState.value === 'connecting') return 'bg-amber-500';
+                if (voiceState.value === 'failed') return 'bg-rose-500';
+                return 'bg-slate-300';
+            });
+            const nowLabel = () => new Date().toLocaleTimeString('zh-CN', {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const logVoiceEvent = (eventName, payload = {}) => {
+                console.info(`[AI Teacher][Voice] ${eventName}`, payload);
+            };
             watch(currentQuestionDisplayKey, (nextKey) => {
                 if (!nextKey) {
                     collapseQuestionDrawer();
@@ -997,6 +1170,423 @@
                     return;
                 }
                 openQuestionDrawer();
+            };
+            const loadLiveKitClient = async () => {
+                if (window.LivekitClient?.Room) {
+                    return window.LivekitClient;
+                }
+                if (!livekitClientModulePromise) {
+                    livekitClientModulePromise = import('https://cdn.jsdelivr.net/npm/livekit-client/+esm');
+                }
+                return livekitClientModulePromise;
+            };
+            const extractRequestErrorMessage = (error) => {
+                if (error?.response?.data?.detail) {
+                    return String(error.response.data.detail);
+                }
+                if (error?.message) {
+                    return String(error.message);
+                }
+                return String(error || '未知错误');
+            };
+            const resolveVoiceErrorMessage = (error) => {
+                const message = extractRequestErrorMessage(error);
+                if (
+                    error?.name === 'NotAllowedError'
+                    || /NotAllowedError|Permission denied|Permission dismissed|麦克风权限|permission/i.test(message)
+                ) {
+                    return '麦克风权限被拒绝，请在浏览器中允许麦克风访问后重试。';
+                }
+                if (/NotFoundError|Requested device not found|device/i.test(message)) {
+                    return '没有检测到可用麦克风，请检查系统输入设备。';
+                }
+                if (/LIVEKIT_|LiveKit is not configured|not configured/i.test(message)) {
+                    return '后端 LiveKit 环境变量未配置完整，无法申请语音 token。';
+                }
+                return `语音连接失败：${message}`;
+            };
+            const cancelActiveAssistantReply = (reason = 'cancelled') => {
+                if (!activeAssistantAbortController) {
+                    return;
+                }
+                activeAssistantAbortController.abort(reason);
+                activeAssistantAbortController = null;
+            };
+            const resetVoiceDebugState = () => {
+                voiceDebug.value = {
+                    workerJoined: false,
+                    trackSubscribed: false,
+                    firstAudioFrame: false,
+                    lastSpeechStartAt: '',
+                    lastSpeechEndAt: '',
+                    lastPartialAt: '',
+                    lastFinalAt: '',
+                    lastAudioChunkSentAt: '',
+                    lastFlushSentAt: '',
+                    lastForceFlushOnStopAt: '',
+                    lastFunasrMessageAt: '',
+                    vadState: 'idle',
+                    workerLastVadEvent: '',
+                    workerLastAudioChunkSent: '',
+                    workerLastFlushSent: '',
+                    workerLastFunasrMessage: '',
+                    workerLastFunasrFinal: '',
+                    workerLastStage: ''
+                };
+            };
+            const resolvePendingVoiceStopWaiter = (result = 'resolved') => {
+                if (!pendingVoiceStopWaiter) {
+                    return;
+                }
+                pendingVoiceStopWaiter.resolve(result);
+                pendingVoiceStopWaiter = null;
+            };
+            const waitForVoiceFlushOrFinal = (timeoutMs = 4500) => new Promise((resolve) => {
+                if (pendingVoiceStopWaiter) {
+                    pendingVoiceStopWaiter.resolve('superseded');
+                }
+                const timer = window.setTimeout(() => {
+                    if (pendingVoiceStopWaiter?.timer === timer) {
+                        pendingVoiceStopWaiter = null;
+                    }
+                    resolve('timeout');
+                }, timeoutMs);
+                pendingVoiceStopWaiter = {
+                    timer,
+                    resolve: (result) => {
+                        clearTimeout(timer);
+                        resolve(result);
+                    }
+                };
+            });
+            const stopWorkerStatusPolling = () => {
+                if (workerStatusPollTimer) {
+                    clearInterval(workerStatusPollTimer);
+                    workerStatusPollTimer = null;
+                }
+            };
+            const resetVoiceDisconnectDebug = () => {
+                voiceBrowserDisconnected.value = false;
+                voiceDisconnectReason.value = '';
+                voiceLastDisconnectSource.value = '';
+                pendingDisconnectMeta = null;
+            };
+            const syncWorkerStatus = async (roomName, { silenceErrors = false } = {}) => {
+                const normalizedRoomName = String(roomName || '').trim();
+                if (!normalizedRoomName) {
+                    return;
+                }
+                try {
+                    const response = await axios.get(API_BASE_URL + '/api/livekit/worker-status', {
+                        params: { roomName: normalizedRoomName }
+                    });
+                    const payload = response.data || {};
+                    const workerStatus = String(payload.status || 'idle').trim() || 'idle';
+                    if (workerStatus === 'connected') {
+                        voiceDebug.value.workerJoined = true;
+                        voiceWorkerError.value = '';
+                        if (voiceState.value === 'connected') {
+                            voiceBackendState.value = 'worker.connected';
+                        }
+                    } else if (workerStatus === 'failed') {
+                        voiceWorkerError.value = String(payload.lastError || 'worker startup failed').trim();
+                        if (voiceState.value === 'connected') {
+                            voiceBackendState.value = 'worker.failed';
+                        }
+                    }
+                    voiceDebug.value.workerLastVadEvent = String(payload.last_vad_event || '').trim();
+                    voiceDebug.value.workerLastAudioChunkSent = String(payload.last_audio_chunk_sent || '').trim();
+                    voiceDebug.value.workerLastFlushSent = String(payload.last_flush_sent || '').trim();
+                    voiceDebug.value.workerLastFunasrMessage = String(payload.last_funasr_message || '').trim();
+                    voiceDebug.value.workerLastFunasrFinal = String(payload.last_funasr_final || '').trim();
+                    voiceDebug.value.workerLastStage = String(payload.last_stage || '').trim();
+                } catch (error) {
+                    if (!silenceErrors) {
+                        console.warn('[AI Teacher] Failed to fetch worker status.', error);
+                    }
+                }
+            };
+            const startWorkerStatusPolling = (roomName) => {
+                stopWorkerStatusPolling();
+                const normalizedRoomName = String(roomName || '').trim();
+                if (!normalizedRoomName) {
+                    return;
+                }
+                syncWorkerStatus(normalizedRoomName, { silenceErrors: true });
+                workerStatusPollTimer = window.setInterval(() => {
+                    syncWorkerStatus(normalizedRoomName, { silenceErrors: true });
+                }, 2000);
+            };
+            const resetVoiceTranscriptState = ({ keepFinal = false } = {}) => {
+                voicePartialTranscript.value = '';
+                if (!keepFinal) {
+                    voiceFinalTranscript.value = '';
+                }
+            };
+            const toggleVoiceDebugPanel = () => {
+                isVoiceDebugExpanded.value = !isVoiceDebugExpanded.value;
+            };
+            const disconnectVoiceRoom = async ({ source = 'unknown', reason = '', room = null } = {}) => {
+                const targetRoom = room || livekitRoom;
+                const normalizedReason = String(reason || '').trim() || 'no reason provided';
+                voiceLastDisconnectSource.value = source;
+                voiceDisconnectReason.value = normalizedReason;
+                pendingDisconnectMeta = { source, reason: normalizedReason, ts: Date.now() };
+                logVoiceEvent('voice.disconnect.called', {
+                    source,
+                    reason: normalizedReason,
+                    roomName: voiceRoomName.value || targetRoom?.name || ''
+                });
+                console.trace('[AI Teacher][Voice] voice.disconnect.trace', { source, reason: normalizedReason });
+                if (!targetRoom) {
+                    return;
+                }
+                try {
+                    targetRoom.disconnect();
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to disconnect LiveKit room cleanly.', error);
+                }
+            };
+            const publishTeacherText = async (text, { isFinal = false } = {}) => {
+                const room = livekitRoom;
+                const normalizedText = String(text || '').trim();
+                if (!room || !normalizedText || voiceState.value !== 'connected') {
+                    return;
+                }
+                try {
+                    await room.localParticipant.sendText(JSON.stringify({
+                        text: normalizedText,
+                        isFinal,
+                        source: 'ai_teacher',
+                        roomName: voiceRoomName.value,
+                        identity: voiceIdentity.value,
+                        ts: Date.now()
+                    }), { topic: 'teacher.text' });
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to publish teacher.text stream.', error);
+                }
+            };
+            const bindLiveKitRoomEvents = (room, livekit) => {
+                room.on(livekit.RoomEvent.Reconnecting, () => {
+                    logVoiceEvent('voice.room.reconnecting');
+                    voiceState.value = 'connecting';
+                    voiceError.value = '';
+                });
+                room.on(livekit.RoomEvent.Reconnected, () => {
+                    logVoiceEvent('voice.room.reconnected');
+                    voiceState.value = 'connected';
+                    voiceError.value = '';
+                });
+                room.on(livekit.RoomEvent.Disconnected, (...args) => {
+                    const reasonPayload = args?.[0] ?? null;
+                    const derivedReason = pendingDisconnectMeta?.reason
+                        || reasonPayload?.reason
+                        || reasonPayload?.message
+                        || String(reasonPayload || '').trim()
+                        || 'unknown';
+                    const derivedSource = pendingDisconnectMeta?.source || 'room.disconnected.event';
+                    logVoiceEvent('voice.room.disconnected event', {
+                        source: derivedSource,
+                        reason: derivedReason,
+                        payload: reasonPayload
+                    });
+                    if (livekitRoom !== room) {
+                        return;
+                    }
+                    voiceBrowserDisconnected.value = true;
+                    voiceLastDisconnectSource.value = derivedSource;
+                    voiceDisconnectReason.value = derivedReason;
+                    livekitRoom = null;
+                    voiceState.value = 'idle';
+                    voiceRoomName.value = '';
+                    voiceIdentity.value = '';
+                    voiceBackendState.value = 'idle';
+                    voiceWorkerError.value = '';
+                    stopWorkerStatusPolling();
+                    resolvePendingVoiceStopWaiter('room.disconnected');
+                    pendingDisconnectMeta = null;
+                });
+            };
+            const handleIncomingVoiceTextStream = async (topic, reader) => {
+                let rawText = '';
+                for await (const chunk of reader) {
+                    rawText += String(chunk || '');
+                }
+                if (!rawText.trim()) {
+                    return;
+                }
+                try {
+                    const payload = JSON.parse(rawText);
+                    if (topic === 'stt.partial') {
+                        voicePartialTranscript.value = String(payload.text || '').trim();
+                        voiceDebug.value.lastPartialAt = nowLabel();
+                        return;
+                    }
+                    if (topic === 'stt.final') {
+                        voiceFinalTranscript.value = String(payload.text || '').trim();
+                        voiceDebug.value.lastFinalAt = nowLabel();
+                        resolvePendingVoiceStopWaiter('stt.final');
+                        await submitVoiceTranscript(String(payload.text || '').trim());
+                        return;
+                    }
+                    if (topic === 'voice.state') {
+                        const nextState = String(payload.state || '').trim() || 'idle';
+                        const noisyDebugStates = new Set([
+                            'asr.audio_chunk_sent',
+                            'asr.flush_sent',
+                            'asr.force_flush_on_stop',
+                            'funasr.message.received',
+                            'vad.state_change'
+                        ]);
+                        if (!noisyDebugStates.has(nextState)) {
+                            voiceBackendState.value = nextState;
+                        }
+                        if (nextState === 'worker.joined') {
+                            voiceDebug.value.workerJoined = true;
+                            voiceWorkerError.value = '';
+                            if (voiceState.value === 'connected') {
+                                voiceBackendState.value = 'worker.connected';
+                            }
+                        } else if (nextState === 'worker.error') {
+                            voiceWorkerError.value = String(payload.error || 'worker failed').trim();
+                            if (voiceState.value === 'connected') {
+                                voiceBackendState.value = 'worker.failed';
+                            }
+                        } else if (nextState === 'track.subscribed') {
+                            voiceDebug.value.trackSubscribed = true;
+                        } else if (nextState === 'audio.first_frame') {
+                            voiceDebug.value.firstAudioFrame = true;
+                        } else if (nextState === 'speech.start') {
+                            cancelActiveAssistantReply('voice_interrupt');
+                            voicePartialTranscript.value = '';
+                            voiceFinalTranscript.value = '';
+                            voiceDebug.value.lastSpeechStartAt = nowLabel();
+                        } else if (nextState === 'speech.end') {
+                            voiceDebug.value.lastSpeechEndAt = nowLabel();
+                        } else if (nextState === 'vad.state_change') {
+                            voiceDebug.value.vadState = String(payload.vadState || '').trim() || voiceDebug.value.vadState;
+                        } else if (nextState === 'asr.audio_chunk_sent') {
+                            voiceDebug.value.lastAudioChunkSentAt = nowLabel();
+                        } else if (nextState === 'asr.flush_sent') {
+                            voiceDebug.value.lastFlushSentAt = nowLabel();
+                        } else if (nextState === 'asr.force_flush_on_stop') {
+                            voiceDebug.value.lastForceFlushOnStopAt = nowLabel();
+                        } else if (nextState === 'funasr.partial') {
+                            voiceDebug.value.lastPartialAt = nowLabel();
+                        } else if (nextState === 'funasr.final') {
+                            voiceDebug.value.lastFinalAt = nowLabel();
+                            resolvePendingVoiceStopWaiter('funasr.final');
+                        } else if (nextState === 'funasr.message.received') {
+                            voiceDebug.value.lastFunasrMessageAt = nowLabel();
+                        } else if (nextState === 'utterance.complete') {
+                            resolvePendingVoiceStopWaiter('utterance.complete');
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to parse LiveKit text stream payload.', topic, rawText, error);
+                }
+            };
+            const bindVoiceTextStreamHandlers = (room) => {
+                room.registerTextStreamHandler('stt.partial', async (reader) => {
+                    await handleIncomingVoiceTextStream('stt.partial', reader);
+                });
+                room.registerTextStreamHandler('stt.final', async (reader) => {
+                    await handleIncomingVoiceTextStream('stt.final', reader);
+                });
+                room.registerTextStreamHandler('voice.state', async (reader) => {
+                    await handleIncomingVoiceTextStream('voice.state', reader);
+                });
+            };
+            const stopVoice = async () => {
+                const room = livekitRoom;
+                voiceError.value = '';
+                if (!room) {
+                    return;
+                }
+                try {
+                    await room.localParticipant.setMicrophoneEnabled(false);
+                    logVoiceEvent('voice.mic.unpublish.success');
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to unpublish microphone cleanly.', error);
+                }
+                const stopWaitMs = (
+                    voiceDebug.value.vadState === 'speech'
+                    || Boolean(voicePartialTranscript.value.trim())
+                ) ? 4500 : 900;
+                const stopResult = await waitForVoiceFlushOrFinal(stopWaitMs);
+                logVoiceEvent('voice.stop.flush.wait.result', { result: stopResult });
+                await disconnectVoiceRoom({ source: 'user.stop_voice', reason: 'user clicked 结束语音', room });
+                setImmediateSubtitle('语音已结束，浏览器麦克风已停止发布。');
+            };
+            const startVoice = async () => {
+                if (voiceState.value === 'connecting' || voiceState.value === 'connected') {
+                    return;
+                }
+                logVoiceEvent('voice.start.begin');
+                voiceError.value = '';
+                voiceState.value = 'connecting';
+                voiceBackendState.value = 'joining-room';
+                voiceWorkerError.value = '';
+                stopWorkerStatusPolling();
+                resetVoiceDisconnectDebug();
+                resetVoiceTranscriptState();
+                resetVoiceDebugState();
+                setImmediateSubtitle('正在连接 LiveKit 房间并申请麦克风权限...');
+                let room = null;
+                try {
+                    const livekit = await loadLiveKitClient();
+                    if (!livekit?.Room) {
+                        throw new Error('LiveKit JS client SDK 未正确加载。');
+                    }
+
+                    const tokenResponse = await axios.post(API_BASE_URL + '/api/livekit/token', {});
+                    const payload = tokenResponse.data || {};
+                    room = new livekit.Room();
+                    bindLiveKitRoomEvents(room, livekit);
+                    bindVoiceTextStreamHandlers(room);
+
+                    logVoiceEvent('voice.room.connect.begin', {
+                        roomName: payload.roomName,
+                        identity: payload.identity,
+                        serverUrl: payload.serverUrl
+                    });
+                    await room.connect(payload.serverUrl, payload.participantToken);
+                    logVoiceEvent('voice.room.connect.success', {
+                        roomName: payload.roomName,
+                        identity: payload.identity,
+                        participantIdentity: room.localParticipant?.identity || ''
+                    });
+                    await room.localParticipant.setMicrophoneEnabled(true);
+                    logVoiceEvent('voice.mic.publish.success', {
+                        roomName: payload.roomName,
+                        identity: payload.identity
+                    });
+
+                    livekitRoom = room;
+                    voiceRoomName.value = String(payload.roomName || '');
+                    voiceIdentity.value = String(payload.identity || '');
+                    voiceState.value = 'connected';
+                    voiceBackendState.value = 'browser.connected';
+                    startWorkerStatusPolling(voiceRoomName.value);
+                    setImmediateSubtitle('语音已接通，浏览器麦克风正在发布到 LiveKit room。');
+                } catch (error) {
+                    if (room) {
+                        await disconnectVoiceRoom({
+                            source: 'voice.start.rollback',
+                            reason: `startVoice failed: ${extractRequestErrorMessage(error)}`,
+                            room
+                        });
+                    }
+                    livekitRoom = null;
+                    voiceRoomName.value = '';
+                    voiceIdentity.value = '';
+                    voiceState.value = 'failed';
+                    voiceBackendState.value = 'failed';
+                    voiceWorkerError.value = extractRequestErrorMessage(error);
+                    voiceError.value = resolveVoiceErrorMessage(error);
+                    setImmediateSubtitle(voiceError.value);
+                    console.error('[AI Teacher] LiveKit connect failed:', error);
+                }
             };
 
             const syncWhiteboardUnreadState = () => {
@@ -1502,6 +2092,7 @@
             };
 
             onMounted(() => {
+                scrollChatFeedToBottom();
                 window.addEventListener('resize', resizeRadarChart);
             });
             onBeforeUnmount(() => {
@@ -1509,6 +2100,19 @@
                 disconnectRadarObserver();
                 clearSubtitleTimers();
                 clearWhiteboardFxTimers();
+                if (livekitRoom) {
+                    try {
+                        disconnectVoiceRoom({
+                            source: 'app.unmount',
+                            reason: 'Vue app unmount / page closing',
+                            room: livekitRoom
+                        });
+                    } catch (error) {
+                        console.warn('[AI Teacher] Failed to disconnect LiveKit room on unmount.', error);
+                    }
+                    livekitRoom = null;
+                }
+                stopWorkerStatusPolling();
                 if (radarResizeFrame) {
                     cancelAnimationFrame(radarResizeFrame);
                     radarResizeFrame = null;
@@ -1862,11 +2466,12 @@
                 return { visibleText, nextCarry };
             };
 
-            const readStreamIntoMessage = async (url, payload, messageIndex) => {
+            const readStreamIntoMessage = async (url, payload, messageIndex, { signal = null, onTextChunk = null, onCompleted = null } = {}) => {
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal
                 });
 
                 if (!response.ok) {
@@ -1914,6 +2519,9 @@
                         messages.value[messageIndex].systemStatus = '';
                         messages.value[messageIndex].content += segmentText;
                         enqueueSubtitleText(segmentText, { stagePageKey: activeSubtitleStagePageKey });
+                        if (typeof onTextChunk === 'function') {
+                            onTextChunk(segmentText);
+                        }
                     };
 
                     while ((match = markerRegex.exec(visibleText)) !== null) {
@@ -1957,16 +2565,28 @@
                         pendingPageKeys: pendingWhiteboardStages.map((stage) => stage.pageKey || stage.nodeKey || 'unknown')
                     });
                 }
+                if (typeof onCompleted === 'function') {
+                    onCompleted(messages.value[messageIndex]?.content || '');
+                }
             };
 
-            const streamClassMessage = async (text, action) => {
+            const streamClassMessage = async (text, action, { signal = null } = {}) => {
                 const aiMessage = { role: 'ai', isClass: true, content: '', systemStatus: '' };
                 messages.value.push(aiMessage);
                 const aiMessageIndex = messages.value.length - 1;
                 const history = action === 'start' ? [] : buildRecentHistory(2, 6);
 
                 isThinking.value = false;
-                await readStreamIntoMessage(API_BASE_URL + '/class_chat_stream', { text, action, history }, aiMessageIndex);
+                await readStreamIntoMessage(
+                    API_BASE_URL + '/class_chat_stream',
+                    { text, action, history },
+                    aiMessageIndex,
+                    {
+                        signal,
+                        onTextChunk: (segmentText) => publishTeacherText(segmentText, { isFinal: false }),
+                        onCompleted: (fullText) => publishTeacherText(fullText, { isFinal: true })
+                    }
+                );
 
                 if (messages.value[aiMessageIndex].content.includes(CLASS_COMPLETED_HINT)) {
                     isInClass.value = false;
@@ -1976,12 +2596,13 @@
                 }
             };
 
-            const readChatStreamIntoMessage = async (text, messageIndex) => {
+            const readChatStreamIntoMessage = async (text, messageIndex, { signal = null } = {}) => {
                 const history = buildRecentHistory(2, 6);
                 const response = await fetch(API_BASE_URL + '/chat_stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, history })
+                    body: JSON.stringify({ text, history }),
+                    signal
                 });
 
                 if (!response.ok) {
@@ -2004,6 +2625,7 @@
                     if (buffer) {
                         messages.value[messageIndex].content += buffer;
                         enqueueSubtitleText(buffer);
+                        publishTeacherText(buffer, { isFinal: false });
                         buffer = "";
                     }
                 }
@@ -2014,6 +2636,7 @@
                     enqueueSubtitleText(buffer);
                 }
                 flushSubtitleBuffer();
+                await publishTeacherText(messages.value[messageIndex].content || '', { isFinal: true });
             };
 
             const switchToLocalApi = () => window.aiTeacherApi.useLocal();
@@ -2077,33 +2700,59 @@
                 }
             };
 
-            const sendMessage = async () => {
-                const text = inputText.value.trim();
+            const submitVoiceTranscript = async (transcriptText) => {
+                const normalizedText = String(transcriptText || '').trim();
+                if (!normalizedText) {
+                    return;
+                }
+                await submitStudentInput(normalizedText, { source: 'voice' });
+            };
+
+            const submitStudentInput = async (rawText, { source = 'text' } = {}) => {
+                const text = String(rawText || '').trim();
+                const isVoiceSource = source === 'voice';
                 if (!text || isThinking.value || isInputLocked.value) return;
 
                 messages.value.push({ role: 'user', content: text });
                 setImmediateSubtitle(isInClass.value ? '老师正在继续这场折磨教育...' : '老师正在接收新的弹幕...');
-                resetInputBox();
+                if (!isVoiceSource) {
+                    resetInputBox();
+                }
                 isInputLocked.value = true;
                 isThinking.value = true;
+                cancelActiveAssistantReply('new_input');
+                const controller = new AbortController();
+                activeAssistantAbortController = controller;
 
                 try {
                     if (isInClass.value) {
-                        await streamClassMessage(text, "chat");
+                        await streamClassMessage(text, "chat", { signal: controller.signal });
                     } else {
                         const aiMessage = { role: 'ai', content: '' };
                         messages.value.push(aiMessage);
                         const aiMessageIndex = messages.value.length - 1;
                         isThinking.value = false;
-                        await readChatStreamIntoMessage(text, aiMessageIndex);
+                        await readChatStreamIntoMessage(text, aiMessageIndex, { signal: controller.signal });
                     }
                 } catch (error) {
-                    messages.value.push({ role: 'ai', content: "❌ 请求失败！请检查后端网络。" });
-                    setImmediateSubtitle('网络出了点毛病，老师暂时没接到这条消息。');
+                    if (error?.name === 'AbortError') {
+                        console.warn('[AI Teacher] Active assistant reply aborted.', error);
+                        setImmediateSubtitle('老师的上一轮回复已被新的语音输入打断。');
+                    } else {
+                        messages.value.push({ role: 'ai', content: "❌ 请求失败！请检查后端网络。" });
+                        setImmediateSubtitle('网络出了点毛病，老师暂时没接到这条消息。');
+                    }
                 } finally {
+                    if (activeAssistantAbortController === controller) {
+                        activeAssistantAbortController = null;
+                    }
                     isInputLocked.value = false;
                     isThinking.value = false;
                 }
+            };
+
+            const sendMessage = async () => {
+                await submitStudentInput(inputText.value, { source: 'text' });
             };
 
             const startNewChat = () => { 
@@ -2130,8 +2779,10 @@
                 inputText, messages, isThinking, isInClass, isInputLocked,
                 currentSubtitle, subtitleLines, whiteboardPages, currentPageIndex, currentWhiteboardPage, canGoPrevWhiteboardPage, canGoNextWhiteboardPage, hasUnreadWhiteboardUpdate, currentQuestionDisplayKey, isQuestionDrawerAvailable, isQuestionDrawerOpen, freshWhiteboardBlockKey,
                 currentApiBaseUrl, currentApiMode, currentApiKind, currentApiModeLabel, currentApiStatusText,
+                voiceState, voiceError, voiceRoomName, voiceIdentity, voiceStatusDotClass, voiceBackendState, voiceWorkerError, voiceBrowserDisconnected, voiceDisconnectReason, voiceLastDisconnectSource, voicePartialTranscript, voiceFinalTranscript, voiceDebug, isVoiceDebugExpanded, toggleVoiceDebugPanel,
+                recentHistoryMessages, shouldShowVoiceSummary, chatFeedRef,
                 isDashboardOpen, dashboardLoading, dashboardError, dashboardData, latestDashboardTime,
-                autoResize, handleEnter, sendMessage, startNewChat, startClass, exitClass, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage, toggleQuestionDrawer, handleQuestionDrawerMouseEnter, handleQuestionDrawerMouseLeave,
+                autoResize, handleEnter, sendMessage, startClass, exitClass, startNewChat, startVoice, stopVoice, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage, toggleQuestionDrawer, handleQuestionDrawerMouseEnter, handleQuestionDrawerMouseLeave,
                 openDashboard, closeDashboard, formatDashboardTime,
                 switchToLocalApi, switchToProdApi, switchToAutoApi
             };
