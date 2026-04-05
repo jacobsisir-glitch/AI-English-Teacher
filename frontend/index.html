@@ -513,15 +513,15 @@
                 </button>
                 <button
                     @click="stopVoice"
-                    :disabled="voiceState === 'idle'"
+                    :disabled="voiceState === 'idle' || isStopping"
                     :class="[
                         'mb-1 inline-flex h-12 items-center justify-center rounded-2xl px-4 text-sm font-medium transition-all',
-                        voiceState === 'idle'
+                        voiceState === 'idle' || isStopping
                             ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
                             : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
                     ]">
                     <i class="fa-solid fa-microphone-slash mr-2"></i>
-                    <span class="whitespace-nowrap">结束语音</span>
+                    <span class="whitespace-nowrap">{{ isStopping ? '正在停止…' : '结束语音' }}</span>
                 </button>
                 <button
                     @click="sendMessage"
@@ -915,6 +915,7 @@
             const voiceLastDisconnectSource = ref('');
             const voicePartialTranscript = ref('');
             const voiceFinalTranscript = ref('');
+            const isStopping = ref(false);
             const isVoiceDebugExpanded = ref(false);
             const chatFeedRef = ref(null);
             const voiceDebug = ref({
@@ -996,6 +997,7 @@
             const SUBTITLE_DELIMITER_REGEX = /[，,。！？!?；;：:]/;
             let subtitleHoldTimer = null;
             let subtitleLineSeed = 1;
+            let chatMessageSeed = 0;
             let whiteboardFlashTimer = null;
             let questionDrawerAutoHideTimer = null;
             let questionDrawerHoverCollapseTimer = null;
@@ -1005,11 +1007,93 @@
             let activeAssistantAbortController = null;
             let pendingDisconnectMeta = null;
             let pendingVoiceStopWaiter = null;
+            let pendingVoiceDisconnectWaiter = null;
             const pendingWhiteboardStages = [];
             const activatedWhiteboardStageKeys = new Set();
             const SUBTITLE_MIN_WEAK_BREAK_CHARS = 8;
             const SUBTITLE_HARD_BREAK_CHARS = 26;
             const STRONG_SUBTITLE_DELIMITER_REGEX = /[。！？!?]/;
+            const nextChatMessageId = () => {
+                chatMessageSeed += 1;
+                return `msg-${Date.now()}-${chatMessageSeed}`;
+            };
+            const ensureChatMessageId = (message) => {
+                if (!message || typeof message !== 'object') {
+                    return '';
+                }
+                const existingId = String(message.id || '').trim();
+                if (existingId) {
+                    return existingId;
+                }
+                const nextId = nextChatMessageId();
+                message.id = nextId;
+                return nextId;
+            };
+            const createChatMessage = (role, content = '', extra = {}) => ({
+                id: nextChatMessageId(),
+                role,
+                content,
+                ...extra
+            });
+            const resolveChatMessageTarget = ({ messageId = '', messageIndex = -1 } = {}) => {
+                const normalizedId = String(messageId || '').trim();
+                if (normalizedId) {
+                    const resolvedIndex = messages.value.findIndex((message) => ensureChatMessageId(message) === normalizedId);
+                    if (resolvedIndex >= 0) {
+                        return {
+                            messageIndex: resolvedIndex,
+                            messageId: normalizedId,
+                            message: messages.value[resolvedIndex]
+                        };
+                    }
+                }
+                if (
+                    Number.isInteger(messageIndex)
+                    && messageIndex >= 0
+                    && messageIndex < messages.value.length
+                ) {
+                    const message = messages.value[messageIndex];
+                    return {
+                        messageIndex,
+                        messageId: ensureChatMessageId(message),
+                        message
+                    };
+                }
+                return {
+                    messageIndex: -1,
+                    messageId: normalizedId || '',
+                    message: null
+                };
+            };
+            const buildChatLogPayload = ({
+                text = '',
+                content = '',
+                response = null,
+                messageIndex = null,
+                messageId = '',
+                source = '',
+                chunkLength = null
+            } = {}) => ({
+                source: source || undefined,
+                messageCount: messages.value.length,
+                textLength: String(text || '').length,
+                contentLength: String(content || '').length,
+                isThinking: Boolean(isThinking.value),
+                isInputLocked: Boolean(isInputLocked.value),
+                isStoppingVoice: Boolean(isStopping.value),
+                responseOk: response ? Boolean(response.ok) : null,
+                responseStatus: response ? Number(response.status) : null,
+                hasBody: response ? Boolean(response.body) : null,
+                messageIndex: Number.isInteger(messageIndex) ? messageIndex : null,
+                messageId: String(messageId || '').trim() || null,
+                chunkLength: typeof chunkLength === 'number' ? chunkLength : null
+            });
+            const logChatEvent = (label, meta = {}) => {
+                console.info(label, buildChatLogPayload(meta));
+            };
+            messages.value.forEach((message) => {
+                ensureChatMessageId(message);
+            });
             const buildQuestionDisplayKey = (pageIndex, question) => {
                 const normalizedQuestion = String(question || '').trim();
                 if (pageIndex < 0 || !normalizedQuestion) {
@@ -1241,6 +1325,13 @@
                 pendingVoiceStopWaiter.resolve(result);
                 pendingVoiceStopWaiter = null;
             };
+            const resolvePendingVoiceDisconnectWaiter = (result = 'resolved') => {
+                if (!pendingVoiceDisconnectWaiter) {
+                    return;
+                }
+                pendingVoiceDisconnectWaiter.resolve(result);
+                pendingVoiceDisconnectWaiter = null;
+            };
             const waitForVoiceFlushOrFinal = (timeoutMs = 4500) => new Promise((resolve) => {
                 if (pendingVoiceStopWaiter) {
                     pendingVoiceStopWaiter.resolve('superseded');
@@ -1252,6 +1343,24 @@
                     resolve('timeout');
                 }, timeoutMs);
                 pendingVoiceStopWaiter = {
+                    timer,
+                    resolve: (result) => {
+                        clearTimeout(timer);
+                        resolve(result);
+                    }
+                };
+            });
+            const waitForVoiceDisconnect = (timeoutMs = 900) => new Promise((resolve) => {
+                if (pendingVoiceDisconnectWaiter) {
+                    pendingVoiceDisconnectWaiter.resolve('superseded');
+                }
+                const timer = window.setTimeout(() => {
+                    if (pendingVoiceDisconnectWaiter?.timer === timer) {
+                        pendingVoiceDisconnectWaiter = null;
+                    }
+                    resolve('timeout');
+                }, timeoutMs);
+                pendingVoiceDisconnectWaiter = {
                     timer,
                     resolve: (result) => {
                         clearTimeout(timer);
@@ -1404,6 +1513,8 @@
                     voiceWorkerError.value = '';
                     stopWorkerStatusPolling();
                     resolvePendingVoiceStopWaiter('room.disconnected');
+                    resolvePendingVoiceDisconnectWaiter('room.disconnected');
+                    isStopping.value = false;
                     pendingDisconnectMeta = null;
                 });
             };
@@ -1500,29 +1611,82 @@
             const stopVoice = async () => {
                 const room = livekitRoom;
                 voiceError.value = '';
-                if (!room) {
+                if (!room || isStopping.value) {
                     return;
                 }
+                isStopping.value = true;
+                logVoiceEvent('stop_voice.begin', {
+                    roomName: voiceRoomName.value || room.name || '',
+                    vadState: voiceDebug.value.vadState || 'unknown'
+                });
+                setImmediateSubtitle('正在停止语音...');
                 try {
                     await room.localParticipant.setMicrophoneEnabled(false);
                     logVoiceEvent('voice.mic.unpublish.success');
                 } catch (error) {
                     console.warn('[AI Teacher] Failed to unpublish microphone cleanly.', error);
                 }
-                const stopWaitMs = (
-                    voiceDebug.value.vadState === 'speech'
-                    || Boolean(voicePartialTranscript.value.trim())
-                ) ? 4500 : 900;
-                const stopResult = await waitForVoiceFlushOrFinal(stopWaitMs);
-                logVoiceEvent('voice.stop.flush.wait.result', { result: stopResult });
-                await disconnectVoiceRoom({ source: 'user.stop_voice', reason: 'user clicked 结束语音', room });
-                setImmediateSubtitle('语音已结束，浏览器麦克风已停止发布。');
+                try {
+                    const stopWaitMs = (
+                        voiceDebug.value.vadState === 'speech'
+                        || Boolean(voicePartialTranscript.value.trim())
+                    ) ? 1800 : 900;
+                    const stopResult = await waitForVoiceFlushOrFinal(stopWaitMs);
+                    logVoiceEvent('voice.stop.flush.wait.result', { result: stopResult });
+                    if (stopResult !== 'room.disconnected') {
+                        if (stopResult === 'timeout') {
+                            logVoiceEvent('stop_voice.force_disconnect', {
+                                roomName: voiceRoomName.value || room.name || '',
+                                reason: 'graceful stop timeout'
+                            });
+                        }
+                        await disconnectVoiceRoom({
+                            source: stopResult === 'timeout' ? 'stop_voice.force_disconnect' : 'user.stop_voice',
+                            reason: stopResult === 'timeout' ? 'graceful stop timed out' : 'user clicked 结束语音',
+                            room
+                        });
+                        await waitForVoiceDisconnect(900);
+                    }
+                    logVoiceEvent('stop_voice.end', {
+                        stopResult,
+                        roomConnected: Boolean(livekitRoom)
+                    });
+                    setImmediateSubtitle('语音已结束，浏览器麦克风已停止发布。');
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to stop voice cleanly.', error);
+                    logVoiceEvent('stop_voice.force_disconnect', {
+                        roomName: voiceRoomName.value || room.name || '',
+                        reason: extractRequestErrorMessage(error)
+                    });
+                    await disconnectVoiceRoom({
+                        source: 'stop_voice.force_disconnect',
+                        reason: `stopVoice failed: ${extractRequestErrorMessage(error)}`,
+                        room
+                    });
+                    await waitForVoiceDisconnect(900);
+                    logVoiceEvent('stop_voice.end', {
+                        stopResult: 'error_force_disconnect',
+                        roomConnected: Boolean(livekitRoom)
+                    });
+                    setImmediateSubtitle('语音已结束，浏览器麦克风已停止发布。');
+                } finally {
+                    if (livekitRoom !== room || voiceState.value === 'idle') {
+                        isStopping.value = false;
+                    } else {
+                        window.setTimeout(() => {
+                            if (livekitRoom === room && voiceState.value !== 'idle') {
+                                isStopping.value = false;
+                            }
+                        }, 300);
+                    }
+                }
             };
             const startVoice = async () => {
                 if (voiceState.value === 'connecting' || voiceState.value === 'connected') {
                     return;
                 }
                 logVoiceEvent('voice.start.begin');
+                isStopping.value = false;
                 voiceError.value = '';
                 voiceState.value = 'connecting';
                 voiceBackendState.value = 'joining-room';
@@ -2596,47 +2760,106 @@
                 }
             };
 
-            const readChatStreamIntoMessage = async (text, messageIndex, { signal = null } = {}) => {
-                const history = buildRecentHistory(2, 6);
-                const response = await fetch(API_BASE_URL + '/chat_stream', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, history }),
-                    signal
+            const readChatStreamIntoMessage = async (text, messageIndex, { signal = null, messageId = '' } = {}) => {
+                let target = resolveChatMessageTarget({ messageId, messageIndex });
+                let response = null;
+                logChatEvent('[chat] readChatStream.begin', {
+                    text,
+                    content: target.message?.content || '',
+                    messageIndex: target.messageIndex,
+                    messageId: target.messageId
                 });
+                try {
+                    const history = buildRecentHistory(2, 6);
+                    response = await fetch(API_BASE_URL + '/chat_stream', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text, history }),
+                        signal
+                    });
+                    logChatEvent('[chat] chatStream.response', {
+                        text,
+                        content: target.message?.content || '',
+                        response,
+                        messageIndex: target.messageIndex,
+                        messageId: target.messageId
+                    });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                if (!response.body) {
-                    throw new Error('响应体为空，无法读取聊天流');
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder("utf-8");
-                let buffer = "";
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-                    if (buffer) {
-                        messages.value[messageIndex].content += buffer;
-                        enqueueSubtitleText(buffer);
-                        publishTeacherText(buffer, { isFinal: false });
-                        buffer = "";
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
-                }
 
-                buffer += decoder.decode();
-                if (buffer) {
-                    messages.value[messageIndex].content += buffer;
-                    enqueueSubtitleText(buffer);
+                    if (!response.body) {
+                        throw new Error('响应体为空，无法读取聊天流');
+                    }
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder("utf-8");
+                    let buffer = "";
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        if (buffer) {
+                            target = resolveChatMessageTarget({ messageId: target.messageId, messageIndex: target.messageIndex });
+                            logChatEvent('[chat] readChatStream.chunk', {
+                                text,
+                                content: buffer,
+                                response,
+                                messageIndex: target.messageIndex,
+                                messageId: target.messageId,
+                                chunkLength: buffer.length
+                            });
+                            if (!target.message) {
+                                throw new Error('AI 占位消息不存在，无法写入聊天流');
+                            }
+                            target.message.content += buffer;
+                            logChatEvent('[chat] aiMessage.updated', {
+                                text,
+                                content: target.message.content || '',
+                                response,
+                                messageIndex: target.messageIndex,
+                                messageId: target.messageId,
+                                chunkLength: buffer.length
+                            });
+                            enqueueSubtitleText(buffer);
+                            publishTeacherText(buffer, { isFinal: false });
+                            buffer = "";
+                        }
+                    }
+
+                    buffer += decoder.decode();
+                    if (buffer) {
+                        target = resolveChatMessageTarget({ messageId: target.messageId, messageIndex: target.messageIndex });
+                        if (!target.message) {
+                            throw new Error('AI 占位消息不存在，无法写入聊天流尾包');
+                        }
+                        target.message.content += buffer;
+                        logChatEvent('[chat] aiMessage.updated', {
+                            text,
+                            content: target.message.content || '',
+                            response,
+                            messageIndex: target.messageIndex,
+                            messageId: target.messageId,
+                            chunkLength: buffer.length
+                        });
+                        enqueueSubtitleText(buffer);
+                    }
+                    flushSubtitleBuffer();
+                    target = resolveChatMessageTarget({ messageId: target.messageId, messageIndex: target.messageIndex });
+                    await publishTeacherText(target.message?.content || '', { isFinal: true });
+                } finally {
+                    target = resolveChatMessageTarget({ messageId: target.messageId, messageIndex: target.messageIndex });
+                    logChatEvent('[chat] readChatStream.end', {
+                        text,
+                        content: target.message?.content || '',
+                        response,
+                        messageIndex: target.messageIndex,
+                        messageId: target.messageId
+                    });
                 }
-                flushSubtitleBuffer();
-                await publishTeacherText(messages.value[messageIndex].content || '', { isFinal: true });
             };
 
             const switchToLocalApi = () => window.aiTeacherApi.useLocal();
@@ -2702,18 +2925,49 @@
 
             const submitVoiceTranscript = async (transcriptText) => {
                 const normalizedText = String(transcriptText || '').trim();
+                logChatEvent('[voice] submitVoiceTranscript.begin', {
+                    text: normalizedText,
+                    content: voiceFinalTranscript.value || '',
+                    source: 'voice'
+                });
                 if (!normalizedText) {
+                    logChatEvent('[voice] submitVoiceTranscript.end', {
+                        text: normalizedText,
+                        content: '',
+                        source: 'voice'
+                    });
                     return;
                 }
-                await submitStudentInput(normalizedText, { source: 'voice' });
+                try {
+                    await submitStudentInput(normalizedText, { source: 'voice' });
+                } finally {
+                    logChatEvent('[voice] submitVoiceTranscript.end', {
+                        text: normalizedText,
+                        content: voiceFinalTranscript.value || '',
+                        source: 'voice'
+                    });
+                }
             };
 
             const submitStudentInput = async (rawText, { source = 'text' } = {}) => {
                 const text = String(rawText || '').trim();
                 const isVoiceSource = source === 'voice';
-                if (!text || isThinking.value || isInputLocked.value) return;
+                logChatEvent('[chat] submitStudentInput.begin', {
+                    text,
+                    source
+                });
+                if (!text) return;
+                if (!isVoiceSource && (isThinking.value || isInputLocked.value)) return;
 
-                messages.value.push({ role: 'user', content: text });
+                const studentMessage = createChatMessage('user', text);
+                messages.value.push(studentMessage);
+                logChatEvent('[chat] studentMessage.appended', {
+                    text,
+                    content: studentMessage.content,
+                    source,
+                    messageIndex: messages.value.length - 1,
+                    messageId: studentMessage.id
+                });
                 setImmediateSubtitle(isInClass.value ? '老师正在继续这场折磨教育...' : '老师正在接收新的弹幕...');
                 if (!isVoiceSource) {
                     resetInputBox();
@@ -2728,11 +2982,21 @@
                     if (isInClass.value) {
                         await streamClassMessage(text, "chat", { signal: controller.signal });
                     } else {
-                        const aiMessage = { role: 'ai', content: '' };
+                        const aiMessage = createChatMessage('ai', '');
                         messages.value.push(aiMessage);
                         const aiMessageIndex = messages.value.length - 1;
+                        logChatEvent('[chat] aiPlaceholder.appended', {
+                            text,
+                            content: aiMessage.content,
+                            source,
+                            messageIndex: aiMessageIndex,
+                            messageId: aiMessage.id
+                        });
                         isThinking.value = false;
-                        await readChatStreamIntoMessage(text, aiMessageIndex, { signal: controller.signal });
+                        await readChatStreamIntoMessage(text, aiMessageIndex, {
+                            signal: controller.signal,
+                            messageId: aiMessage.id
+                        });
                     }
                 } catch (error) {
                     if (error?.name === 'AbortError') {
@@ -2780,6 +3044,7 @@
                 currentSubtitle, subtitleLines, whiteboardPages, currentPageIndex, currentWhiteboardPage, canGoPrevWhiteboardPage, canGoNextWhiteboardPage, hasUnreadWhiteboardUpdate, currentQuestionDisplayKey, isQuestionDrawerAvailable, isQuestionDrawerOpen, freshWhiteboardBlockKey,
                 currentApiBaseUrl, currentApiMode, currentApiKind, currentApiModeLabel, currentApiStatusText,
                 voiceState, voiceError, voiceRoomName, voiceIdentity, voiceStatusDotClass, voiceBackendState, voiceWorkerError, voiceBrowserDisconnected, voiceDisconnectReason, voiceLastDisconnectSource, voicePartialTranscript, voiceFinalTranscript, voiceDebug, isVoiceDebugExpanded, toggleVoiceDebugPanel,
+                isStopping,
                 recentHistoryMessages, shouldShowVoiceSummary, chatFeedRef,
                 isDashboardOpen, dashboardLoading, dashboardError, dashboardData, latestDashboardTime,
                 autoResize, handleEnter, sendMessage, startClass, exitClass, startNewChat, startVoice, stopVoice, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage, toggleQuestionDrawer, handleQuestionDrawerMouseEnter, handleQuestionDrawerMouseLeave,

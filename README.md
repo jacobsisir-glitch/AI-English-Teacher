@@ -1,514 +1,304 @@
-# AI English Teacher
+﻿# AI English Teacher
 
-## Realtime STT Worker
+一个以 `FastAPI + 前端直播间 UI + LiveKit + FunASR` 为核心的 AI 英语老师项目。
 
-This repo now includes a realtime speech-to-text backend path for voice mode:
+当前仓库已经不只是传统聊天页，而是同时支持：
 
-- Browser microphone publishes audio into a LiveKit room
-- FastAPI keeps the existing token endpoint and lazily boots a room-scoped voice worker
-- The voice worker joins the same room as a backend participant
-- User microphone tracks are consumed through LiveKit raw `AudioStream`
-- Audio is normalized to `16k / mono`
-- `Silero VAD` detects speech start / end with pre-buffer and tail silence handling
-- Speech PCM is streamed to `FunASR websocket`
-- `partial` / `final` transcript messages are returned to the frontend through LiveKit text streams
-- `stt.final` is fed back into the existing AI Teacher chat / class flow instead of a duplicated voice-only teacher stack
-- streamed teacher replies are mirrored into LiveKit text streams with topic `teacher.text`
+- 文本闲聊 / 答疑
+- 微课白板讲解
+- 实时语音输入转写
+- 语音结果回流到原有聊天链路
 
-### Required env vars
+## 项目概览
 
-```env
-LIVEKIT_WS_URL=wss://your-livekit-host
-LIVEKIT_API_KEY=your_livekit_api_key
-LIVEKIT_API_SECRET=your_livekit_api_secret
-VOICE_DEFAULT_ROOM=ai-teacher-room
-
-FUNASR_WS_URL=ws://127.0.0.1:10095
-FUNASR_MODE=2pass
-FUNASR_MODEL_NAME=
-SILERO_SAMPLE_RATE=16000
-SILERO_CHANNELS=1
-```
-
-### Voice modules
-
-- `voice/livekit_room_bridge.py`
-- `voice/audio_buffer.py`
-- `voice/vad_controller.py`
-- `voice/funasr_client.py`
-- `voice/transcript_publisher.py`
-- `voice/session_state.py`
-
-### How to start
-
-No extra HTTP service is required. Start the existing FastAPI app:
-
-```bash
-uvicorn main:app --reload
-```
-
-When the frontend clicks `开始语音`, the flow becomes:
-
-1. Browser requests `POST /api/livekit/token`
-2. FastAPI returns the participant token
-3. Before returning, FastAPI calls `VoiceWorkerManager.ensure_session(roomName)`
-4. If the room has no backend worker yet, a new room bridge is started automatically
-
-### Dry-run validation
-
-```bash
-python scripts/verify_voice_pipeline.py
-```
-
-The script verifies:
-
-- the packaged Silero ONNX model can be located
-- the LiveKit audio normalization / resampling layer can run
-- the VAD controller can initialize without touching the web UI
-
-### Validate partial/final transcript
-
-With LiveKit and FunASR both available:
-
-1. Start `uvicorn main:app --reload`
-2. Open `http://127.0.0.1:8000/frontend/index.html`
-3. Click `开始语音`
-4. Allow browser microphone permission
-5. Speak one short sentence
-
-Expected signals:
-
-- `Voice` changes to `connected`
-- the STT status line shows state updates such as `speech.start` or `utterance.complete`
-- the partial area updates without flashing away immediately
-- the final area keeps the last recognized result until the next speech round starts
-- the voice debug panel shows worker join / track subscription / first audio frame / recent VAD and FunASR timestamps
-- the recognized final text is appended into the existing chat history as a student turn
-- the existing AI Teacher response starts streaming into chat and is also mirrored as `teacher.text`
-- backend logs include `room_id`, `user_identity`, `speech_start_ts`, `speech_end_ts`, `asr_first_partial_ms`, `asr_final_ms`
-## AI 虚拟英语老师
-
-![Frontend](https://img.shields.io/badge/Frontend-HTML%20%2F%20CSS%20%2F%20JavaScript-2563EB?style=for-the-badge)
-![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi)
-![LLM](https://img.shields.io/badge/LLM-Streaming%20Subtitles-111827?style=for-the-badge)
-![StateMachine](https://img.shields.io/badge/Class-Orchestrated%20Stages-8B5CF6?style=for-the-badge)
-
-> 面向 B 站直播间场景的 AI 虚拟英语老师。  
-> 当前项目已经从“传统语法分析器”重构为“沉浸式直播间 + 后端控白板 + LLM 讲字幕”的微课系统。
-
-## 项目定位
-
-当前系统有两条主链路：
-
-- `POST /chat_stream`：闲聊 / 英语答疑
-- `POST /class_chat_stream`：微课讲授
-
-核心原则已经变成：
-
-- 白板由后端状态机和教材结构驱动
-- 字幕由 LLM 负责口语化讲解
-- 白板与字幕共享同一套阶段推进，但不互相猜测对方内容
-
-换句话说，当前课堂不是“模型边说边决定写什么板书”，而是：
-
-1. 后端决定当前知识点、当前阶段、当前白板页
-2. 前端接收白板事件并展示对应页面
-3. LLM 只讲当前阶段该讲的内容
-4. 学生答题后，后端再决定是否重答或推进
-
-## 当前真实架构
-
-### 1. 后端状态机是唯一真相源
-
-微课节奏不再依赖前端猜字幕语义，也不再依赖模型临场控制白板。
-
-当前由 `main.py` 负责：
-
-- 维护 `COURSE_TASKS`
-- 读取教材切片
-- 构建运行时任务 `reference / llm_reference / whiteboard_question / stage_plan`
-- 按阶段发送白板事件
-- 决定何时等待学生作答、何时重试、何时推进下一节点
-
-### 2. 双轨制并行课堂
-
-当前微课链路已经固定为双轨制：
-
-- 白板轨：后端直接发送 `<WBEVENT>{json}</WBEVENT>`
-- 字幕轨：LLM 只输出中文口语解释
-
-白板事件当前主要包括：
-
-- `new_page`
-- `append`
-- `question`
-
-前端不再从模型文本里猜白板 DSL，也不再依赖旧的 `WB_TOOL` / tool calling。
-
-### 3. 教材正在迁移到“显式阶段脚本”
-
-旧教材结构主要是：
-
-- `【白板核心公式】`
-- `【经典对错对比】`
-- `【AI 主播话术与人设 Trigger】`
-
-当前项目已经开始支持新的显式阶段结构，适合更细粒度的白板与字幕同步。  
-当前已用于试点的章节包括：
-
-- `### 五大基本句型导读 (Opening Overview)`
-- `### 主谓结构 (SV Pattern)`
-
-新结构示例：
-
-```md
-#### [STAGE:HOOK]
-[WB_TITLE] 主谓结构（SV）· 开场引入
-[WB_LINES]
-- 主谓结构 = 英语句子的最低生存配置
-- 主语出场，谓语发力，句子才算真的活着
-[VOICE_GUIDE]
-- 开场要继续保持傲娇名师口吻，但重点是优雅地引出“最低骨架”这个概念。
-[STAGE_RULE]
-- 这一页只负责引出主谓结构的舞台定位，不要直接讲错句，不要提问。
-[TRANSITION]
-- 现在把主谓结构的核心公式亮出来。
-
-#### [STAGE:QUIZ]
-[QUESTION] 请用英语说“那个男孩在跑步。”你也可以自己另造一个正确的 SV 句。
-[ANSWER_RULE] 先给出英文句子，再用中文说一句为什么这里不用宾语。
-```
-
-当前支持的字段包括：
-
-- `[STAGE:HOOK|FRAME|CORE|ERROR|REINFORCE|PREVIEW|QUIZ]`
-- `[WB_TITLE]`
-- `[WB_LINES]`
-- `[VOICE_GUIDE]`
-- `[STAGE_RULE]`
-- `[TRANSITION]`
-- `[QUESTION]`
-- `[ANSWER_RULE]`
-
-这意味着每个知识点不必再强行限制为 3 页白板，而是可以按教学需要拆成 4 到 6 个阶段。
-
-### 4. LLM 只负责“讲”
-
-`llm_wrapper.py` 现在的职责是：
-
-- 构建闲聊 prompt
-- 构建微课 prompt
-- 按阶段生成字幕
-- 清洗协议碎片、旧白板标签和异常输出
-
-当前约束包括：
-
-- 不再输出白板协议或系统提示词
-- 不再把 `[WHITEBOARD: ...]`、`[WB_APPEND: ...]`、`<WBEVENT>` 漏进字幕
-- 不再使用“约会 / 暧昧 / 私人感情生活”这类老师人设
-- 对导读页允许更厚的讲解
-- 对普通知识点页要求一页一轮完整讲解
-
-### 5. 前端是直播间舞台，不是流程控制器
-
-`frontend/index.html` 当前负责：
-
-- 沉浸式直播间 UI
-- 多页白板 `whiteboardPages`
-- 双行字幕队列
-- 顶部问题悬浮窗
-- 学习报告面板
-
-但前端不负责决定课程推进。  
-推进依旧由后端状态机掌控。
-
-## 当前课堂节奏
-
-当前推荐节奏不是“一进知识点就把所有板书和问题全部抖出来”，而是：
-
-1. 进入知识点
-2. 白板显示当前阶段的一页
-3. AI teacher 只讲这一页
-4. 讲完后进入下一页
-5. 最后才挂题
-6. 学生回答
-7. 后端决定重答或推进
-
-对于当前已迁移的导读与 `SV`，大致会走：
-
-### 五大基本句型导读
-
-- `HOOK`
-- `FRAME`
-- `CORE`
-- `REINFORCE`
-- `PREVIEW`
-
-### 主谓结构（SV）
-
-- `HOOK`
-- `CORE`
-- `ERROR`
-- `REINFORCE`
-- `QUIZ`
-
-## 学生作答逻辑
-
-当前微课答题轮规则：
-
-- 学生不必死改老师给的原句
-- 也可以自己另造一个符合当前知识点的正确句子
-- 第一次答错：老师嘲讽 + 解释错因 + 要求重答
-- 第二次还错：老师给标准答案 + 点评，然后推进
-- 答对后推进到下一个知识点
-
-## 前端访问方式
-
-FastAPI 已挂载静态前端：
-
-```python
-app.mount("/frontend", StaticFiles(...), name="frontend")
-```
-
-推荐访问：
-
-```text
-http://127.0.0.1:8000/frontend/index.html
-```
-
-## 当前接口
+这个项目面向“AI 英语老师”场景，核心思路是把几条能力链路合在一起：
 
 - `POST /chat_stream`
+  处理普通聊天、问答、翻译、语法说明等文本请求
 - `POST /class_chat_stream`
-- `POST /course/exit`
+  处理带白板节奏的微课讲解
 - `POST /api/livekit/token`
-- `GET /api/dashboard/data`
-- `GET /api/memory/summary`
-- `GET /frontend/index.html`
+  为浏览器语音模式签发 LiveKit token，并确保房间级语音 worker 已启动
+- `GET /api/livekit/worker-status`
+  返回房间语音 worker 的状态和最近一次关键事件
+
+语音模式下，浏览器麦克风音频会先进入 LiveKit 房间，再由后端 worker 订阅、做 VAD 切分、送入 FunASR，最终把识别出的 `partial` / `final` 文本重新送回前端，并把 `final` 文本提交到原有聊天链路。
+
+## 当前能力
+
+- 文本聊天：支持流式返回 AI 回复
+- 微课模式：支持教材驱动、白板事件驱动和阶段化讲解
+- 语音模式：支持浏览器直接说话，实时显示 partial / final transcript
+- 语音回流：最终识别结果会自动作为学生输入进入聊天区
+- 调试能力：前端有语音调试面板，后端有结构化语音日志
+- 一键启动：提供 Windows 启动脚本 [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)
 
 ## 目录结构
 
 ```text
-AIEnglish_grammar_teacher/
-|-- frontend/
-|   `-- index.html
-|-- data/
-|   |-- textbooks/
-|   |   |-- 00_Grammar_Overview.md
-|   |   |-- 01_Verb.md
-|   |   |-- 02_Subordinate_Clause.md
-|   |   `-- 03_Parts_of_Speech.md
-|   `-- ai_teacher.db
-|-- database/
-|   |-- database.py
-|   `-- models.py
-|-- livekit_utils.py
-|-- tools/
-|   `-- textbook_tool.py
-|-- llm_wrapper.py
-|-- main.py
-|-- Open_AI_teacher.bat
-|-- config.py
-|-- requirements.txt
-`-- README.md
+.
+├─ frontend/                前端页面与语音 UI
+├─ voice/                   LiveKit + VAD + FunASR 语音链路
+├─ data/                    数据库与教材数据
+├─ database/                数据层代码
+├─ scripts/                 验证和辅助脚本
+├─ tools/                   工具文件
+├─ main.py                  FastAPI 入口
+├─ llm_wrapper.py           LLM prompt 与流式包装
+├─ config.py                环境变量与运行参数
+├─ livekit_utils.py         LiveKit token 与配置辅助
+├─ requirements.txt         Python 依赖
+└─ Open_AI_teacher.bat      Windows 一键启动脚本
 ```
 
-## 快速开始
+## 技术栈
 
-### 1. 克隆项目
+- 后端：FastAPI、Uvicorn、SQLAlchemy
+- 大模型接入：OpenAI 兼容接口
+- 实时语音：LiveKit
+- 语音识别：FunASR WebSocket
+- 语音切分：Silero VAD
+- 前端：HTML、CSS、JavaScript、Vue 3 CDN 版
+
+## 运行前准备
+
+### 1. Python 依赖
 
 ```bash
-git clone https://github.com/<your-account>/<your-repo>.git
-cd AIEnglish_grammar_teacher
+pip install -r requirements.txt
 ```
 
-### 2. 配置环境变量
+当前 [requirements.txt](/d:/AIEnglish_grammar_teacher/requirements.txt) 主要依赖：
+
+- `fastapi`
+- `uvicorn`
+- `openai`
+- `sqlalchemy`
+- `python-dotenv`
+- `livekit-api`
+- `livekit`
+- `websockets`
+- `silero-vad`
+- `onnxruntime`
+
+### 2. 环境变量
+
+先复制 `.env.example`：
 
 ```bash
 copy .env.example .env
 ```
 
-示例：
+最少需要关注这些配置：
 
 ```env
 DEEPSEEK_API_KEY=your_api_key_here
 DATABASE_URL=sqlite:///data/ai_teacher.db
 DEFAULT_STUDENT_ID=TestUser
+
 LIVEKIT_WS_URL=wss://your-livekit-host
 LIVEKIT_API_KEY=your_livekit_api_key
 LIVEKIT_API_SECRET=your_livekit_api_secret
 VOICE_DEFAULT_ROOM=ai-teacher-room
+
+FUNASR_WS_URL=wss://127.0.0.1:10095
+FUNASR_MODE=2pass
+FUNASR_MODEL_NAME=
+
+FUNASR_FINAL_WAIT_OFFLINE_MS=5000
+FUNASR_FINAL_WAIT_FALLBACK_MS=1000
+FUNASR_FINAL_DRAIN_WINDOW_MS=4000
+FUNASR_FINAL_RESCUE_WAIT_MS=6000
+FUNASR_LATE_FINAL_GRACE_MS=12000
+
+SILERO_VAD_THRESHOLD=0.38
+SILERO_MIN_SILENCE_MS=1200
+SILERO_PRE_SPEECH_MS=480
+SILERO_MIN_SPEECH_MS=320
+SILERO_SPEECH_END_HOLD_MS=720
 ```
 
-### 3. 安装依赖
+完整示例见 [.env.example](/d:/AIEnglish_grammar_teacher/.env.example)。
+
+## 启动方式
+
+### 方式一：手动启动
+
+先启动后端：
 
 ```bash
-pip install -r requirements.txt
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-### 4. 启动服务
-
-```bash
-uvicorn main:app --reload
-```
-
-或者使用：
-
-```bat
-Open_AI_teacher.bat
-```
-
-### 5. 打开前端
+前端访问：
 
 ```text
 http://127.0.0.1:8000/frontend/index.html
 ```
 
-如果只想确认后端在线：
+如果要使用语音模式，还需要额外准备：
 
-```text
-http://127.0.0.1:8000/docs
-```
+- LiveKit 服务
+- FunASR WebSocket 服务
+- 本机浏览器麦克风权限
 
-## 本地运行语音模式
+### 方式二：Windows 一键启动
 
-当前语音模式只做最小 LiveKit 打通：
+仓库已提供 [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)。
 
-- 前端向后端申请 token
-- 浏览器连接 LiveKit room
-- 发布本地麦克风音轨
-- 暂不接入 ASR / TTS
+这个脚本会按顺序：
 
-### 1. 准备 LiveKit 环境变量
+1. 校验 Conda、项目目录和外部工具路径
+2. 激活指定 Conda 环境
+3. 检查并启动 LiveKit
+4. 检查并启动 FunASR
+5. 检查并启动 FastAPI 后端
+6. 自动打开前端页面
 
-在 `.env` 中填写：
+脚本顶部需要按你本机环境修改这些路径和参数：
 
-```env
-LIVEKIT_WS_URL=wss://your-livekit-host
-LIVEKIT_API_KEY=your_livekit_api_key
-LIVEKIT_API_SECRET=your_livekit_api_secret
-VOICE_DEFAULT_ROOM=ai-teacher-room
-```
+- `CONDA_ACTIVATE_BAT`
+- `CONDA_ENV_NAME`
+- `PROJECT_DIR`
+- `LIVEKIT_EXE`
+- `FUNASR_WORKDIR`
+- `FUNASR_SCRIPT`
+- `FUNASR_SSL_CERT`
+- `FUNASR_SSL_KEY`
 
-### 2. 安装新增依赖
+## 语音链路说明
 
-```bash
-pip install -r requirements.txt
-```
+当前语音链路位于 [voice/](/d:/AIEnglish_grammar_teacher/voice)：
 
-其中后端 token 生成功能使用官方 Python SDK：
+- [voice/livekit_room_bridge.py](/d:/AIEnglish_grammar_teacher/voice/livekit_room_bridge.py)
+  管理房间、参与者、音频订阅和整条实时识别流程
+- [voice/funasr_client.py](/d:/AIEnglish_grammar_teacher/voice/funasr_client.py)
+  负责与 FunASR WebSocket 通信，接收 `partial` / `final`
+- [voice/vad_controller.py](/d:/AIEnglish_grammar_teacher/voice/vad_controller.py)
+  用 Silero 做语音起止检测
+- [voice/audio_buffer.py](/d:/AIEnglish_grammar_teacher/voice/audio_buffer.py)
+  做音频缓存、归一化和预缓冲
+- [voice/transcript_publisher.py](/d:/AIEnglish_grammar_teacher/voice/transcript_publisher.py)
+  把识别结果发布回 LiveKit 文本流
+- [voice/session_state.py](/d:/AIEnglish_grammar_teacher/voice/session_state.py)
+  负责结构化日志和会话状态
 
-- `livekit-api`
+语音模式的大致流程：
 
-前端连接房间使用官方 JS client SDK：
+1. 浏览器请求 `POST /api/livekit/token`
+2. 后端签发 token，并确保房间 worker 已启动
+3. 浏览器加入 LiveKit 房间并发布麦克风
+4. 后端 worker 订阅音轨并转成 `16k / mono`
+5. Silero VAD 识别 `speech_start` / `speech_end`
+6. 音频片段流式发送给 FunASR
+7. FunASR 返回 `partial` 和 `final`
+8. `final` 文本发布到前端并自动提交到聊天链路
 
-- `livekit-client`
+## 最近这批语音更新
 
-### 3. 启动后端并打开页面
+这次上传的更新重点在“长句语音识别稳定性”和“前端流式显示链路”：
 
-```bash
-uvicorn main:app --reload
-```
+- 增加了更长的 FunASR `offline final` 等待与补救窗口
+- 增加了 late final recovery，尽量救回超时后才到达的 `2pass-offline`
+- 对过短 partial fallback 做了更严格的抑制
+- 增加了 VAD 结束保持时间，减少一句话被切成多段
+- 前端增加了更多语音与聊天流式调试日志
+- 语音转文本结果现在会更稳定地回流到聊天消息区
 
-打开：
+本次关键配置位于：
 
-```text
-http://127.0.0.1:8000/frontend/index.html
-```
+- [config.py](/d:/AIEnglish_grammar_teacher/config.py)
+- [.env.example](/d:/AIEnglish_grammar_teacher/.env.example)
+- [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)
 
-### 4. 进入语音模式
+## 已知限制
 
-页面底部输入框右侧会出现：
+当前项目里，启动脚本默认拉起的 FunASR 还是中文模型配置：
 
-- `开始语音`
-- `结束语音`
+- `speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404`
+- `speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online`
 
-连接状态会显示为：
+这意味着：
 
-- `idle`
-- `connecting`
-- `connected`
-- `failed`
+- 中文长句通常更稳
+- 英文长句能识别，但更容易出现拼写错误、碎片化 partial 和更慢的 final
+- 中英混说会比纯中文更依赖模型适配
 
-### 5. 如何验证已经成功进入 LiveKit room 并发布了麦克风
+如果后续要重点优化英文长句，优先级通常是：
 
-至少同时满足下面几条：
+1. 更换更适合英文或中英混说的 ASR 模型
+2. 继续拉长极端慢 final 的恢复窗口
+3. 结合浏览器控制台日志排查“后端成功了但前端没显示”的场景
 
-1. 页面状态从 `connecting` 变为 `connected`
-2. 页面没有出现麦克风权限报错
-3. 页面字幕区提示“语音已接通，浏览器麦克风正在发布到 LiveKit room”
-4. 在 LiveKit 控制台或对应 room 观察到新 participant 加入
-5. 该 participant 存在已发布的麦克风音轨
+## 前端调试建议
 
-如果浏览器拒绝麦克风权限，页面会明确提示：
+前端页面已经内置语音调试面板，建议重点观察：
 
-- `麦克风权限被拒绝，请在浏览器中允许麦克风访问后重试。`
+- `Voice`
+- `STT`
+- `Partial`
+- `Final`
+- `worker 入房`
+- `收到第一帧音频`
+- `最近 speech_start`
+- `最近 speech_end`
+- `最近 partial`
+- `最近 final`
 
-## 当前教材说明
+如果后端日志里已经出现：
 
-教材位于 `data/textbooks/`。
+- `funasr.final.publish`
+- `POST /chat_stream 200 OK`
 
-当前重点教材：
+但页面上仍然没有显示结果，那么问题更可能在前端流式渲染链路，而不是 ASR 本身。
 
-- `00_Grammar_Overview.md`
-- `01_Verb.md`
-- `02_Subordinate_Clause.md`
-- `03_Parts_of_Speech.md`
+## 常见排障
 
-其中：
+### 1. 语音按钮能点，但没有识别结果
 
-- `00_Grammar_Overview.md` 已开始迁移到显式阶段脚本
-- `01_Verb.md` 仍以旧结构为主，但可以继续迁移
-- 系统兼容“显式阶段脚本”和“旧三段式结构”两种教材写法
+优先检查：
 
-## 已知现实约束
+- LiveKit 是否成功启动
+- FunASR WebSocket 是否可连
+- 浏览器是否真的发布了麦克风
+- `worker-status` 是否返回 `worker.connected`
 
-### 1. 前端当前依赖外部 CDN
+### 2. 日志里只有很多 `asr.audio_chunk_sent`
 
-当前前端入口仍直接引用：
+这通常说明：
 
-- Tailwind CDN
-- Vue CDN
-- Axios CDN
-- Marked CDN
-- ECharts CDN
-- Font Awesome CDN
+- 音频已经送到了后端
+- 但 FunASR 还没及时给出可用 `final`
 
-如果本地网络阻断这些外链，页面可能出现样式缺失或图表加载失败。  
-这属于当前前端部署现实，不是课堂状态机本身的问题。
+这时要继续看是否出现：
 
-### 2. 阶段化教材仍在迁移中
+- `funasr.final_timeout.begin`
+- `funasr.final.publish`
+- `voice.speech_end_without_final`
+- `late_timeout_final.accepted`
 
-目前不是整套教材都已经迁到 `[STAGE:...]` 格式。  
-所以当前系统是：
+### 3. 英文长句输出质量差
 
-- 已迁移章节：走显式阶段计划
-- 未迁移章节：走旧结构的兼容解析路径
+优先怀疑当前 ASR 模型适配，而不是前端按钮或聊天链路。
 
-### 3. 课堂节奏仍在继续打磨
+### 4. 一键启动脚本报路径错误
 
-虽然当前系统已经从“白板一次性倾倒全部内容”往阶段化推进迈了一步，但：
+请先检查 [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat) 顶部用户配置区是否与你的本机环境一致。
 
-- 白板阶段时机
-- 字幕长度
-- 浮窗动画
-- 页间切换体感
+## 开发建议
 
-仍然在持续优化中。
+- 语音链路改动后，优先观察结构化日志是否能走到 `funasr.final.publish`
+- 前端显示问题，不要只看网络面板，也要看控制台里新增的 `[voice]` 和 `[chat]` 调试日志
+- 如果准备做英文优化，建议把“模型切换”和“超晚 final 恢复”分开验证
 
-## 当前最重要的文件
+## 入口文件
 
-- [main.py](./main.py)：路由、微课状态机、阶段推进、白板事件
-- [llm_wrapper.py](./llm_wrapper.py)：prompt、字幕生成、清洗规则
-- [frontend/index.html](./frontend/index.html)：直播间 UI、白板、字幕、题窗、Dashboard
-- [data/textbooks/00_Grammar_Overview.md](./data/textbooks/00_Grammar_Overview.md)：导读与五大句型教材
-- [data/textbooks/01_Verb.md](./data/textbooks/01_Verb.md)：动词体系教材
+- 后端入口：[main.py](/d:/AIEnglish_grammar_teacher/main.py)
+- 前端页面：[frontend/index.html](/d:/AIEnglish_grammar_teacher/frontend/index.html)
+- 语音配置：[config.py](/d:/AIEnglish_grammar_teacher/config.py)
+- 一键启动：[Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)
 
-## 下一步建议
+## License
 
-如果继续沿当前架构推进，最值得优先做的是：
+当前仓库未单独声明开源许可证；如果准备公开分发，建议补充 `LICENSE` 文件。
 
-1. 把 `SVO / SVOO / SVOC / SVC` 也迁成显式阶段脚本
-2. 把导读和正式知识点的白板 / 字幕节奏继续对齐
-3. 把前端 CDN 依赖收束成本地可控资源
-4. 继续统一教材里的人设话术，避免出现和课堂主风格不一致的比喻

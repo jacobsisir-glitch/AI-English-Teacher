@@ -17,9 +17,8 @@ from config import (
     SILERO_MIN_SPEECH_MS,
     SILERO_PRE_SPEECH_MS,
     SILERO_SAMPLE_RATE,
+    SILERO_SPEECH_END_HOLD_MS,
     SILERO_VAD_THRESHOLD,
-    VOICE_DEBUG_FORCE_SEGMENT_MODE,
-    VOICE_DEBUG_FORCE_SEGMENT_MS,
 )
 from livekit_utils import create_livekit_worker_token, livekit_voice_stack_is_configured
 from voice.audio_buffer import LiveKitAudioNormalizer
@@ -87,8 +86,15 @@ class ParticipantVoiceProcessor:
         self._received_first_frame = False
         self._stop_reason = "participant_stop"
         self._vad_state = "idle"
-        self._debug_segment_started_at = 0.0
         self._last_chunk_state_emit_monotonic = 0.0
+        self._pending_finish_task: asyncio.Task | None = None
+        self._pending_finish_started_monotonic = 0.0
+        self._awaiting_final = False
+        self._finishing_utterance_id = ""
+        self._deferred_utterance_chunks: list[bytes] = []
+        self._deferred_utterance_start_ts: float | None = None
+        self._deferred_utterance_end_ts: float | None = None
+        self._deferred_finish_requested = False
 
     def start(self) -> None:
         if self._task is None:
@@ -137,6 +143,16 @@ class ParticipantVoiceProcessor:
             num_channels=1,
             frame_size_ms=20,
         )
+        try:
+            await self.funasr.ensure_connected()
+        except Exception as exc:
+            structured_voice_log(
+                "voice.funasr_preconnect_failed",
+                room_id=self.room_id_getter(),
+                room_name=self.room_name,
+                user_identity=self.user_identity,
+                error=str(exc),
+            )
 
         try:
             async for audio_event in self.audio_stream:
@@ -161,10 +177,12 @@ class ParticipantVoiceProcessor:
         except asyncio.CancelledError:
             raise
         finally:
+            await self._cancel_pending_finish_task()
             for normalized_pcm in self.audio_normalizer.flush():
                 await self._consume_pcm(normalized_pcm)
             for action in self.vad.flush():
                 await self._handle_vad_action(action.kind, action.pcm, action.event_ts)
+            await self._cancel_pending_finish_task()
             if self.state.active_utterance_id:
                 await self._finish_utterance(time.time(), reason=self._stop_reason, force_flush_on_stop=True)
             await self.funasr.close()
@@ -173,43 +191,91 @@ class ParticipantVoiceProcessor:
         actions = self.vad.feed(pcm)
         for action in actions:
             await self._handle_vad_action(action.kind, action.pcm, action.event_ts)
-        if (
-            VOICE_DEBUG_FORCE_SEGMENT_MODE
-            and self.state.active_utterance_id
-            and self.state.telemetry is not None
-            and self._debug_segment_started_at > 0
-            and ((time.monotonic() - self._debug_segment_started_at) * 1000) >= VOICE_DEBUG_FORCE_SEGMENT_MS
-        ):
-            await self._finish_utterance(time.time(), reason="debug_interval")
-            if self.vad.active:
-                await self._start_utterance(b"", time.time())
 
     async def _handle_vad_action(self, kind: str, pcm: bytes, event_ts: float | None) -> None:
         if kind == "speech_start":
+            if self.state.active_utterance_id and self._pending_finish_task is not None:
+                await self._resume_utterance(pcm, event_ts or time.time())
+                return
+            if self.state.active_utterance_id and self._awaiting_final:
+                self._buffer_deferred_utterance_audio(pcm, event_ts=event_ts or time.time(), mark_start=True)
+                structured_voice_log(
+                    "vad.speech_start_buffered",
+                    **self._log_context(),
+                    utterance_id=self.state.active_utterance_id,
+                    event_ts=event_ts or time.time(),
+                    reason="awaiting_final",
+                    buffered_bytes=sum(len(chunk) for chunk in self._deferred_utterance_chunks),
+                )
+                return
+            if self.state.active_utterance_id:
+                structured_voice_log(
+                    "vad.speech_start_ignored",
+                    **self._log_context(),
+                    utterance_id=self.state.active_utterance_id,
+                    event_ts=event_ts or time.time(),
+                    reason="awaiting_final",
+                )
+                return
             await self._start_utterance(pcm, event_ts or time.time())
             return
         if kind == "speech_chunk":
-            if self.state.active_utterance_id:
-                await self.funasr.send_audio_chunk(pcm)
-                structured_voice_log("asr.audio_chunk_sent", **self._log_context(), bytes=len(pcm), utterance_id=self.state.active_utterance_id)
-                self.room_state.last_audio_chunk_sent = time.strftime("%H:%M:%S")
-                self._mark_room_stage("asr.audio_chunk_sent")
-                now_mono = time.monotonic()
-                if (now_mono - self._last_chunk_state_emit_monotonic) >= 0.35:
-                    self._last_chunk_state_emit_monotonic = now_mono
-                    await self.publisher.publish_state(
-                        self.user_identity,
-                        state="asr.audio_chunk_sent",
-                        payload={"utteranceId": self.state.active_utterance_id, "bytes": len(pcm)},
-                    )
+            if self.state.active_utterance_id and not self._awaiting_final:
+                await self._send_active_audio_chunk(pcm)
+            elif self._awaiting_final and pcm:
+                self._buffer_deferred_utterance_audio(pcm, event_ts=event_ts or time.time())
             return
         if kind == "speech_end":
-            await self._finish_utterance(event_ts or time.time(), reason="vad_end")
+            if self._awaiting_final and self._deferred_utterance_chunks:
+                self._deferred_finish_requested = True
+                self._deferred_utterance_end_ts = event_ts or time.time()
+                structured_voice_log(
+                    "vad.speech_end_buffered",
+                    **self._log_context(),
+                    utterance_id=self.state.active_utterance_id,
+                    event_ts=event_ts or time.time(),
+                    reason="awaiting_final",
+                    buffered_bytes=sum(len(chunk) for chunk in self._deferred_utterance_chunks),
+                )
+                return
+            await self._schedule_finish_utterance(event_ts or time.time(), reason="vad_end")
+
+    def _buffer_deferred_utterance_audio(self, pcm: bytes, *, event_ts: float, mark_start: bool = False) -> None:
+        if mark_start and self._deferred_utterance_start_ts is None:
+            self._deferred_utterance_start_ts = event_ts
+        if pcm:
+            self._deferred_utterance_chunks.append(bytes(pcm))
+
+    async def _replay_deferred_utterance_if_needed(self) -> None:
+        if not self._deferred_utterance_chunks:
+            self._deferred_utterance_start_ts = None
+            self._deferred_utterance_end_ts = None
+            self._deferred_finish_requested = False
+            return
+        initial_pcm = b"".join(self._deferred_utterance_chunks)
+        speech_start_ts = self._deferred_utterance_start_ts or time.time()
+        speech_end_ts = self._deferred_utterance_end_ts or time.time()
+        should_finish = self._deferred_finish_requested
+        self._deferred_utterance_chunks = []
+        self._deferred_utterance_start_ts = None
+        self._deferred_utterance_end_ts = None
+        self._deferred_finish_requested = False
+        structured_voice_log(
+            "vad.deferred_utterance_replayed",
+            **self._log_context(),
+            event_ts=speech_start_ts,
+            buffered_bytes=len(initial_pcm),
+            finish_requested=should_finish,
+        )
+        await self._start_utterance(initial_pcm, speech_start_ts)
+        if should_finish:
+            await self._finish_utterance(speech_end_ts, reason="awaiting_final_replay")
 
     async def _start_utterance(self, initial_pcm: bytes, speech_start_ts: float) -> None:
         utterance_id = str(uuid4())
         self.state.active_utterance_id = utterance_id
-        self._debug_segment_started_at = time.monotonic()
+        self._awaiting_final = False
+        self._finishing_utterance_id = ""
         self.room_state.last_vad_event = "speech_start"
         self._mark_room_stage("vad.speech_start")
         self.state.telemetry = UtteranceTelemetry(
@@ -229,10 +295,102 @@ class ParticipantVoiceProcessor:
         structured_voice_log("voice.speech_start", **self.state.telemetry.to_log_payload())
         await self.funasr.start_utterance(utterance_id, initial_pcm=initial_pcm)
 
+    async def _resume_utterance(self, initial_pcm: bytes, speech_restart_ts: float) -> None:
+        utterance_id = self.state.active_utterance_id
+        resume_after_ms = 0
+        if self._pending_finish_started_monotonic > 0:
+            resume_after_ms = int((time.monotonic() - self._pending_finish_started_monotonic) * 1000)
+        await self._cancel_pending_finish_task()
+        self.room_state.last_vad_event = "speech_resume"
+        self._mark_room_stage("vad.speech_resume")
+        structured_voice_log(
+            "vad.speech_resume",
+            **self._log_context(),
+            utterance_id=utterance_id,
+            event_ts=speech_restart_ts,
+            resume_after_ms=resume_after_ms,
+        )
+        if initial_pcm:
+            await self._send_active_audio_chunk(initial_pcm)
+
+    async def _schedule_finish_utterance(self, speech_end_ts: float, *, reason: str) -> None:
+        if not self.state.active_utterance_id:
+            return
+        if self._awaiting_final:
+            return
+        utterance_id = self.state.active_utterance_id
+        hold_ms = max(SILERO_SPEECH_END_HOLD_MS, 0)
+        structured_voice_log(
+            "vad.speech_end.detected",
+            **self._log_context(),
+            utterance_id=utterance_id,
+            event_ts=speech_end_ts,
+            reason=reason,
+            hold_ms=hold_ms,
+        )
+        if hold_ms <= 0:
+            await self._finish_utterance(speech_end_ts, reason=reason)
+            return
+        await self._cancel_pending_finish_task()
+        self._pending_finish_started_monotonic = time.monotonic()
+        self._pending_finish_task = asyncio.create_task(
+            self._delayed_finish_utterance(
+                utterance_id=utterance_id,
+                speech_end_ts=speech_end_ts,
+                reason=reason,
+                hold_ms=hold_ms,
+            ),
+            name=f"voice-finish-hold-{self.user_identity}",
+        )
+
+    async def _delayed_finish_utterance(self, *, utterance_id: str, speech_end_ts: float, reason: str, hold_ms: int) -> None:
+        try:
+            await asyncio.sleep(hold_ms / 1000)
+            if self._pending_finish_task is not asyncio.current_task():
+                return
+            self._pending_finish_task = None
+            self._pending_finish_started_monotonic = 0.0
+            if self.state.active_utterance_id != utterance_id:
+                return
+            await self._finish_utterance(speech_end_ts, reason=reason)
+        except asyncio.CancelledError:
+            return
+
+    async def _cancel_pending_finish_task(self) -> None:
+        task = self._pending_finish_task
+        self._pending_finish_task = None
+        self._pending_finish_started_monotonic = 0.0
+        if task is None or task.done():
+            return
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+    async def _send_active_audio_chunk(self, pcm: bytes) -> None:
+        utterance_id = self.state.active_utterance_id
+        if not utterance_id or not pcm:
+            return
+        await self.funasr.send_audio_chunk(pcm)
+        structured_voice_log("asr.audio_chunk_sent", **self._log_context(), bytes=len(pcm), utterance_id=utterance_id)
+        self.room_state.last_audio_chunk_sent = time.strftime("%H:%M:%S")
+        self._mark_room_stage("asr.audio_chunk_sent")
+        now_mono = time.monotonic()
+        if (now_mono - self._last_chunk_state_emit_monotonic) >= 0.35:
+            self._last_chunk_state_emit_monotonic = now_mono
+            await self.publisher.publish_state(
+                self.user_identity,
+                state="asr.audio_chunk_sent",
+                payload={"utteranceId": utterance_id, "bytes": len(pcm)},
+            )
+
     async def _finish_utterance(self, speech_end_ts: float, *, reason: str = "vad_end", force_flush_on_stop: bool = False) -> None:
         if not self.state.active_utterance_id or self.state.telemetry is None:
             return
+        if self._awaiting_final and self._finishing_utterance_id == self.state.active_utterance_id:
+            return
+        await self._cancel_pending_finish_task()
+        self._awaiting_final = True
         utterance_id = self.state.active_utterance_id
+        self._finishing_utterance_id = utterance_id
         self.state.telemetry.speech_end_ts = speech_end_ts
         self.room_state.last_vad_event = "speech_end"
         self._mark_room_stage("vad.speech_end")
@@ -258,11 +416,16 @@ class ParticipantVoiceProcessor:
                 state="asr.force_flush_on_stop",
                 payload={"utteranceId": utterance_id, "reason": reason},
             )
-        final_event = await self.funasr.finish_utterance()
-        if final_event is None:
-            structured_voice_log("voice.speech_end_without_final", **self.state.telemetry.to_log_payload())
-        self.state.active_utterance_id = ""
-        self._debug_segment_started_at = 0.0
+        try:
+            final_event = await self.funasr.finish_utterance()
+            if final_event is None:
+                structured_voice_log("voice.speech_end_without_final", **self.state.telemetry.to_log_payload())
+        finally:
+            self._awaiting_final = False
+            self._finishing_utterance_id = ""
+            self.state.active_utterance_id = ""
+            self.state.telemetry = None
+            await self._replay_deferred_utterance_if_needed()
 
     async def _on_partial(self, event: FunASRTranscriptEvent) -> None:
         self.state.last_partial_text = event.text
@@ -280,16 +443,42 @@ class ParticipantVoiceProcessor:
         await self.publisher.publish_state(
             self.user_identity,
             state="funasr.partial",
-            payload={"utteranceId": event.utterance_id},
+            payload={
+                "utteranceId": event.utterance_id,
+                "textLength": len(event.text),
+                "asrFirstPartialMs": self.state.telemetry.asr_first_partial_ms if self.state.telemetry is not None else None,
+            },
         )
 
     async def _on_final(self, event: FunASRTranscriptEvent) -> None:
         self.state.last_final_text = event.text
         self.state.last_partial_text = ""
+        final_source = event.source or ("timeout_partial_fallback" if event.raw.get("fallback_final") else "server_final")
+        final_text_length = len(event.text)
         if self.state.telemetry is not None:
             self.state.telemetry.mark_final()
-            structured_voice_log("voice.utterance_final", **self.state.telemetry.to_log_payload())
-            structured_voice_log("voice.funasr_final", **self.state.telemetry.to_log_payload())
+            structured_voice_log(
+                "voice.utterance_final",
+                **self.state.telemetry.to_log_payload(),
+                final_source=final_source,
+                final_text_length=final_text_length,
+            )
+            structured_voice_log(
+                "voice.funasr_final",
+                **self.state.telemetry.to_log_payload(),
+                final_source=final_source,
+                final_text_length=final_text_length,
+            )
+        else:
+            structured_voice_log(
+                "voice.late_utterance_final",
+                room_id=self.room_id_getter(),
+                room_name=self.room_name,
+                user_identity=self.user_identity,
+                utterance_id=event.utterance_id,
+                final_source=final_source,
+                final_text_length=final_text_length,
+            )
         self.room_state.last_funasr_final = time.strftime("%H:%M:%S")
         self._mark_room_stage("funasr.final")
         await self.publisher.publish_final(
@@ -300,7 +489,12 @@ class ParticipantVoiceProcessor:
         await self.publisher.publish_state(
             self.user_identity,
             state="funasr.final",
-            payload={"utteranceId": event.utterance_id},
+            payload={
+                "utteranceId": event.utterance_id,
+                "finalSource": final_source,
+                "finalTextLength": final_text_length,
+                "asrFinalMs": self.state.telemetry.asr_final_ms if self.state.telemetry is not None else None,
+            },
         )
         await self.publisher.publish_state(
             self.user_identity,
