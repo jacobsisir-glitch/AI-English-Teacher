@@ -1,24 +1,35 @@
 import json
+import logging
 import os
 import re
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
 import uvicorn
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session
 
 import database.models
-from config import DEFAULT_STUDENT_ID
+from config import (
+    DEFAULT_STUDENT_ID,
+    TTS_BASE_URL,
+    TTS_DEFAULT_LANG,
+    TTS_DEFAULT_SPEED,
+    TTS_DEFAULT_VOICE,
+    TTS_ENABLED,
+    TTS_PROVIDER,
+)
 from database.database import Base, SessionLocal, engine, get_db
 from database.models import ErrorBook, KnowledgeMastery, Student, StudentQuestion
 from livekit_utils import create_livekit_participant_token, livekit_is_configured
+from tts_client import TTSClientError, list_voices as tts_list_voices, stream_speech, synthesize_speech
 from voice.livekit_room_bridge import VoiceWorkerManager
 from voice.session_state import structured_voice_log
 from llm_wrapper import (
@@ -1512,6 +1523,11 @@ app.add_middleware(
 )
 
 
+def structured_tts_log(event: str, **payload) -> None:
+    tts_logger = logging.getLogger("uvicorn.error")
+    tts_logger.info(json.dumps({"event": event, **payload}, ensure_ascii=False, default=str))
+
+
 class UserInput(BaseModel):
     text: str
     history: list[dict] = Field(default_factory=list)
@@ -1527,6 +1543,13 @@ class LiveKitTokenRequest(BaseModel):
     roomName: str | None = None
     userId: str | None = None
     displayName: str | None = None
+
+
+class TTSSpeakRequest(BaseModel):
+    text: str
+    voice: str = TTS_DEFAULT_VOICE
+    lang: str = TTS_DEFAULT_LANG
+    speed: float = TTS_DEFAULT_SPEED
 
 
 @app.post("/chat_stream")
@@ -1674,6 +1697,272 @@ async def create_livekit_token(request: LiveKitTokenRequest):
 @app.get("/api/livekit/worker-status")
 async def get_livekit_worker_status(roomName: str):
     return voice_worker_manager.get_status(roomName)
+
+
+@app.get("/api/tts/voices")
+async def get_tts_voices():
+    if not TTS_ENABLED:
+        raise HTTPException(status_code=503, detail="TTS is disabled.")
+    request_url = f"{TTS_BASE_URL.rstrip('/')}/voices"
+    started_at = time.perf_counter()
+    structured_tts_log(
+        "tts.request.begin",
+        text_length=0,
+        voice=None,
+        lang=None,
+        speed=None,
+        base_url=TTS_BASE_URL,
+        request_url=request_url,
+        method="GET",
+        elapsed_ms=0,
+        status_code=None,
+    )
+    try:
+        payload = await tts_list_voices()
+    except TTSClientError as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=0,
+            voice=None,
+            lang=None,
+            speed=None,
+            base_url=exc.base_url or TTS_BASE_URL,
+            request_url=exc.request_url or request_url,
+            method=exc.method or "GET",
+            elapsed_ms=elapsed_ms,
+            status_code=exc.status_code,
+            response_text=exc.response_text,
+            exception_repr=exc.exception_repr,
+        )
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    structured_tts_log(
+        "tts.request.success",
+        text_length=0,
+        voice=None,
+        lang=None,
+        speed=None,
+        base_url=TTS_BASE_URL,
+        request_url=request_url,
+        method="GET",
+        elapsed_ms=elapsed_ms,
+        status_code=200,
+    )
+    return payload
+
+
+@app.post("/api/tts/speak")
+async def proxy_tts_speak(request: TTSSpeakRequest):
+    text = request.text.strip()
+    voice = request.voice.strip() or TTS_DEFAULT_VOICE
+    lang = request.lang.strip() or TTS_DEFAULT_LANG
+    speed = request.speed
+
+    if not text:
+        raise HTTPException(status_code=400, detail="text must not be empty")
+
+    started_at = time.perf_counter()
+    structured_tts_log(
+        "tts.request.begin",
+        text_length=len(text),
+        voice=voice,
+        lang=lang,
+        speed=speed,
+        base_url=TTS_BASE_URL,
+        request_url=f"{TTS_BASE_URL.rstrip('/')}/speak",
+        method="POST",
+        elapsed_ms=0,
+        status_code=None,
+    )
+
+    try:
+        audio_bytes, media_type = await synthesize_speech(
+            text=text,
+            voice=voice,
+            lang=lang,
+            speed=speed,
+        )
+    except TTSClientError as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            base_url=exc.base_url or TTS_BASE_URL,
+            request_url=exc.request_url or f"{TTS_BASE_URL.rstrip('/')}/speak",
+            method=exc.method or "POST",
+            elapsed_ms=elapsed_ms,
+            status_code=exc.status_code,
+            response_text=exc.response_text,
+            exception_repr=exc.exception_repr,
+        )
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            base_url=TTS_BASE_URL,
+            request_url=f"{TTS_BASE_URL.rstrip('/')}/speak",
+            method="POST",
+            elapsed_ms=elapsed_ms,
+            status_code=500,
+            response_text="",
+            exception_repr=repr(exc),
+        )
+        raise HTTPException(status_code=500, detail=f"TTS proxy failed: {exc}") from exc
+
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    structured_tts_log(
+        "tts.request.success",
+        text_length=len(text),
+        voice=voice,
+        lang=lang,
+        speed=speed,
+        base_url=TTS_BASE_URL,
+        request_url=f"{TTS_BASE_URL.rstrip('/')}/speak",
+        method="POST",
+        elapsed_ms=elapsed_ms,
+        status_code=200,
+    )
+    return Response(content=audio_bytes, media_type=media_type or "audio/wav")
+
+
+@app.websocket("/api/tts/stream")
+async def websocket_tts_stream(websocket: WebSocket):
+    await websocket.accept()
+    started_at = time.perf_counter()
+    payload = {}
+    text = ""
+    voice = TTS_DEFAULT_VOICE
+    lang = TTS_DEFAULT_LANG
+    speed = TTS_DEFAULT_SPEED
+    try:
+        payload = await websocket.receive_json()
+        text = str(payload.get("text") or "").strip()
+        voice = str(payload.get("voice") or TTS_DEFAULT_VOICE).strip() or TTS_DEFAULT_VOICE
+        lang = str(payload.get("lang") or TTS_DEFAULT_LANG).strip() or TTS_DEFAULT_LANG
+        speed = float(payload.get("speed") or TTS_DEFAULT_SPEED)
+
+        if not TTS_ENABLED:
+            await websocket.send_json({"type": "error", "detail": "TTS is disabled."})
+            await websocket.close(code=1011)
+            return
+        if not text:
+            await websocket.send_json({"type": "error", "detail": "text must not be empty"})
+            await websocket.close(code=1008)
+            return
+
+        structured_tts_log(
+            "tts.request.begin",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url="/api/tts/stream",
+            method="WEBSOCKET",
+            elapsed_ms=0,
+            status_code=None,
+        )
+        await websocket.send_json(
+            {
+                "type": "begin",
+                "provider": TTS_PROVIDER,
+                "media_type": "audio/mpeg",
+            }
+        )
+
+        chunk_count = 0
+        total_bytes = 0
+        async for chunk in stream_speech(text=text, voice=voice, lang=lang, speed=speed):
+            chunk_count += 1
+            total_bytes += len(chunk)
+            await websocket.send_bytes(chunk)
+
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        await websocket.send_json(
+            {
+                "type": "end",
+                "provider": TTS_PROVIDER,
+                "chunk_count": chunk_count,
+                "total_bytes": total_bytes,
+                "elapsed_ms": elapsed_ms,
+            }
+        )
+        structured_tts_log(
+            "tts.request.success",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url="/api/tts/stream",
+            method="WEBSOCKET",
+            elapsed_ms=elapsed_ms,
+            status_code=200,
+            chunk_count=chunk_count,
+            total_bytes=total_bytes,
+        )
+        await websocket.close()
+    except WebSocketDisconnect:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url="/api/tts/stream",
+            method="WEBSOCKET",
+            elapsed_ms=elapsed_ms,
+            status_code=499,
+            response_text="client disconnected",
+            exception_repr="WebSocketDisconnect",
+        )
+    except TTSClientError as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url=exc.request_url or "/api/tts/stream",
+            method=exc.method or "WEBSOCKET",
+            elapsed_ms=elapsed_ms,
+            status_code=exc.status_code,
+            response_text=exc.response_text,
+            exception_repr=exc.exception_repr,
+        )
+        await websocket.send_json({"type": "error", "detail": exc.detail, "status_code": exc.status_code})
+        await websocket.close(code=1011)
+    except Exception as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url="/api/tts/stream",
+            method="WEBSOCKET",
+            elapsed_ms=elapsed_ms,
+            status_code=500,
+            response_text="",
+            exception_repr=repr(exc),
+        )
+        await websocket.send_json({"type": "error", "detail": f"TTS stream failed: {exc}"})
+        await websocket.close(code=1011)
 
 
 @app.post("/course/exit")

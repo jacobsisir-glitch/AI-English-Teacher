@@ -3,6 +3,7 @@
 
 # Python
 __pycache__/
+**/__pycache__/
 *.pyc
 *.pyo
 *.pyd
@@ -23,3 +24,12 @@ chroma_db/
 
 # OS files
 .DS_Store
+
+# TTS generated audio and local caches
+temp_audio_melo/
+*.wav
+*_test.mp3
+*_probe.wav
+doubao_v3_test.mp3
+doubao_v3_api_test.mp3
+ai_teacher_tts_proxy.wav

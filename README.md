@@ -8,6 +8,7 @@
 - 微课白板讲解
 - 实时语音输入转写
 - 语音结果回流到原有聊天链路
+- 老师语音输出：豆包 V3 双向流式 TTS
 
 ## 项目概览
 
@@ -21,6 +22,12 @@
   为浏览器语音模式签发 LiveKit token，并确保房间级语音 worker 已启动
 - `GET /api/livekit/worker-status`
   返回房间语音 worker 的状态和最近一次关键事件
+- `GET /api/tts/voices`
+  返回当前 TTS provider 和可用音色信息
+- `POST /api/tts/speak`
+  兼容接口：通过当前 TTS provider 生成完整音频
+- `WebSocket /api/tts/stream`
+  当前老师语音输出主路径：豆包 V3 bidirection WebSocket 音频转发
 
 语音模式下，浏览器麦克风音频会先进入 LiveKit 房间，再由后端 worker 订阅、做 VAD 切分、送入 FunASR，最终把识别出的 `partial` / `final` 文本重新送回前端，并把 `final` 文本提交到原有聊天链路。
 
@@ -30,8 +37,41 @@
 - 微课模式：支持教材驱动、白板事件驱动和阶段化讲解
 - 语音模式：支持浏览器直接说话，实时显示 partial / final transcript
 - 语音回流：最终识别结果会自动作为学生输入进入聊天区
+- 语音输出：老师回复可通过豆包 V3 双向流式 TTS 自动播报
+- 中英同声线：中文讲解与英文例句使用同一豆包音色
+- 打断能力：学生新输入或开始语音输入时会中断旧播报
 - 调试能力：前端有语音调试面板，后端有结构化语音日志
 - 一键启动：提供 Windows 启动脚本 [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)
+
+## 语音输出：豆包 V3 双向流式 TTS
+
+当前老师语音输出主链路已经切换为“豆包 V3 双向流式 TTS”：
+
+```text
+frontend/index.html
+→ /api/tts/stream 或 /api/tts/speak
+→ main.py
+→ tts_client.py
+→ speech_providers/doubao_tts.py
+→ 豆包 V3 bidirection WebSocket
+```
+
+当前验收通过的关键配置：
+
+```env
+TTS_PROVIDER=doubao
+DOUBAO_TTS_API_VERSION=v3
+DOUBAO_AUTH_MODE=api_key
+DOUBAO_TTS_V3_ENDPOINT=wss://openspeech.bytedance.com/api/v3/tts/bidirection
+DOUBAO_TTS_RESOURCE_ID=seed-icl-2.0
+DOUBAO_TTS_VOICE_TYPE=S_D9gzp4Q12
+DOUBAO_TTS_ENABLE_STREAM=true
+TTS_FALLBACK_ON_ERROR=false
+```
+
+旧 Melo/OpenVoice 已经变成 `local_melo` legacy fallback，不再是主路径。旧 Kokoro 也属于 legacy 实验链路。使用豆包 TTS 时，不需要再启动 `127.0.0.1:8012` 的 Melo/OpenVoice 服务。
+
+更详细的配置、错误排查和验证步骤见 [docs/doubao_tts_v3_setup.md](/d:/AIEnglish_grammar_teacher/docs/doubao_tts_v3_setup.md)。
 
 ## 目录结构
 
@@ -41,11 +81,14 @@
 ├─ voice/                   LiveKit + VAD + FunASR 语音链路
 ├─ data/                    数据库与教材数据
 ├─ database/                数据层代码
+├─ speech_providers/        TTS provider：豆包 V3 与相关协议实现
 ├─ scripts/                 验证和辅助脚本
+├─ docs/                    接入说明与运维文档
 ├─ tools/                   工具文件
 ├─ main.py                  FastAPI 入口
 ├─ llm_wrapper.py           LLM prompt 与流式包装
 ├─ config.py                环境变量与运行参数
+├─ tts_client.py            TTS provider router 与 legacy fallback
 ├─ livekit_utils.py         LiveKit token 与配置辅助
 ├─ requirements.txt         Python 依赖
 └─ Open_AI_teacher.bat      Windows 一键启动脚本
@@ -58,6 +101,7 @@
 - 实时语音：LiveKit
 - 语音识别：FunASR WebSocket
 - 语音切分：Silero VAD
+- 语音输出：豆包 V3 双向流式 TTS
 - 前端：HTML、CSS、JavaScript、Vue 3 CDN 版
 
 ## 运行前准备
@@ -116,17 +160,31 @@ SILERO_MIN_SILENCE_MS=1200
 SILERO_PRE_SPEECH_MS=480
 SILERO_MIN_SPEECH_MS=320
 SILERO_SPEECH_END_HOLD_MS=720
+
+TTS_PROVIDER=doubao
+DOUBAO_TTS_API_VERSION=v3
+DOUBAO_AUTH_MODE=api_key
+DOUBAO_API_KEY=your_real_api_key_only_in_dotenv
+DOUBAO_TTS_V3_ENDPOINT=wss://openspeech.bytedance.com/api/v3/tts/bidirection
+DOUBAO_TTS_RESOURCE_ID=seed-icl-2.0
+DOUBAO_TTS_VOICE_TYPE=S_D9gzp4Q12
+DOUBAO_TTS_ENABLE_STREAM=true
+TTS_FALLBACK_ON_ERROR=false
 ```
 
 完整示例见 [.env.example](/d:/AIEnglish_grammar_teacher/.env.example)。
+
+注意：真实 `DOUBAO_API_KEY`、Access Token、LiveKit Secret 只能写入 `.env`，不能提交到 Git。
 
 ## 启动方式
 
 ### 方式一：手动启动
 
-先启动后端：
+当前推荐启动方式：
 
 ```bash
+conda activate ai_teacher
+cd D:\AIEnglish_grammar_teacher
 uvicorn main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
@@ -141,6 +199,47 @@ http://127.0.0.1:8000/frontend/index.html
 - LiveKit 服务
 - FunASR WebSocket 服务
 - 本机浏览器麦克风权限
+
+如果只测试老师语音输出的豆包 TTS，不需要启动 8012 的 Melo/OpenVoice 服务。
+
+## 豆包 TTS 验证步骤
+
+### 1. 验证豆包 V3 provider
+
+```bash
+python scripts/verify_doubao_tts_v3.py
+```
+
+成功时会生成 `doubao_v3_test.mp3`，并打印多个 `audio chunk`。
+
+### 2. 验证 voices 接口
+
+```powershell
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/tts/voices" -UseBasicParsing | Select-Object -ExpandProperty Content
+```
+
+### 3. 验证 speak 兼容接口
+
+```powershell
+$body = '{"text":"你好，欢迎来到 AI Teacher。今天我们测试豆包语音。","voice":"doubao_default","lang":"zh","speed":1.0}'
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/tts/speak" -Method POST -ContentType "application/json" -Body $body -OutFile "doubao_v3_api_test.mp3"
+```
+
+### 4. 前端页面测试
+
+打开：
+
+```text
+http://127.0.0.1:8000/frontend/index.html
+```
+
+输入：
+
+```text
+请用中文介绍一下什么是定语从句，并给我一个英文例句。
+```
+
+预期：老师语音能自动播放，中文清晰，英文例句与中文讲解保持同一声线，新输入可打断旧语音。
 
 ### 方式二：Windows 一键启动
 
@@ -212,6 +311,14 @@ http://127.0.0.1:8000/frontend/index.html
 - [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)
 
 ## 已知限制
+
+当前已知状态：
+
+- 豆包 TTS：已接入 V3 bidirection，并通过第一阶段验收。
+- 豆包 ASR：尚未接入。
+- 语音输入：仍使用 LiveKit + FunASR + Silero VAD。
+- Melo/OpenVoice：暂时保留为 legacy fallback / 归档对象。
+- Kokoro：外部工具链保留为 legacy 实验对象。
 
 当前项目里，启动脚本默认拉起的 FunASR 还是中文模型配置：
 

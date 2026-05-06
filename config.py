@@ -38,6 +38,31 @@ LIVEKIT_WS_URL = os.getenv("LIVEKIT_WS_URL", "").strip()
 LIVEKIT_API_KEY = os.getenv("LIVEKIT_API_KEY", "").strip()
 LIVEKIT_API_SECRET = os.getenv("LIVEKIT_API_SECRET", "").strip()
 VOICE_DEFAULT_ROOM = os.getenv("VOICE_DEFAULT_ROOM", "ai-teacher-room").strip() or "ai-teacher-room"
+TTS_ENABLED = str(os.getenv("TTS_ENABLED", "true")).strip().lower() in {"1", "true", "yes", "on"}
+TTS_PROVIDER = os.getenv("TTS_PROVIDER", "doubao").strip().lower() or "doubao"
+TTS_BASE_URL = os.getenv("TTS_BASE_URL", "http://127.0.0.1:8012").strip() or "http://127.0.0.1:8012"
+TTS_DEFAULT_VOICE = os.getenv("TTS_DEFAULT_VOICE", "melo_teacher").strip() or "melo_teacher"
+TTS_DEFAULT_LANG = os.getenv("TTS_DEFAULT_LANG", "zh").strip() or "zh"
+TTS_DEFAULT_SPEED = float(os.getenv("TTS_DEFAULT_SPEED", "1.0") or "1.0")
+TTS_TIMEOUT_SECONDS = float(os.getenv("TTS_TIMEOUT_SECONDS", "120") or "120")
+DOUBAO_APP_ID = os.getenv("DOUBAO_APP_ID", "").strip()
+DOUBAO_ACCESS_TOKEN = os.getenv("DOUBAO_ACCESS_TOKEN", "").strip()
+DOUBAO_AUTH_MODE = os.getenv("DOUBAO_AUTH_MODE", "api_key").strip().lower() or "api_key"
+DOUBAO_API_KEY = os.getenv("DOUBAO_API_KEY", "").strip()
+DOUBAO_CLUSTER = os.getenv("DOUBAO_CLUSTER", "volcano_tts").strip() or "volcano_tts"
+DOUBAO_TTS_API_VERSION = os.getenv("DOUBAO_TTS_API_VERSION", "v3").strip().lower() or "v3"
+DOUBAO_TTS_V3_ENDPOINT = (
+    os.getenv("DOUBAO_TTS_V3_ENDPOINT", "wss://openspeech.bytedance.com/api/v3/tts/bidirection").strip()
+    or "wss://openspeech.bytedance.com/api/v3/tts/bidirection"
+)
+DOUBAO_TTS_VOICE = os.getenv("DOUBAO_TTS_VOICE", "").strip()
+DOUBAO_TTS_RESOURCE_ID = os.getenv("DOUBAO_TTS_RESOURCE_ID", "seed-tts-2.0").strip() or "seed-tts-2.0"
+DOUBAO_TTS_RESOURCE_ID_HEADER = os.getenv("DOUBAO_TTS_RESOURCE_ID_HEADER", "X-Api-Resource-Id").strip() or "X-Api-Resource-Id"
+DOUBAO_TTS_VOICE_TYPE = os.getenv("DOUBAO_TTS_VOICE_TYPE", "S_D9gzp4Q12").strip() or "S_D9gzp4Q12"
+DOUBAO_TTS_SPEAKER_ID = os.getenv("DOUBAO_TTS_SPEAKER_ID", "").strip()
+DOUBAO_TTS_MODEL = os.getenv("DOUBAO_TTS_MODEL", "").strip()
+DOUBAO_TTS_ENABLE_STREAM = str(os.getenv("DOUBAO_TTS_ENABLE_STREAM", "true")).strip().lower() in {"1", "true", "yes", "on"}
+TTS_FALLBACK_ON_ERROR = str(os.getenv("TTS_FALLBACK_ON_ERROR", "false")).strip().lower() in {"1", "true", "yes", "on"}
 FUNASR_WS_URL = os.getenv("FUNASR_WS_URL", "").strip()
 FUNASR_MODE = os.getenv("FUNASR_MODE", "2pass").strip() or "2pass"
 FUNASR_MODEL_NAME = os.getenv("FUNASR_MODEL_NAME", "").strip()

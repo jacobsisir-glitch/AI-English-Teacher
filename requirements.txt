@@ -3,6 +3,7 @@ uvicorn
 pydantic
 openai
 requests
+httpx
 python-dotenv
 sqlalchemy
 livekit-api
