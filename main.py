@@ -276,6 +276,34 @@ student_state = {
 stream_state = {"session_summary": ""}
 stream_state_lock = threading.Lock()
 
+FEATURE_PPT_MODE = True
+
+COURSE_SLIDE_MAP = {
+    "课程导读与开场白": {
+        "hook": "sp_intro_001",
+    },
+    "主谓结构（SV）": {
+        "core": "sp_sv_001",
+        "quiz": "sp_sv_quiz_001",
+    },
+    "主谓宾结构（SVO）": {
+        "core": "sp_svo_001",
+        "quiz": "sp_svo_quiz_001",
+    },
+    "主谓双宾结构（SVOO）": {
+        "core": "sp_svoo_001",
+        "quiz": "sp_svoo_quiz_001",
+    },
+    "主谓宾补结构（SVOC）": {
+        "core": "sp_svoc_001",
+        "quiz": "sp_svoc_quiz_001",
+    },
+    "主系表结构（SVC / SVP）": {
+        "core": "sp_svc_001",
+        "quiz": "sp_svc_quiz_001",
+    },
+}
+
 TASK_COMPLETED_MARKER = "[TASK_COMPLETED]"
 RETRY_REQUIRED_MARKER = "[RETRY_REQUIRED]"
 CLASS_COMPLETED_MESSAGE = "🎉 恭喜你！我们所有的语法特训任务都通关啦！现在退出微课模式咯~"
@@ -807,6 +835,56 @@ def _build_whiteboard_page_key(task_info: dict, stage_kind: str = "") -> str:
 def _build_whiteboard_stage_system_notice(task_info: dict, stage_kind: str = "") -> str:
     page_key = _build_whiteboard_page_key(task_info, stage_kind)
     return f"[SYSTEM:WB_STAGE_READY::{page_key}]"
+
+
+def _get_slide_id_for_task(task_info: dict, stage_kind: str = "") -> str:
+    """从 COURSE_SLIDE_MAP 查找当前 task + stage 对应的 slide_id。"""
+    task_name = str(task_info.get("task_name") or task_info.get("node_name") or "").strip()
+    stage_key = str(stage_kind or "").strip().lower() or "core"
+    mapping = COURSE_SLIDE_MAP.get(task_name, {})
+    slide_id = mapping.get(stage_key, mapping.get("core", ""))
+    if not slide_id:
+        # fallback: 尝试 task_name 下的第一个 slide
+        for key in ("hook", "core", "frame", "quiz"):
+            if mapping.get(key):
+                slide_id = mapping[key]
+                break
+    return str(slide_id or "").strip()
+
+
+def _emit_slide_goto(task_info: dict, stage_kind: str = "") -> str:
+    """生成 [SYSTEM:SLIDE:GOTO:id] 事件字符串。"""
+    if not FEATURE_PPT_MODE:
+        return ""
+    slide_id = _get_slide_id_for_task(task_info, stage_kind)
+    if not slide_id:
+        task_name = str(task_info.get("task_name") or task_info.get("node_name") or "?").strip()
+        print(f"[SlideMap] WARNING: no slide_id for task={task_name!r} stage={stage_kind!r}")
+        return ""
+    return f"[SYSTEM:SLIDE:GOTO:{slide_id}]\n"
+
+
+def _emit_slide_question(question_text: str) -> str:
+    """生成 [SYSTEM:SLIDE:QUESTION:text] 事件字符串。"""
+    if not FEATURE_PPT_MODE or not question_text:
+        return ""
+    safe_text = str(question_text).replace("\n", " | ").replace("\r", "").strip()
+    return f"[SYSTEM:SLIDE:QUESTION:{safe_text}]\n"
+
+
+def _emit_slide_reveal_answer(answer_text: str) -> str:
+    """生成 [SYSTEM:SLIDE:REVEAL_ANSWER:text] 事件字符串。"""
+    if not FEATURE_PPT_MODE or not answer_text:
+        return ""
+    safe_text = str(answer_text).replace("\n", " | ").replace("\r", "").strip()
+    return f"[SYSTEM:SLIDE:REVEAL_ANSWER:{safe_text}]\n"
+
+
+def _emit_slide_clear_overlay() -> str:
+    """生成 [SYSTEM:SLIDE:CLEAR_OVERLAY] 事件字符串。"""
+    if not FEATURE_PPT_MODE:
+        return ""
+    return "[SYSTEM:SLIDE:CLEAR_OVERLAY]\n"
 
 
 def _iter_whiteboard_stage_events(
@@ -2029,6 +2107,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             stage_kind: str = "",
         ):
             stage_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
+            if FEATURE_PPT_MODE:
+                slide_goto = _emit_slide_goto(task_info, stage_kind)
+                if slide_goto:
+                    yield slide_goto
             yield _build_whiteboard_stage_system_notice(task_info, stage_kind)
             for chunk in generate_agent_class_reply_stream(
                 task_info,
@@ -2078,6 +2160,11 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                     )
 
                     if stage_content:
+                        stage_kind_slug = stage_page_key.split("::", 1)[-1] if stage_page_key else stage_kind
+                        if FEATURE_PPT_MODE:
+                            slide_goto = _emit_slide_goto(task_info, stage_kind_slug)
+                            if slide_goto:
+                                yield slide_goto
                         yield _serialize_whiteboard_update(
                             {
                                 "action": "new_page",
@@ -2113,6 +2200,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                     if include_question and combined_question and stage.get("expects_answer"):
                         question_page_key = last_stage_page_key or stage_page_key or _build_whiteboard_page_key(task_info, f"question_{stage_kind or 'quiz'}")
                         question_title = last_stage_title or stage_title
+                        if FEATURE_PPT_MODE:
+                            slide_q = _emit_slide_question(combined_question)
+                            if slide_q:
+                                yield slide_q
                         yield _serialize_whiteboard_update(
                             {
                                 "action": "question",
@@ -2129,6 +2220,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                         return
                 return
 
+            if FEATURE_PPT_MODE:
+                slide_goto_formula = _emit_slide_goto(task_info, "formula")
+                if slide_goto_formula:
+                    yield slide_goto_formula
             for event_str in _iter_whiteboard_stage_events(
                 task_info,
                 include_new_page=True,
@@ -2146,6 +2241,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
 
             example_content = _build_whiteboard_example_content(task_info.get("reference") or "")
             if example_content:
+                if FEATURE_PPT_MODE:
+                    slide_goto_example = _emit_slide_goto(task_info, "example")
+                    if slide_goto_example:
+                        yield slide_goto_example
                 for event_str in _iter_whiteboard_stage_events(
                     task_info,
                     include_new_page=True,
@@ -2161,6 +2260,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                     "example",
                 )
                 if include_question:
+                    if FEATURE_PPT_MODE:
+                        whiteboard_q = str(task_info.get("whiteboard_question") or "").strip()
+                        if whiteboard_q:
+                            yield _emit_slide_question(whiteboard_q)
                     for event_str in _iter_whiteboard_stage_events(
                         task_info,
                         include_question=True,
@@ -2172,6 +2275,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                 return
 
             if include_question:
+                if FEATURE_PPT_MODE:
+                    whiteboard_q = str(task_info.get("whiteboard_question") or "").strip()
+                    if whiteboard_q:
+                        yield _emit_slide_question(whiteboard_q)
                 for event_str in _iter_whiteboard_stage_events(
                     task_info,
                     include_question=True,

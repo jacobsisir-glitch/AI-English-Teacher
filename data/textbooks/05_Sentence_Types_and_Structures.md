@@ -116,7 +116,7 @@
 - 经典例句: The captain has never seen such a storm before. 船长以前还没有看到过这样的风暴。
 
 句首有"only"时候的部分倒装句
-- 经典例句: Only in this can we save that child's life. 只有这样我们才能救那孩子的命。情态动词"can"置于主语"that child"前作为部分倒装。
+- 经典例句: Only in this way can we save that child's life. 只有这样我们才能救那孩子的命。情态动词"can"置于主语"that child"前作为部分倒装。
 原句也可写为，
 - 经典例句: We can save that child's life only in this way. 
 
@@ -139,7 +139,7 @@
 
 3. 形式倒装句，谓语动词不提前，而是把特定的部分前置形成倒装。
 感叹句中的倒装
-- 经典例句: What a terrible wether it is today! 今天是恶什么鬼天气！
+- 经典例句: What a terrible wether it is today! 今天是什么鬼天气！
 原句写为，
 - 经典例句: It is a terrible wether today.
 
@@ -157,3 +157,81 @@
 - 经典例句: Much as he enjoys the classic music, he still listens pop from time to time. 他那样喜欢古典乐的人，仍然时不时的去听流行乐。
 原句可以写为，
 - 经典例句: Although he enjoys the classic music, he still listens pop from time to time.
+
+### 强调句
+表示强调的方式有很多，包括重读句子的特定部分进行强调；添加语气词、标点符号、加粗、斜体字来表示强调；添加表示强调的词语(一般为程度副词)如: really, extremely, very, just, ever等。
+
+此外，强调谓语动词时，可以对其加助动词表示强调。
+- 经典例句: I need your help. 我需要你的帮助。
+- 经典例句: I do need your help. 我真的需要你的帮助。
+
+反身代词也可以表示强调的意味，但在表达这种含义时，一般也被称为"强调代词"。
+- 经典例句: He went to the hospital himself. 他自己去了医院。即使删掉"himself"也不影响句意。
+注意和下面的句子做区分：
+- 经典例句: She saw herself in that video. 她在录像中看到了自己。这里" herself"作为宾语不可以删掉。
+
+强调句还可以通过倒装的方式来表现：
+参见倒装句部分的讲解。
+
+还有一个表示强调的固定句式搭配，非常常见：
+it + be动词 + that...
+这个句式可以对你想要强调的句子部分表示强调，先看原句：
+- 经典例句: Peter saw a beautiful lady in the coffee bar this morning. Peter早上在咖啡馆遇到了一位美丽的女士。
+强调是peter而不是别人遇到的，
+- 经典例句: It was Peter that saw a beautiful lady in the coffee bar this morning.
+强调遇到的是" a beautiful lady",
+- 经典例句: It was a beautiful lady that Peter saw in the coffee bar this morning.
+强调是早上遇到的，
+- 经典例句: It was this morning that Peter saw a beautiful lady in the coffee bar.
+
+### 省略句
+1. 对冠词的省略
+当描述的对象是唯一的时，可以省略前面的定冠词"the"
+- 经典例句: Jacob Med was elected as Prime Minster of the UK. Jacob Med 被选为了英国的首相。"Prime Minster"在政府中只有一个，故省略"the".
+
+表示并列关系时，省略冠词
+- 经典例句: Do you like a banana or (an) apple? 你是要一个香蕉还是苹果？
+- 经典例句: Neither the driver nor (the) passenger was found in this accident. 在这次事故中，司机和乘客都没有被找到。
+当表达并列的关系时，第二个描述对象的冠词可以省略。
+
+但是对于容易引起歧义的句式，就尽量不要省略，例如：
+- 经典例子: a traveler and (a) Vtuber 这个短语容易引起歧义，到底是一个旅行者和一个Vtuber，还是旅行者兼Vtuber？
+
+对于某些独立主格结构，也是可以省略冠词的
+- 经典例句: The police man came in, (whit a) gun in (his) hand. 警察进来了，手里拿着枪。
+
+2. 对介词的省略
+对于表示时间的介词省略很常见：
+- 经典例句: Ellen went to supermarket (on) that day. Ellen那天去了超市。
+- 经典例句: Bill worked (for) one week in order to buy that ticket. Bill工作了一周来买票。
+
+对于表示动作的介词的省略：
+- 经典例句: Sally was busy (in) making cake that time.  Sally当时在做蛋糕。
+
+3. 对不定式"to"的省略：
+- 经典例句: I just want to learn and (to) read. 我只想学习和读书。
+- 经典例句: Gorge helped me (to) write the report. Gorge帮我写报告。
+
+4. 对从句引导词的省略：
+- 经典例句: She is the student (who) won first prize. 她就是那个拿了一等奖的学生。定语从句。
+- 经典例句: Adam sees (that) a storm is approaching. Adam看到风暴正在逼近。宾语从句。
+
+5. 对句子特定成分的省略：
+- 经典例句: (You) Eat the pill. (你)吃那药片。祈使句，省略了主语。
+- 经典例句: What a stupid decision (it is) ! 多么愚蠢的决定！ 感叹句，省略了主语、谓语动词。
+
+
+6. 口语中的省略：
+- 经典例句: Where did you go last night? —— (I went to the) coffee bar. 你昨晚去哪了？——(我去了)咖啡馆。
+
+7. 并列句的省略：
+- 经典例句: We went to the park, and (we) walked along the river. 我们去了公园，并且沿着河走。
+- 经典例句: Ive ran to the bus, but I didn't (run to the bus). Ive向公交车跑去，但是我没有。
+- 经典例句: The song made me happy but (made) my friend sad. 这首歌让我开心，但让我朋友伤心。
+- 经典例句: I dank the beer and my father (drank) the wine. 我喝啤酒，我父亲喝红酒。
+
+8. 复杂句(主句与从句)的省略:
+- 经典例句: He wil pick me up tomorrow, but I don't know when (he will do it). 他明天来接我，但不知道是什么时候。
+- 经典例句: When (I was) young, I went to school by bicycle. 我年轻的时候，骑自行车去学校。
+- 经典例句: If (it is) possible, I will handle it myself. 如有可能，我亲自处理。
+- 经典例句: (I am) Sorry to hear that. 很抱歉听到这消息。

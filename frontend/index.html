@@ -126,6 +126,87 @@
     box-shadow: 0 16px 30px rgba(245, 158, 11, 0.18);
     background: #fffbeb; /* 统一成实色的暖黄底 */
         }
+        /* ── PPT Slide Player ── */
+        .slide-player {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .slide-image-wrap {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .slide-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background: #0f172a;
+        }
+        .slide-fallback {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            color: #64748b;
+        }
+        .slide-fallback i {
+            font-size: 3rem;
+            opacity: 0.4;
+        }
+        .slide-fallback span {
+            font-size: 1rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+        }
+        .slide-caption {
+            width: 100%;
+            text-align: center;
+            padding: 0.75rem 0 0;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #64748b;
+            letter-spacing: 0.06em;
+        }
+        .slide-overlay-question,
+        .slide-overlay-answer {
+            position: absolute;
+            bottom: 4.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 35;
+            pointer-events: auto;
+            max-width: min(90%, 42rem);
+            padding: 1rem 1.5rem;
+            border-radius: 1.25rem;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            line-height: 1.6;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.18);
+            backdrop-filter: blur(12px);
+            animation: slideOverlayIn 0.4s ease-out;
+        }
+        .slide-overlay-question {
+            background: rgba(255,255,255,0.94);
+            border: 1.5px solid #fbbf24;
+            color: #1e293b;
+        }
+        .slide-overlay-answer {
+            background: rgba(240,253,244,0.94);
+            border: 1.5px solid #34d399;
+            color: #065f46;
+        }
+        @keyframes slideOverlayIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
         @keyframes wbBlockFlash {
             0% {
                 background-color: rgba(254, 249, 195, 0.9);
@@ -357,7 +438,44 @@
             </span>
         </div>
 
-        <section class="stage-shell w-11/12 max-w-6xl h-[65vh] mx-auto mt-6 bg-white/90 backdrop-blur-xl border border-slate-200 shadow-[0_20px_60px_rgba(0,0,0,0.05)] rounded-3xl relative overflow-hidden">
+        <!-- ═══ PPT 课件播放器 ═══ -->
+        <section v-if="pptMode" class="w-11/12 max-w-6xl h-[65vh] mx-auto mt-6 rounded-3xl relative overflow-hidden bg-gray-900">
+            <div class="slide-player">
+                <!-- 图片加载成功 -->
+                <div v-if="currentSlideSrc" class="slide-image-wrap">
+                    <img :src="currentSlideSrc"
+                         :alt="currentSlideLabel"
+                         class="slide-image"
+                         @error="handleSlideError" />
+                </div>
+                <!-- Fallback 占位 -->
+                <div v-else class="slide-fallback">
+                    <i class="fa-solid fa-image"></i>
+                    <span>{{ slideManifestError ? '课件清单加载失败' : '等待课件加载...' }}</span>
+                </div>
+
+                <!-- 题目 overlay -->
+                <div v-if="slideQuestionVisible" class="slide-overlay-question">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-circle-question text-amber-500"></i>
+                        <span class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">练习题目</span>
+                    </div>
+                    <div class="whitespace-pre-line">{{ slideQuestionText }}</div>
+                </div>
+
+                <!-- 答案 overlay -->
+                <div v-if="slideAnswerVisible" class="slide-overlay-answer">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                        <span class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">参考答案</span>
+                    </div>
+                    <div class="whitespace-pre-line">{{ slideAnswerText }}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ 旧白板展示区（PPT 模式关闭时显示） ═══ -->
+        <section v-if="!pptMode" class="stage-shell w-11/12 max-w-6xl h-[65vh] mx-auto mt-6 bg-white/90 backdrop-blur-xl border border-slate-200 shadow-[0_20px_60px_rgba(0,0,0,0.05)] rounded-3xl relative overflow-hidden">
             <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.16),transparent_32%)] pointer-events-none"></div>
             <div class="absolute inset-x-10 top-8 flex items-center justify-between text-[11px] uppercase tracking-[0.36em] text-slate-400">
                 <span>Whiteboard Stage</span>
@@ -389,7 +507,6 @@
     v-if="isQuestionDrawerAvailable"
     :class="[
         'pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center overflow-hidden transition-[height,padding] duration-500 ease-out',
-        /* 👇 修改点 1：微调父容器高度，展开给 h-[17.5rem]，收起给 h-14，保证挂在外面的把手不被 overflow-hidden 切掉 */
         isQuestionDrawerOpen ? 'h-[17.5rem] pt-16' : 'h-14 pt-0'
     ]"
 >
@@ -414,7 +531,7 @@
             </div>
             <div class="mt-3 whitespace-pre-line rounded-2xl bg-amber-50 px-4 py-3 text-left text-sm font-medium leading-7 text-slate-800 md:text-base">{{ currentWhiteboardPage.question }}</div>
         </div>
-        
+
         <button
             type="button"
             class="wb-question-handle absolute left-1/2 top-full z-10 flex -translate-x-1/2 -mt-px items-center gap-2 rounded-full border border-amber-300 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-700 shadow-[0_14px_28px_rgba(245,158,11,0.16)]"
@@ -458,7 +575,15 @@
 
     <div class="fixed bottom-48 left-1/2 z-40 w-4/5 max-w-4xl -translate-x-1/2 pointer-events-none">
         <div class="mx-auto h-20 w-full overflow-hidden">
+            <!-- TTS 语音驱动字幕：立即显示，不经过慢速字幕队列 -->
+            <div v-if="currentSpokenSubtitle" class="flex h-full w-full flex-col justify-end overflow-hidden text-center">
+                <p class="subtitle-mask max-w-full truncate px-4 text-lg font-medium tracking-wide text-gray-800 md:text-xl">
+                    {{ currentSpokenSubtitle }}
+                </p>
+            </div>
+            <!-- 普通字幕队列：打字机节奏，TTS 未播放时使用 -->
             <transition-group
+                v-else
                 name="subtitle-stack"
                 tag="div"
                 class="subtitle-stack flex h-full w-full flex-col justify-end gap-1 overflow-hidden text-center"
@@ -873,6 +998,7 @@
         }
     };
     const DASHBOARD_CACHE_KEY = 'aiTeacherDashboardCache';
+    const PPT_MODE_ENABLED = true;
     const WHITEBOARD_EVENT_PACKET_REGEX = /<WBEVENT>([\s\S]*?)<\/WBEVENT>/g;
     const WHITEBOARD_EVENT_OPEN = '<WBEVENT>';
     const WHITEBOARD_EVENT_CLOSE = '</WBEVENT>';
@@ -895,9 +1021,19 @@
             const isInputLocked = ref(false);
             const currentSubtitle = ref('老师正在准备教材...');
             const subtitleLines = ref([{ id: 'subtitle-0', text: currentSubtitle.value, tone: 'current' }]);
+            const currentSpokenSubtitle = ref('');
+            const isSpeechSubtitleActive = ref(false);
             const whiteboardPages = ref([]);
             const currentPageIndex = ref(-1);
             const hasUnreadWhiteboardUpdate = ref(false);
+            const pptMode = ref(PPT_MODE_ENABLED);
+            const slideManifest = ref(null);
+            const slideManifestError = ref('');
+            const currentSlideId = ref('');
+            const slideQuestionText = ref('');
+            const slideAnswerText = ref('');
+            const slideQuestionVisible = ref(false);
+            const slideAnswerVisible = ref(false);
             const isDashboardOpen = ref(false);
             const currentApiBaseUrl = API_BASE_URL;
             const currentApiMode = API_ROUTE_MODE;
@@ -1011,6 +1147,7 @@
             const TTS_ENGLISH_EXAMPLE_WORDS = 4;
             const TTS_ENGLISH_EXAMPLE_LETTERS = 18;
             let subtitleHoldTimer = null;
+            let speechSubtitleClearTimer = null;
             let subtitleLineSeed = 1;
             let chatMessageSeed = 0;
             let whiteboardFlashTimer = null;
@@ -1151,6 +1288,17 @@
                 && questionDrawerOpen.value
                 && questionDrawerActiveKey.value === currentQuestionDisplayKey.value
             ));
+            const currentSlide = computed(() => {
+                if (!slideManifest.value || !currentSlideId.value) return null;
+                const slides = slideManifest.value.slides || [];
+                return slides.find((s) => s.id === currentSlideId.value) || null;
+            });
+            const currentSlideSrc = computed(() => {
+                return currentSlide.value?.image || '';
+            });
+            const currentSlideLabel = computed(() => {
+                return currentSlide.value?.title || currentSlide.value?.id || '';
+            });
             const voiceStatusDotClass = computed(() => {
                 if (voiceState.value === 'connected') return 'bg-emerald-500';
                 if (voiceState.value === 'connecting') return 'bg-amber-500';
@@ -1276,6 +1424,14 @@
                 }
             };
             const stopAssistantSpeech = (reason = 'manual_interrupt') => {
+                logTtsPlayEvent('tts.interrupt.begin', {
+                    reason,
+                    isSpeaking: Boolean(isSpeaking.value),
+                    audioExists: Boolean(currentAudio.value),
+                    audioPaused: currentAudio.value ? currentAudio.value.paused : null,
+                    ttsQueueLength: ttsSentenceQueue.value.length,
+                    subtitleQueueLength: subtitleQueue.value.length
+                });
                 ttsPlaybackToken += 1;
                 clearTtsIdleTimer();
                 if (currentPlayingTtsChunk?.seqId) {
@@ -1286,8 +1442,14 @@
                     closeTtsChunkStream(chunkItem, reason);
                     dropQueuedTtsChunk(chunkItem, reason);
                 });
+                logTtsPlayEvent('tts.interrupt.queue.clear', {
+                    reason,
+                    clearedCount: ttsSentenceQueue.value.length
+                });
+                ttsSentenceQueue.value = [];
                 if (currentTtsStreamSocket) {
                     try {
+                        logTtsPlayEvent('tts.interrupt.controller.abort', { reason, socketReadyState: currentTtsStreamSocket.readyState });
                         logTtsPlayEvent('frontend.tts.stream.interrupt', { reason, seqId: 0, textLength: 0 });
                         currentTtsStreamSocket.close(1000, reason);
                     } catch (error) {
@@ -1295,15 +1457,29 @@
                     }
                     currentTtsStreamSocket = null;
                 }
-                ttsSentenceQueue.value = [];
                 ttsSentenceBuffer = '';
                 pendingShortTtsSentence = null;
                 pendingSubtitleTtsFinalFlush = false;
                 currentPlayingTtsSentenceKey = '';
                 currentPlayingTtsChunk = null;
                 ttsPlaybackBusy = false;
+                if (currentAudio.value) {
+                    logTtsPlayEvent('tts.interrupt.audio.pause', {
+                        reason,
+                        audioPaused: currentAudio.value.paused,
+                        audioSrc: Boolean(currentAudio.value.getAttribute('src'))
+                    });
+                }
                 cleanupAssistantSpeech();
                 isSpeaking.value = false;
+                resetSubtitleQueue({ keepCurrent: false });
+                logTtsPlayEvent('tts.interrupt.end', {
+                    reason,
+                    isSpeaking: Boolean(isSpeaking.value),
+                    audioExists: Boolean(currentAudio.value),
+                    ttsQueueLength: ttsSentenceQueue.value.length,
+                    subtitleQueueLength: subtitleQueue.value.length
+                });
             };
             const appendSpeechText = (baseText, nextText) => {
                 const left = String(baseText || '');
@@ -1662,6 +1838,13 @@
                 if (!normalizedText) {
                     return;
                 }
+                clearSpeechSubtitleTimer();
+                currentSpokenSubtitle.value = normalizedText;
+                isSpeechSubtitleActive.value = true;
+                logTtsPlayEvent('subtitle.speech.activate', {
+                    textLength: normalizedText.length,
+                    queueLength: ttsSentenceQueue.value.length
+                });
                 assignTtsChunkSeqId(sentenceItem);
                 const route = sentenceItem.route || resolveTtsRoute(normalizedText, sentenceItem?.chunkLang || '');
                 sentenceItem.route = route;
@@ -1688,6 +1871,8 @@
                         queueLength: ttsSentenceQueue.value.length
                     });
                     markTtsChunkState(sentenceItem, 'dropped', { reason: 'audio_already_playing' });
+                    currentSpokenSubtitle.value = '';
+                    isSpeechSubtitleActive.value = false;
                     return;
                 }
                 const audioUrl = URL.createObjectURL(audioBlob);
@@ -1783,12 +1968,29 @@
                         error: String(error?.message || error),
                         detail: String(error)
                     });
+                    currentSpokenSubtitle.value = '';
+                    isSpeechSubtitleActive.value = false;
+                    clearSpeechSubtitleTimer();
+                    logTtsPlayEvent('subtitle.speech.clear', {
+                        reason: 'tts_error',
+                        error: String(error?.message || error)
+                    });
                 } finally {
                     currentPlayingTtsSentenceKey = '';
                     currentPlayingTtsChunk = null;
                     ttsPlaybackBusy = false;
                     if (ttsSentenceQueue.value.length > 0) {
                         void drainTtsSentenceQueue();
+                    } else {
+                        clearSpeechSubtitleTimer();
+                        speechSubtitleClearTimer = window.setTimeout(() => {
+                            currentSpokenSubtitle.value = '';
+                            isSpeechSubtitleActive.value = false;
+                            speechSubtitleClearTimer = null;
+                            logTtsPlayEvent('subtitle.speech.clear', {
+                                reason: 'all_sentences_done'
+                            });
+                        }, 1200);
                     }
                 }
             };
@@ -2430,11 +2632,19 @@
                 currentSubtitle.value = currentLine ? currentLine.text : '';
             };
 
+            const clearSpeechSubtitleTimer = () => {
+                if (speechSubtitleClearTimer) {
+                    clearTimeout(speechSubtitleClearTimer);
+                    speechSubtitleClearTimer = null;
+                }
+            };
+
             const clearSubtitleTimers = () => {
                 if (subtitleHoldTimer) {
                     clearTimeout(subtitleHoldTimer);
                     subtitleHoldTimer = null;
                 }
+                clearSpeechSubtitleTimer();
             };
 
             const clearWhiteboardFxTimers = () => {
@@ -2497,6 +2707,61 @@
                     return;
                 }
                 openQuestionDrawer();
+            };
+            const handleSlideGoto = (slideId) => {
+                if (!slideId) return;
+                const prevId = currentSlideId.value;
+                currentSlideId.value = slideId;
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
+                if (prevId !== slideId) {
+                    console.info('[SlidePlayer] goto:', slideId);
+                }
+            };
+            const handleSlideQuestion = (text) => {
+                slideQuestionText.value = String(text || '').trim();
+                slideQuestionVisible.value = Boolean(slideQuestionText.value);
+                slideAnswerVisible.value = false;
+                slideAnswerText.value = '';
+                if (slideQuestionVisible.value) {
+                    console.info('[SlidePlayer] question:', slideQuestionText.value.slice(0, 80));
+                }
+            };
+            const handleSlideRevealAnswer = (text) => {
+                slideAnswerText.value = String(text || '').trim();
+                slideAnswerVisible.value = Boolean(slideAnswerText.value);
+                if (slideAnswerVisible.value) {
+                    console.info('[SlidePlayer] answer:', slideAnswerText.value.slice(0, 80));
+                }
+            };
+            const handleSlideClearOverlay = () => {
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
+            };
+            const handleSlideError = () => {
+                console.warn('[SlidePlayer] image load failed:', currentSlideSrc.value);
+            };
+            const loadSlideManifest = async () => {
+                if (!pptMode.value) return;
+                const manifestUrl = '/frontend/slides/manifest.json';
+                console.info('[SlidePlayer] loading manifest:', manifestUrl);
+                try {
+                    const response = await fetch(manifestUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    slideManifest.value = await response.json();
+                    slideManifestError.value = '';
+                    console.info('[SlidePlayer] manifest loaded, slides:', (slideManifest.value.slides || []).length);
+                } catch (error) {
+                    slideManifestError.value = String(error.message || error);
+                    slideManifest.value = null;
+                    console.warn('[SlidePlayer] manifest load failed, slides disabled:', slideManifestError.value);
+                }
             };
             const loadLiveKitClient = async () => {
                 if (window.LivekitClient?.Room) {
@@ -3070,6 +3335,8 @@
                 ttsSentenceBuffer = '';
                 pendingSubtitleTtsFinalFlush = false;
                 currentLiveSubtitleText.value = '';
+                currentSpokenSubtitle.value = '';
+                isSpeechSubtitleActive.value = false;
                 if (!keepCurrent) {
                     syncSubtitleLines([]);
                 }
@@ -3521,6 +3788,7 @@
             onMounted(() => {
                 scrollChatFeedToBottom();
                 window.addEventListener('resize', resizeRadarChart);
+                loadSlideManifest();
             });
             onBeforeUnmount(() => {
                 window.removeEventListener('resize', resizeRadarChart);
@@ -3962,6 +4230,21 @@
                             flushSubtitleBuffer({ stagePageKey: activeSubtitleStagePageKey });
                             messages.value[messageIndex].systemStatus = '';
                             activeSubtitleStagePageKey = normalizedStatus.slice('WB_STAGE_READY::'.length).trim();
+                        } else if (normalizedStatus.startsWith('SLIDE:GOTO:')) {
+                            const slideId = normalizedStatus.slice('SLIDE:GOTO:'.length).trim();
+                            handleSlideGoto(slideId);
+                            messages.value[messageIndex].systemStatus = '';
+                        } else if (normalizedStatus.startsWith('SLIDE:QUESTION:')) {
+                            const qText = normalizedStatus.slice('SLIDE:QUESTION:'.length).trim();
+                            handleSlideQuestion(qText);
+                            messages.value[messageIndex].systemStatus = '';
+                        } else if (normalizedStatus.startsWith('SLIDE:REVEAL_ANSWER:')) {
+                            const aText = normalizedStatus.slice('SLIDE:REVEAL_ANSWER:'.length).trim();
+                            handleSlideRevealAnswer(aText);
+                            messages.value[messageIndex].systemStatus = '';
+                        } else if (normalizedStatus.startsWith('SLIDE:CLEAR_OVERLAY')) {
+                            handleSlideClearOverlay();
+                            messages.value[messageIndex].systemStatus = '';
                         } else {
                             messages.value[messageIndex].systemStatus = normalizedStatus;
                             maybeShowStatusSubtitle(normalizedStatus, '老师正在准备下一段讲解...');
@@ -4132,8 +4415,16 @@
             const switchToAutoApi = () => window.aiTeacherApi.useAuto();
 
             const startClass = async () => {
-                if (isInputLocked.value) return;
+                logTtsPlayEvent('tts.interrupt.by_class_start', {
+                    isInputLocked: Boolean(isInputLocked.value),
+                    isSpeaking: Boolean(isSpeaking.value),
+                    ttsQueueLength: ttsSentenceQueue.value.length,
+                    subtitleQueueLength: subtitleQueue.value.length
+                });
+                cancelActiveAssistantReply('class_start_interrupt');
                 stopAssistantSpeech('class_start_interrupt');
+                isInputLocked.value = false;
+                isThinking.value = false;
 
                 pendingWhiteboardStages.length = 0;
                 activatedWhiteboardStageKeys.clear();
@@ -4145,16 +4436,30 @@
                 clearQuestionDrawerTimers();
                 questionDrawerOpen.value = false;
                 questionDrawerActiveKey.value = '';
+                currentSlideId.value = '';
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
                 messages.value.push({ role: 'user', content: '👨‍🎓 老师好，我准备好上课了！' });
                 setImmediateSubtitle('老师正在步入教室...');
                 isInputLocked.value = true;
                 isThinking.value = true;
+                const controller = new AbortController();
+                activeAssistantAbortController = controller;
                 try {
-                    await streamClassMessage("", "start");
+                    await streamClassMessage("", "start", { signal: controller.signal });
                 } catch (error) {
+                    if (error?.name === 'AbortError') {
+                        console.warn('[AI Teacher] Class start stream aborted.', error);
+                        return;
+                    }
                     messages.value.push({ role: 'ai', content: "❌ 唤醒老师失败，请检查后端。" });
                     setImmediateSubtitle('老师没有成功上线，请检查后端。');
                 } finally {
+                    if (activeAssistantAbortController === controller) {
+                        activeAssistantAbortController = null;
+                    }
                     isInputLocked.value = false;
                     isThinking.value = false;
                 }
@@ -4162,31 +4467,38 @@
 
             // 👇 加了显微镜的退出函数
             const exitClass = async () => {
-                if (isInputLocked.value) return;
+                logTtsPlayEvent('tts.interrupt.by_class_exit', {
+                    isInputLocked: Boolean(isInputLocked.value),
+                    isSpeaking: Boolean(isSpeaking.value),
+                    ttsQueueLength: ttsSentenceQueue.value.length,
+                    subtitleQueueLength: subtitleQueue.value.length
+                });
+                cancelActiveAssistantReply('class_exit_interrupt');
                 stopAssistantSpeech('class_exit_interrupt');
+                isInputLocked.value = false;
+                isThinking.value = false;
+
+                isInClass.value = false;
+                pendingWhiteboardStages.length = 0;
+                activatedWhiteboardStageKeys.clear();
+                clearQuestionDrawerTimers();
+                questionDrawerOpen.value = false;
+                questionDrawerActiveKey.value = '';
+                currentSlideId.value = '';
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
+                messages.value.push({
+                    role: 'ai',
+                    content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算先喘口气了？很好，微课模式关闭。现在回到闲聊和答疑通道，你要是还有问题，就继续开口。'
+                });
+                setImmediateSubtitle('微课模式已关闭，直播间回到闲聊答疑。');
 
                 try {
-                    console.log("正在尝试向后端发送退出请求...");
-                    // 确保这里的接口路径和 main.py 里完全一致，不要带任何参数
                     await axios.post(API_BASE_URL + '/course/exit');
-                    
-                    console.log("后端已成功响应退出请求！");
-                    isInClass.value = false;
-                    pendingWhiteboardStages.length = 0;
-                    activatedWhiteboardStageKeys.clear();
-                    clearQuestionDrawerTimers();
-                    questionDrawerOpen.value = false;
-                    questionDrawerActiveKey.value = '';
-                    messages.value.push({ 
-                        role: 'ai', 
-                        content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算先喘口气了？很好，微课模式关闭。现在回到闲聊和答疑通道，你要是还有问题，就继续开口。' 
-                    });
-                    setImmediateSubtitle('微课模式已关闭，直播间回到闲聊答疑。');
                 } catch (error) {
-                    // 🌟 这一句极其关键，它会在浏览器的控制台里打印出真正的死因！
                     console.error("❌ 退出报错详情：", error);
-                    messages.value.push({ role: 'ai', content: "❌ 退出请求失败，请按 F12 打开开发者工具查看 Console 日志。" });
-                    setImmediateSubtitle('退出微课失败，请检查网络或后端日志。');
                 }
             };
 
@@ -4294,7 +4606,8 @@
                 await submitStudentInput(inputText.value, { source: 'text' });
             };
 
-            const startNewChat = () => { 
+            const startNewChat = () => {
+                cancelActiveAssistantReply('new_chat_interrupt');
                 stopAssistantSpeech('new_chat_interrupt');
                 messages.value = []; 
                 isInClass.value = false; 
@@ -4311,13 +4624,19 @@
                 clearQuestionDrawerTimers();
                 questionDrawerOpen.value = false;
                 questionDrawerActiveKey.value = '';
+                currentSlideId.value = '';
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
                 resetInputBox();
                 localStorage.removeItem('aiTeacherChatHistory');
             };
 
             return {
                 inputText, messages, isThinking, isInClass, isInputLocked,
-                currentSubtitle, subtitleLines, whiteboardPages, currentPageIndex, currentWhiteboardPage, canGoPrevWhiteboardPage, canGoNextWhiteboardPage, hasUnreadWhiteboardUpdate, currentQuestionDisplayKey, isQuestionDrawerAvailable, isQuestionDrawerOpen, freshWhiteboardBlockKey,
+                currentSubtitle, subtitleLines, currentSpokenSubtitle, whiteboardPages, currentPageIndex, currentWhiteboardPage, canGoPrevWhiteboardPage, canGoNextWhiteboardPage, hasUnreadWhiteboardUpdate, currentQuestionDisplayKey, isQuestionDrawerAvailable, isQuestionDrawerOpen, freshWhiteboardBlockKey,
+                pptMode, currentSlideId, currentSlide, currentSlideSrc, currentSlideLabel, slideQuestionText, slideAnswerText, slideQuestionVisible, slideAnswerVisible, slideManifestError, handleSlideError,
                 currentApiBaseUrl, currentApiMode, currentApiKind, currentApiModeLabel, currentApiStatusText,
                 voiceState, voiceError, voiceRoomName, voiceIdentity, voiceStatusDotClass, voiceBackendState, voiceWorkerError, voiceBrowserDisconnected, voiceDisconnectReason, voiceLastDisconnectSource, voicePartialTranscript, voiceFinalTranscript, voiceDebug, isVoiceDebugExpanded, toggleVoiceDebugPanel,
                 isStopping,
