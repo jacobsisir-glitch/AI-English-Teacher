@@ -16,7 +16,7 @@ from config import (
     FUNASR_CHUNK_INTERVAL,
     FUNASR_CHUNK_SIZE,
     FUNASR_FALLBACK_MIN_STABLE_MS,
-    FUNASR_FINAL_DRAIN_WINDOW_MS,
+    FUNASR_FINAL_DRAIN_MS,
     FUNASR_LATE_FINAL_GRACE_MS,
     FUNASR_FINAL_RESCUE_WAIT_MS,
     FUNASR_FINAL_WAIT_FALLBACK_MS,
@@ -49,7 +49,7 @@ class FunASRClient:
         chunk_interval: int = FUNASR_CHUNK_INTERVAL,
         final_wait_offline_ms: int = FUNASR_FINAL_WAIT_OFFLINE_MS,
         final_wait_fallback_ms: int = FUNASR_FINAL_WAIT_FALLBACK_MS,
-        final_drain_window_ms: int = FUNASR_FINAL_DRAIN_WINDOW_MS,
+        final_drain_window_ms: int = FUNASR_FINAL_DRAIN_MS,
         final_rescue_wait_ms: int = FUNASR_FINAL_RESCUE_WAIT_MS,
         late_final_grace_ms: int = FUNASR_LATE_FINAL_GRACE_MS,
         fallback_min_stable_ms: int = FUNASR_FALLBACK_MIN_STABLE_MS,
@@ -78,6 +78,7 @@ class FunASRClient:
         self._recv_task: asyncio.Task | None = None
         self._closed = False
         self._current_utterance_id = ""
+        self._last_finished_utterance_id = ""
         self._current_chunks: list[bytes] = []
         self._current_final_future: asyncio.Future[FunASRTranscriptEvent | None] | None = None
         self._first_message_sent = False
@@ -89,8 +90,12 @@ class FunASRClient:
         self._drain_until_monotonic = 0.0
         self._late_timeout_recoveries: dict[str, float] = {}
 
+    @property
+    def is_connected(self) -> bool:
+        return self._ws is not None and self._recv_task is not None and not self._recv_task.done()
+
     async def ensure_connected(self) -> None:
-        if self._ws is not None and self._recv_task is not None and not self._recv_task.done():
+        if self.is_connected:
             return
         parsed_url = urlparse(self.ws_url)
         ssl_context = self._build_ssl_context(parsed_url.scheme, parsed_url.hostname or "")
@@ -103,8 +108,9 @@ class FunASRClient:
         try:
             connect_kwargs: dict[str, Any] = {
                 "max_size": None,
-                "ping_interval": 20,
-                "ping_timeout": 20,
+                "ping_interval": None,
+                "ping_timeout": None,
+                "close_timeout": 5,
                 "subprotocols": ["binary"],
             }
             if parsed_url.scheme == "wss":
@@ -155,6 +161,7 @@ class FunASRClient:
         self._prune_late_timeout_recoveries()
         self._close_active_drain_window(outcome="new_utterance_started")
         self._current_utterance_id = utterance_id
+        self._last_finished_utterance_id = ""
         self._current_chunks = []
         self._current_final_future = asyncio.get_running_loop().create_future()
         self._last_partial_event = None
@@ -179,21 +186,49 @@ class FunASRClient:
             await self._emit_state("funasr.error", stage="send_audio_chunk", error=str(exc))
             raise
 
+    def _compute_dynamic_wait(self) -> tuple[float, float, float, float]:
+        """Compute wait times based on utterance audio duration.
+
+        Longer Chinese/English sentences get more time for the offline final.
+        """
+        total_ms = self._estimate_current_audio_ms()
+        configured_offline_s = max(self.final_wait_offline_ms, 0) / 1000
+        if total_ms < 2000:
+            offline_s = max(3.0, configured_offline_s)
+        elif total_ms < 5000:
+            offline_s = max(5.0, configured_offline_s)
+        elif total_ms < 8000:
+            offline_s = max(6.0, configured_offline_s)
+        else:
+            offline_s = max(8.0, configured_offline_s)
+        fallback_s = 0.0
+        drain_s = max(max(self.final_drain_window_ms, 0) / 1000, 1.0)
+        # Rescue: wait longer if partial text looks unreliable for the audio duration
+        rescue_s = 0.0
+        partial_text = self._last_partial_text(self._current_utterance_id)
+        if not partial_text and total_ms >= 2000:
+            rescue_s = min(3.0, max(self.final_rescue_wait_ms, 0) / 1000)
+        elif partial_text and total_ms >= 5000:
+            # Long utterance with short partial — likely incomplete, wait more
+            if len(partial_text) < 10:
+                rescue_s = min(1.5, max(self.final_rescue_wait_ms, 0) / 2000)
+        self._log(
+            "funasr.dynamic_wait",
+            utteranceId=self._current_utterance_id,
+            total_audio_ms=total_ms,
+            offline_wait_s=offline_s,
+            fallback_wait_s=fallback_s,
+            drain_window_s=drain_s,
+            rescue_wait_s=rescue_s,
+        )
+        return offline_s, fallback_s, drain_s, rescue_s
+
     async def finish_utterance(self, *, timeout_s: float = 16.0) -> FunASRTranscriptEvent | None:
         if not self._current_utterance_id:
             return None
 
         utterance_id = self._current_utterance_id
-        preferred_wait_s = min(timeout_s, max(self.final_wait_offline_ms, 0) / 1000)
-        fallback_wait_s = min(
-            max(timeout_s - preferred_wait_s, 0.0),
-            max(self.final_wait_fallback_ms, 0) / 1000,
-        )
-        drain_window_s = max(self.final_drain_window_ms, 0) / 1000
-        rescue_wait_s = min(
-            max(timeout_s - preferred_wait_s - fallback_wait_s - drain_window_s, 0.0),
-            max(self.final_rescue_wait_ms, 0) / 1000,
-        )
+        preferred_wait_s, fallback_wait_s, drain_window_s, rescue_wait_s = self._compute_dynamic_wait()
         self._log(
             "funasr.final_timeout.begin",
             utteranceId=utterance_id,
@@ -322,7 +357,10 @@ class FunASRClient:
             return None
         finally:
             self._close_drain_window(utterance_id=utterance_id, outcome="finalized")
-            self._current_utterance_id = ""
+            self._last_finished_utterance_id = utterance_id
+            # Keep _current_utterance_id until next start_utterance so late offline finals
+            # can still be matched via explicit wav_name. _last_finished_utterance_id
+            # is used as secondary match target for late/drain/recovery finals.
             self._current_chunks = []
             self._current_final_future = None
             self._last_partial_event = None
@@ -354,59 +392,123 @@ class FunASRClient:
                     self._first_message_received = True
                     self._log("funasr.ws.first_message_received", raw=message[:500])
                 self._log("funasr.ws.message.received", raw=message[:500])
+                self._log("funasr.message.received.raw_brief", raw=message[:200])
                 await self._emit_state("funasr.message.received", raw=message[:500])
                 try:
                     payload = json.loads(message)
                 except json.JSONDecodeError:
                     self._log("funasr.error", stage="recv_loop.decode", error="json decode failed")
+                    self._log("funasr.message.ignored.reason", reason="json_decode_failed", raw=message[:200])
                     continue
                 await self._handle_server_message(payload)
         except ConnectionClosed:
+            self._ws = None
             if not self._closed:
+                self._log("funasr.connection_closed", utteranceId=self._current_utterance_id)
                 await self._emit_state("funasr.disconnected", utteranceId=self._current_utterance_id)
         except Exception as exc:
             self._log("funasr.error", stage="recv_loop", error=str(exc))
             await self._emit_state("funasr.error", stage="recv_loop", error=str(exc))
 
+    @staticmethod
+    def _extract_wav_name(payload: dict[str, Any]) -> str:
+        """Extract wav_name from FunASR response, trying multiple known field names."""
+        for key in ("wav_name", "wavName", "name", "utt_id", "uttId", "utterance_id", "utteranceId"):
+            val = payload.get(key)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        return ""
+
     async def _handle_server_message(self, payload: dict[str, Any]) -> None:
         text = self._extract_text(payload)
         mode = str(payload.get("mode") or payload.get("type") or "").lower()
-        wav_name = str(payload.get("wav_name") or self._current_utterance_id or "")
+        raw_wav_name = self._extract_wav_name(payload)
         is_final = self._is_final_message(payload, mode)
-        current_utterance_id = self._current_utterance_id
-        is_drain_window_active = self._is_drain_window_active(wav_name)
-        allow_late_timeout_recovery = is_final and self._is_late_timeout_recovery_active(wav_name)
+        event_source = self._resolve_event_source(is_final=is_final, mode=mode, payload=payload)
+        is_offline_final = is_final and event_source == "2pass-offline"
+        is_online = not is_final
+        current_uid = self._current_utterance_id
+        last_finished_uid = self._last_finished_utterance_id
+        drain_uid = self._drain_utterance_id if self._drain_until_monotonic > time.monotonic() else ""
+
+        # ── wav_name resolution ───────────────────────────────────────
+        # Online partials without explicit wav_name can safely fall back to
+        # current_utterance_id (they arrive while the utterance is active).
+        # Finals and late messages MUST carry an explicit wav_name to avoid
+        # 串句 (cross-utterance confusion) when a new utterance has started.
+        if raw_wav_name:
+            wav_name = raw_wav_name
+        elif is_online and current_uid:
+            wav_name = current_uid
+        else:
+            # Final/drain/recovery without explicit wav_name → untrusted
+            self._log(
+                "funasr.message.ignored.reason",
+                reason="final_missing_wav_name",
+                mode=mode,
+                is_final=is_final,
+                current_uid=current_uid,
+            )
+            if is_final:
+                self._log(
+                    "funasr.final.utterance_mismatch",
+                    wav_name="",
+                    current_uid=current_uid,
+                    text=text,
+                    source=event_source,
+                )
+            return
+
+        # Determine match targets
+        wav_matches_current = wav_name == current_uid if current_uid else False
+        wav_matches_last_finished = wav_name == last_finished_uid if last_finished_uid else False
+        drain_active = drain_uid and wav_name == drain_uid
+        late_recovery_active = is_final and self._is_late_timeout_recovery_active(wav_name)
+
         self._log("funasr.message.mode", mode=mode)
         self._log("funasr.message.is_final", is_final=is_final)
         self._log("funasr.message.text", text=text)
         self._log("funasr.message.wav_name", wav_name=wav_name)
+        self._log("funasr.message.source", source=event_source)
 
-        if wav_name in self._completed_finals:
+        # ── routing: determine if this message should be accepted ─────
+        already_finalized = wav_name in self._completed_finals
+        if already_finalized and not is_offline_final:
             self._log(
                 "funasr.message.ignored",
                 utteranceId=wav_name,
                 reason="utterance_already_finalized",
                 message_mode=mode,
+                event_source=event_source,
             )
+            self._log("funasr.message.ignored.reason", reason="utterance_already_finalized", wav_name=wav_name, mode=mode)
             return
+        if already_finalized and is_offline_final:
+            self._log(
+                "funasr.offline_final.override",
+                utteranceId=wav_name,
+                reason="offline_final_overrides_earlier_final",
+                previous_source=self._completed_finals.get(wav_name),
+            )
 
-        if current_utterance_id and wav_name and wav_name != current_utterance_id and not is_drain_window_active:
+        # Accept if: wav matches current, OR matches last finished, OR drain active, OR late recovery
+        accepted = wav_matches_current or wav_matches_last_finished or drain_active or late_recovery_active
+        if not accepted:
             self._log(
                 "funasr.message.ignored",
                 utteranceId=wav_name,
-                current_utterance_id=current_utterance_id,
-                reason="stale_utterance_message",
+                current_utterance_id=current_uid,
+                last_finished_uid=last_finished_uid,
+                reason="utterance_mismatch",
                 message_mode=mode,
+                drain_active=drain_active,
+                late_recovery_active=late_recovery_active,
             )
-            return
-
-        if not current_utterance_id and wav_name and not is_drain_window_active and not allow_late_timeout_recovery:
-            self._log(
-                "funasr.message.ignored",
-                utteranceId=wav_name,
-                reason="no_active_utterance",
-                message_mode=mode,
-            )
+            self._log("funasr.message.ignored.reason", reason="utterance_mismatch",
+                      wav_name=wav_name, current_uid=current_uid, mode=mode)
+            if is_final:
+                self._log("funasr.final.utterance_mismatch", wav_name=wav_name, current_uid=current_uid,
+                          text=text, source=event_source)
             return
 
         if is_final and not text and self._last_partial_event is not None and self._last_partial_event.utterance_id == wav_name:
@@ -415,37 +517,36 @@ class FunASRClient:
         if not text:
             return
 
+        resolved_uid = wav_name
         event = FunASRTranscriptEvent(
-            utterance_id=wav_name,
+            utterance_id=resolved_uid,
             text=text,
             is_final=is_final,
             raw=payload,
-            source=self._resolve_event_source(is_final=is_final, mode=mode, payload=payload),
+            source=event_source,
         )
         if is_final:
-            if allow_late_timeout_recovery:
+            if late_recovery_active:
                 self._log(
                     "late_timeout_final.accepted",
                     utteranceId=event.utterance_id,
                     source=event.source,
                 )
-            if is_drain_window_active:
+            if drain_active:
                 self._log("late_final.accepted", utteranceId=event.utterance_id, source=event.source)
-            if not self._mark_finalized(event.utterance_id, event.source):
-                self._log(
-                    "funasr.final.duplicate_ignored",
-                    utteranceId=event.utterance_id,
-                    final_source=event.source,
-                )
-                return
+            if not already_finalized:
+                self._mark_finalized(event.utterance_id, event.source)
+            else:
+                self._completed_finals[event.utterance_id] = event.source
             self._log("funasr.final.detected", utteranceId=event.utterance_id, detection_source=event.source)
+            self._log("funasr.final.received", utteranceId=event.utterance_id, text=event.text, source=event.source)
             self._log("funasr.final", utteranceId=event.utterance_id, text=event.text)
             if self._current_final_future and not self._current_final_future.done():
                 self._current_final_future.set_result(event)
             self._log("funasr.final.publish", utteranceId=event.utterance_id, text=event.text, publish_source=event.source)
             await self._emit(self.on_final, event)
         else:
-            if is_drain_window_active:
+            if drain_active:
                 self._log("late_partial.accepted", utteranceId=event.utterance_id, text=event.text)
             self._last_partial_event = event
             self._last_partial_received_monotonic = time.monotonic()
@@ -455,7 +556,14 @@ class FunASRClient:
     async def _send_json(self, payload: dict[str, Any]) -> None:
         await self.ensure_connected()
         assert self._ws is not None
-        await self._ws.send(json.dumps(payload, ensure_ascii=False))
+        try:
+            await self._ws.send(json.dumps(payload, ensure_ascii=False))
+        except ConnectionClosed:
+            self._log("funasr.send_json.connection_closed", payload=str(payload)[:200])
+            self._ws = None
+            await self.ensure_connected()
+            assert self._ws is not None
+            await self._ws.send(json.dumps(payload, ensure_ascii=False))
         if not self._first_message_sent:
             self._first_message_sent = True
             self._log("funasr.ws.first_message_sent", payload=payload)

@@ -19,6 +19,8 @@ from config import (
     SILERO_SAMPLE_RATE,
     SILERO_SPEECH_END_HOLD_MS,
     SILERO_VAD_THRESHOLD,
+    VOICE_FINAL_ACK_RETRY,
+    VOICE_FINAL_ACK_TIMEOUT_MS,
 )
 from livekit_utils import create_livekit_worker_token, livekit_voice_stack_is_configured
 from voice.audio_buffer import LiveKitAudioNormalizer
@@ -29,7 +31,9 @@ from voice.session_state import (
     UtteranceTelemetry,
     structured_voice_log,
 )
+from voice.partial_accumulator import PartialAccumulator
 from voice.transcript_publisher import LiveKitTranscriptPublisher
+from voice.utterance_manager import CommitContext, CommitGate, UtteranceManager
 from voice.vad_controller import SileroVADController
 
 
@@ -45,6 +49,7 @@ class ParticipantVoiceProcessor:
         participant: rtc.RemoteParticipant,
         publication: rtc.RemoteTrackPublication,
         track: rtc.RemoteAudioTrack,
+        context_provider=None,
     ) -> None:
         self.room_name = room_name
         self.room_id_getter = room_id_getter
@@ -54,6 +59,7 @@ class ParticipantVoiceProcessor:
         self.participant = participant
         self.publication = publication
         self.track = track
+        self.context_provider = context_provider
         self.user_identity = participant.identity
         self.state = ParticipantSessionState(
             user_identity=self.user_identity,
@@ -95,6 +101,14 @@ class ParticipantVoiceProcessor:
         self._deferred_utterance_start_ts: float | None = None
         self._deferred_utterance_end_ts: float | None = None
         self._deferred_finish_requested = False
+        self.utterance_mgr = UtteranceManager(
+            room_name=room_name,
+            participant_id=self.user_identity,
+            log_context_provider=self._log_context,
+        )
+        self.partial_acc = PartialAccumulator(
+            log_context_provider=self._log_context,
+        )
 
     def start(self) -> None:
         if self._task is None:
@@ -106,6 +120,49 @@ class ParticipantVoiceProcessor:
             "room_name": self.room_name,
             "user_identity": self.user_identity,
         }
+
+    def _commit_context(self) -> CommitContext:
+        raw_context = {}
+        if self.context_provider is not None:
+            try:
+                raw_context = dict(self.context_provider() or {})
+            except Exception as exc:
+                structured_voice_log(
+                    "transcript.commit.context_error",
+                    **self._log_context(),
+                    error=str(exc),
+                )
+        mode = str(raw_context.get("mode") or "normal_chat").strip() or "normal_chat"
+        class_mode = bool(raw_context.get("class_mode") or mode == "class_mode")
+        pending_question = bool(raw_context.get("pending_question"))
+        short_answer_allowed = bool(raw_context.get("short_answer_allowed"))
+        return CommitContext(
+            mode="pending_question" if class_mode and pending_question else mode,
+            class_mode=class_mode,
+            pending_question=pending_question,
+            pending_question_text=str(raw_context.get("pending_question_text") or ""),
+            short_answer_allowed=short_answer_allowed,
+        )
+
+    def _utterance_duration_ms(self, utterance_id: str) -> int:
+        state = self.utterance_mgr.get_state(utterance_id)
+        if state is not None and state.speech_started_at > 0:
+            end_ts = state.speech_ended_at or time.time()
+            return max(0, int((end_ts - state.speech_started_at) * 1000))
+        if self.state.telemetry is not None and self.state.telemetry.utterance_id == utterance_id:
+            end_ts = self.state.telemetry.speech_end_ts or time.time()
+            return max(0, int((end_ts - self.state.telemetry.speech_start_ts) * 1000))
+        return 0
+
+    @staticmethod
+    def _is_offline_final_source(source: str) -> bool:
+        s = str(source or "").lower()
+        return "offline" in s
+
+    @staticmethod
+    def _is_server_final_source(source: str) -> bool:
+        s = str(source or "").lower()
+        return "server_final" in s or s == "final"
 
     def _mark_room_stage(self, stage: str) -> None:
         self.room_state.last_stage = stage
@@ -156,24 +213,35 @@ class ParticipantVoiceProcessor:
 
         try:
             async for audio_event in self.audio_stream:
-                normalized_chunks = self.audio_normalizer.transform(audio_event.frame)
-                for normalized_pcm in normalized_chunks:
-                    if not self._received_first_frame and normalized_pcm:
-                        self._received_first_frame = True
-                        structured_voice_log(
-                            "voice.first_audio_frame_received",
-                            room_id=self.room_id_getter(),
-                            room_name=self.room_name,
-                            user_identity=self.user_identity,
-                            track_sid=self.publication.sid,
-                        )
-                        await self.publisher.publish_state(
-                            self.user_identity,
-                            state="audio.first_frame",
-                            payload={"trackSid": self.publication.sid},
-                        )
-                        self._mark_room_stage("audio.first_frame")
-                    await self._consume_pcm(normalized_pcm)
+                try:
+                    normalized_chunks = self.audio_normalizer.transform(audio_event.frame)
+                    for normalized_pcm in normalized_chunks:
+                        if not self._received_first_frame and normalized_pcm:
+                            self._received_first_frame = True
+                            structured_voice_log(
+                                "voice.first_audio_frame_received",
+                                room_id=self.room_id_getter(),
+                                room_name=self.room_name,
+                                user_identity=self.user_identity,
+                                track_sid=self.publication.sid,
+                            )
+                            await self.publisher.publish_state(
+                                self.user_identity,
+                                state="audio.first_frame",
+                                payload={"trackSid": self.publication.sid},
+                            )
+                            self._mark_room_stage("audio.first_frame")
+                        await self._consume_pcm(normalized_pcm)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as frame_exc:
+                    structured_voice_log(
+                        "voice.audio_frame.error",
+                        room_id=self.room_id_getter(),
+                        room_name=self.room_name,
+                        user_identity=self.user_identity,
+                        error=str(frame_exc),
+                    )
         except asyncio.CancelledError:
             raise
         finally:
@@ -276,6 +344,7 @@ class ParticipantVoiceProcessor:
         self.state.active_utterance_id = utterance_id
         self._awaiting_final = False
         self._finishing_utterance_id = ""
+        self.utterance_mgr.start_utterance(utterance_id, speech_start_ts)
         self.room_state.last_vad_event = "speech_start"
         self._mark_room_stage("vad.speech_start")
         self.state.telemetry = UtteranceTelemetry(
@@ -369,7 +438,17 @@ class ParticipantVoiceProcessor:
         utterance_id = self.state.active_utterance_id
         if not utterance_id or not pcm:
             return
-        await self.funasr.send_audio_chunk(pcm)
+        try:
+            await self.funasr.send_audio_chunk(pcm)
+        except Exception as exc:
+            structured_voice_log(
+                "asr.audio_chunk.failed",
+                **self._log_context(),
+                bytes=len(pcm),
+                utterance_id=utterance_id,
+                error=str(exc),
+            )
+            return
         structured_voice_log("asr.audio_chunk_sent", **self._log_context(), bytes=len(pcm), utterance_id=utterance_id)
         self.room_state.last_audio_chunk_sent = time.strftime("%H:%M:%S")
         self._mark_room_stage("asr.audio_chunk_sent")
@@ -392,6 +471,7 @@ class ParticipantVoiceProcessor:
         utterance_id = self.state.active_utterance_id
         self._finishing_utterance_id = utterance_id
         self.state.telemetry.speech_end_ts = speech_end_ts
+        self.utterance_mgr.mark_speech_end(utterance_id, speech_end_ts)
         self.room_state.last_vad_event = "speech_end"
         self._mark_room_stage("vad.speech_end")
         self._set_vad_state("idle", event_name="vad.speech_end", event_ts=speech_end_ts, utterance_id=utterance_id)
@@ -420,15 +500,199 @@ class ParticipantVoiceProcessor:
             final_event = await self.funasr.finish_utterance()
             if final_event is None:
                 structured_voice_log("voice.speech_end_without_final", **self.state.telemetry.to_log_payload())
+                await self._publish_partial_fallback(utterance_id)
+            elif "timeout_partial" in (final_event.source or ""):
+                structured_voice_log(
+                    "voice.finish_utterance.timeout_fallback_suppressed",
+                    **self.state.telemetry.to_log_payload(),
+                    final_source=final_event.source,
+                    text=final_event.text,
+                    funasr_connected=self.funasr.is_connected,
+                )
+                if final_event.source not in {"partial_fallback"}:
+                    await self._publish_recognition_incomplete(
+                        utterance_id,
+                        reason="timeout_partial_fallback_blocked",
+                        preview_text=self.partial_acc.get(utterance_id) or final_event.text,
+                    )
+            else:
+                structured_voice_log(
+                    "voice.finish_utterance.got_final",
+                    **self.state.telemetry.to_log_payload(),
+                    final_source=final_event.source,
+                )
+        except Exception as exc:
+            structured_voice_log(
+                "voice.finish_utterance.error",
+                room_id=self.room_id_getter(),
+                room_name=self.room_name,
+                user_identity=self.user_identity,
+                utterance_id=utterance_id,
+                error=str(exc),
+            )
+            await self._publish_partial_fallback(utterance_id)
         finally:
             self._awaiting_final = False
             self._finishing_utterance_id = ""
+            self.utterance_mgr.clear_active()
             self.state.active_utterance_id = ""
             self.state.telemetry = None
             await self._replay_deferred_utterance_if_needed()
 
+    async def _publish_partial_fallback(self, utterance_id: str) -> None:
+        state = self.utterance_mgr.get_state(utterance_id)
+        if state is not None and state.selected_text:
+            return  # already published a final for this utterance
+        total_audio_ms = self._utterance_duration_ms(utterance_id)
+        fallback_text = self.partial_acc.get(utterance_id)
+        context = self._commit_context()
+        if not fallback_text:
+            structured_voice_log(
+                "utterance.final.fallback_skipped",
+                room_id=self.room_id_getter(),
+                room_name=self.room_name,
+                user_identity=self.user_identity,
+                utterance_id=utterance_id,
+                fallback_text=fallback_text,
+                reason="empty_accumulated_text",
+            )
+            await self._publish_recognition_incomplete(utterance_id, reason="no_final", preview_text=fallback_text)
+            return
+        decision = CommitGate.evaluate(
+            utterance_id=utterance_id,
+            selected_text=fallback_text,
+            source="partial_fallback",
+            utterance_duration_ms=total_audio_ms,
+            context=context,
+            has_offline_final=False,
+            has_server_final=False,
+            accumulated_partial_text=fallback_text,
+        )
+        if not decision.allowed:
+            blocked_state = self.utterance_mgr.get_state(utterance_id)
+            if blocked_state is not None:
+                blocked_state.selected_text = ""
+                blocked_state.selected_source = ""
+            structured_voice_log(
+                "utterance.final.fallback_skipped",
+                room_id=self.room_id_getter(),
+                room_name=self.room_name,
+                user_identity=self.user_identity,
+                utterance_id=utterance_id,
+                fallback_text=fallback_text,
+                reason=decision.reason,
+                context_mode=context.mode,
+                pending_question=context.pending_question,
+            )
+            structured_voice_log(
+                "transcript.commit.blocked",
+                **self._log_context(),
+                utterance_id=utterance_id,
+                text=fallback_text,
+                source="partial_fallback",
+                reason=decision.reason,
+                utterance_duration_ms=total_audio_ms,
+                context_mode=context.mode,
+            )
+            structured_voice_log(
+                "transcript.commit.blocked.reason",
+                **self._log_context(),
+                utterance_id=utterance_id,
+                reason=decision.reason,
+            )
+            await self._publish_recognition_incomplete(
+                utterance_id,
+                reason=decision.reason,
+                preview_text=fallback_text,
+                message=decision.display_message,
+            )
+            return
+        selected = self.utterance_mgr.select_text(utterance_id, fallback_text, "partial_fallback")
+        if selected is None:
+            return
+        structured_voice_log(
+            "utterance.final_text.selected",
+            room_id=self.room_id_getter(),
+            room_name=self.room_name,
+            user_identity=self.user_identity,
+            utterance_id=utterance_id,
+            text=fallback_text,
+            source="partial_fallback",
+        )
+        structured_voice_log(
+            "transcript.commit.allowed",
+            **self._log_context(),
+            utterance_id=utterance_id,
+            text=fallback_text,
+            source="partial_fallback",
+            reason=decision.reason,
+            utterance_duration_ms=total_audio_ms,
+            context_mode=context.mode,
+        )
+        try:
+            await self.publisher.publish_final(
+                self.user_identity,
+                utterance_id=utterance_id,
+                text=fallback_text,
+                source="partial_fallback",
+            )
+            self.utterance_mgr.mark_published(utterance_id)
+            asyncio.create_task(
+                self._watch_ack(utterance_id, fallback_text, "partial_fallback"),
+                name=f"voice-ack-{self.user_identity}-{utterance_id[:8]}",
+            )
+        except Exception as exc:
+            self.utterance_mgr.mark_failed(utterance_id, str(exc))
+            structured_voice_log(
+                "utterance.submit.failed",
+                room_id=self.room_id_getter(),
+                room_name=self.room_name,
+                user_identity=self.user_identity,
+                utterance_id=utterance_id,
+                error=str(exc),
+            )
+
+    async def _publish_recognition_incomplete(
+        self,
+        utterance_id: str,
+        *,
+        reason: str,
+        preview_text: str = "",
+        message: str = "",
+    ) -> None:
+        display_message = message or "我听到了一部分，但还没拿到完整识别结果，请再说一遍。"
+        structured_voice_log(
+            "recognition_incomplete.no_final",
+            **self._log_context(),
+            utterance_id=utterance_id,
+            reason=reason,
+            preview_text=preview_text,
+        )
+        await self.publisher.publish_state(
+            self.user_identity,
+            state="recognition_incomplete",
+            payload={
+                "utteranceId": utterance_id,
+                "reason": reason,
+                "previewText": preview_text,
+                "message": display_message,
+            },
+        )
+
     async def _on_partial(self, event: FunASRTranscriptEvent) -> None:
         self.state.last_partial_text = event.text
+        structured_voice_log(
+            "funasr.partial.received",
+            room_id=self.room_id_getter(),
+            room_name=self.room_name,
+            user_identity=self.user_identity,
+            utterance_id=event.utterance_id,
+            text=event.text,
+            text_length=len(event.text),
+        )
+        if event.text.strip():
+            self.utterance_mgr.record_partial(event.utterance_id, event.text)
+            self.partial_acc.feed(event.utterance_id, event.text)
         should_log_first_partial = self.state.telemetry is not None and self.state.telemetry.asr_first_partial_ms is None
         if self.state.telemetry is not None:
             self.state.telemetry.mark_first_partial()
@@ -451,23 +715,121 @@ class ParticipantVoiceProcessor:
         )
 
     async def _on_final(self, event: FunASRTranscriptEvent) -> None:
-        self.state.last_final_text = event.text
-        self.state.last_partial_text = ""
+        utterance_id = event.utterance_id
         final_source = event.source or ("timeout_partial_fallback" if event.raw.get("fallback_final") else "server_final")
-        final_text_length = len(event.text)
+
+        structured_voice_log(
+            "funasr.final.received",
+            room_id=self.room_id_getter(),
+            room_name=self.room_name,
+            user_identity=self.user_identity,
+            utterance_id=utterance_id,
+            text=event.text,
+            text_length=len(event.text),
+            source=final_source,
+        )
+
+        is_timeout_fallback = "timeout_partial" in final_source
+        if is_timeout_fallback and self.funasr.is_connected:
+            structured_voice_log(
+                "utterance.final.skipped.timeout_fallback_connection_alive",
+                room_id=self.room_id_getter(),
+                room_name=self.room_name,
+                user_identity=self.user_identity,
+                utterance_id=utterance_id,
+                source=final_source,
+                text=event.text,
+            )
+            return
+
+        state = self.utterance_mgr.get_state(utterance_id)
+        if state is not None and state.status.value in ("acked", "submitted"):
+            structured_voice_log(
+                "late_final_after_submit",
+                **self._log_context(),
+                utterance_id=utterance_id,
+                text=event.text,
+                source=final_source,
+                existing_text=state.selected_text,
+                existing_source=state.selected_source,
+                existing_status=state.status.value,
+            )
+            return
+
+        selected = self.utterance_mgr.select_text(utterance_id, event.text, final_source)
+        if selected is None:
+            return
+
+        selected_text, selected_source = selected
+
+        duration_ms = self._utterance_duration_ms(utterance_id)
+        accumulated_partial_text = self.partial_acc.get(utterance_id)
+        context = self._commit_context()
+        decision = CommitGate.evaluate(
+            utterance_id=utterance_id,
+            selected_text=selected_text,
+            source=selected_source,
+            utterance_duration_ms=duration_ms,
+            context=context,
+            has_offline_final=self._is_offline_final_source(selected_source),
+            has_server_final=self._is_server_final_source(selected_source),
+            accumulated_partial_text=accumulated_partial_text,
+        )
+        if not decision.allowed:
+            structured_voice_log(
+                "transcript.commit.blocked",
+                **self._log_context(),
+                utterance_id=utterance_id,
+                text=selected_text,
+                source=selected_source,
+                reason=decision.reason,
+                utterance_duration_ms=duration_ms,
+                context_mode=context.mode,
+            )
+            structured_voice_log(
+                "transcript.commit.blocked.reason",
+                **self._log_context(),
+                utterance_id=utterance_id,
+                reason=decision.reason,
+            )
+            if "fallback" in selected_source:
+                structured_voice_log(
+                    "late_final_after_blocked_fallback",
+                    **self._log_context(),
+                    utterance_id=utterance_id,
+                    text=selected_text,
+                    source=selected_source,
+                )
+            await self._publish_recognition_incomplete(
+                utterance_id,
+                reason=decision.reason,
+                preview_text=accumulated_partial_text or selected_text,
+                message=decision.display_message,
+            )
+            return
+
+        structured_voice_log(
+            "transcript.commit.allowed",
+            **self._log_context(),
+            utterance_id=utterance_id,
+            text=selected_text,
+            source=selected_source,
+            reason=decision.reason,
+            utterance_duration_ms=duration_ms,
+            context_mode=context.mode,
+            has_offline_final=self._is_offline_final_source(selected_source),
+            has_server_final=self._is_server_final_source(selected_source),
+        )
+
+        self.state.last_final_text = selected_text
+        self.state.last_partial_text = ""
         if self.state.telemetry is not None:
             self.state.telemetry.mark_final()
             structured_voice_log(
                 "voice.utterance_final",
                 **self.state.telemetry.to_log_payload(),
-                final_source=final_source,
-                final_text_length=final_text_length,
-            )
-            structured_voice_log(
-                "voice.funasr_final",
-                **self.state.telemetry.to_log_payload(),
-                final_source=final_source,
-                final_text_length=final_text_length,
+                final_source=selected_source,
+                final_text_length=len(selected_text),
             )
         else:
             structured_voice_log(
@@ -475,31 +837,118 @@ class ParticipantVoiceProcessor:
                 room_id=self.room_id_getter(),
                 room_name=self.room_name,
                 user_identity=self.user_identity,
-                utterance_id=event.utterance_id,
-                final_source=final_source,
-                final_text_length=final_text_length,
+                utterance_id=utterance_id,
+                final_source=selected_source,
+                final_text_length=len(selected_text),
             )
         self.room_state.last_funasr_final = time.strftime("%H:%M:%S")
         self._mark_room_stage("funasr.final")
-        await self.publisher.publish_final(
-            self.user_identity,
-            utterance_id=event.utterance_id,
-            text=event.text,
+
+        structured_voice_log(
+            "utterance.submit.begin",
+            room_id=self.room_id_getter(),
+            room_name=self.room_name,
+            user_identity=self.user_identity,
+            utterance_id=utterance_id,
+            text=selected_text,
+            source=selected_source,
         )
+
+        try:
+            await self.publisher.publish_final(
+                self.user_identity,
+                utterance_id=utterance_id,
+                text=selected_text,
+                source=selected_source,
+            )
+            self.utterance_mgr.mark_published(utterance_id)
+        except Exception as exc:
+            self.utterance_mgr.mark_failed(utterance_id, str(exc))
+            structured_voice_log(
+                "utterance.submit.failed",
+                room_id=self.room_id_getter(),
+                room_name=self.room_name,
+                user_identity=self.user_identity,
+                utterance_id=utterance_id,
+                error=str(exc),
+            )
+            raise
+
+        # Spawn ack watcher (does not block the recv loop)
+        asyncio.create_task(
+            self._watch_ack(utterance_id, selected_text, selected_source),
+            name=f"voice-ack-{self.user_identity}-{utterance_id[:8]}",
+        )
+
         await self.publisher.publish_state(
             self.user_identity,
             state="funasr.final",
             payload={
-                "utteranceId": event.utterance_id,
-                "finalSource": final_source,
-                "finalTextLength": final_text_length,
+                "utteranceId": utterance_id,
+                "finalSource": selected_source,
+                "finalTextLength": len(selected_text),
                 "asrFinalMs": self.state.telemetry.asr_final_ms if self.state.telemetry is not None else None,
             },
         )
         await self.publisher.publish_state(
             self.user_identity,
             state="utterance.complete",
-            payload={"utteranceId": event.utterance_id},
+            payload={"utteranceId": utterance_id},
+        )
+
+    async def _watch_ack(self, utterance_id: str, text: str, source: str) -> None:
+        """Wait for frontend ack, retry publish on timeout."""
+        acked = await self.utterance_mgr.wait_for_ack(utterance_id, VOICE_FINAL_ACK_TIMEOUT_MS)
+        if acked:
+            self.utterance_mgr.cleanup_ack(utterance_id)
+            return
+
+        for attempt in range(1, VOICE_FINAL_ACK_RETRY + 1):
+            retry_delay_ms = VOICE_FINAL_ACK_TIMEOUT_MS * (attempt + 1)
+            structured_voice_log(
+                "transcript.publish.retry",
+                room_id=self.room_id_getter(),
+                room_name=self.room_name,
+                user_identity=self.user_identity,
+                utterance_id=utterance_id,
+                attempt=attempt,
+                retry_delay_ms=retry_delay_ms,
+            )
+            try:
+                await self.publisher.publish_final(
+                    self.user_identity,
+                    utterance_id=utterance_id,
+                    text=text,
+                    source=source,
+                )
+                self.utterance_mgr.mark_published(utterance_id)
+            except Exception as exc:
+                structured_voice_log(
+                    "transcript.publish.retry_failed",
+                    room_id=self.room_id_getter(),
+                    room_name=self.room_name,
+                    user_identity=self.user_identity,
+                    utterance_id=utterance_id,
+                    attempt=attempt,
+                    error=str(exc),
+                )
+
+            acked = await self.utterance_mgr.wait_for_ack(utterance_id, retry_delay_ms)
+            if acked:
+                self.utterance_mgr.cleanup_ack(utterance_id)
+                return
+
+        self.utterance_mgr.mark_failed(utterance_id, "ack_timeout")
+        self.utterance_mgr.cleanup_ack(utterance_id)
+        self.utterance_mgr.cleanup_ack(utterance_id)
+        structured_voice_log(
+            "transcript.publish.failed",
+            room_id=self.room_id_getter(),
+            room_name=self.room_name,
+            user_identity=self.user_identity,
+            utterance_id=utterance_id,
+            error="ack_timeout",
+            total_attempts=VOICE_FINAL_ACK_RETRY + 1,
         )
 
     async def _on_funasr_state(self, state: str, payload: dict) -> None:
@@ -541,14 +990,15 @@ class ParticipantVoiceProcessor:
 
 
 class LiveKitRoomBridge:
-    def __init__(self, room_name: str) -> None:
+    def __init__(self, room_name: str, *, context_provider=None) -> None:
         self.state = RoomSessionState(
             room_name=room_name,
             worker_identity=f"voice-worker-{room_name}-{uuid4().hex[:8]}",
         )
         self.room = rtc.Room()
+        self.context_provider = context_provider
         self.publisher: LiveKitTranscriptPublisher | None = None
-        self._participant_processors: dict[str, ParticipantVoiceProcessor] = {}
+        self._processors: dict[tuple[str, str], ParticipantVoiceProcessor] = {}
         self._session_task: asyncio.Task | None = None
         self._closed = asyncio.Event()
         self._ready = asyncio.Event()
@@ -742,10 +1192,25 @@ class LiveKitRoomBridge:
             return
         if participant.identity == self.state.worker_identity:
             return
-        existing = self._participant_processors.get(participant.identity)
-        if existing is not None:
+        processor_key = (participant.identity, publication.sid)
+        if processor_key in self._processors:
+            structured_voice_log(
+                "voice.track_subscribed.duplicate_skipped",
+                room_id=self.state.room_id or self.state.room_name,
+                room_name=self.state.room_name,
+                user_identity=participant.identity,
+                track_sid=publication.sid,
+            )
             return
         if self.publisher is None:
+            structured_voice_log(
+                "voice.processor.create_skipped",
+                room_id=self.state.room_id or self.state.room_name,
+                room_name=self.state.room_name,
+                user_identity=participant.identity,
+                track_sid=publication.sid,
+                reason="publisher_not_ready",
+            )
             return
         processor = ParticipantVoiceProcessor(
             room_name=self.state.room_name,
@@ -756,12 +1221,26 @@ class LiveKitRoomBridge:
             participant=participant,
             publication=publication,
             track=track,
+            context_provider=self.context_provider,
         )
-        self._participant_processors[participant.identity] = processor
+        self._processors[processor_key] = processor
         self.state.participants[participant.identity] = processor.state
-        processor.start()
+        try:
+            processor.start()
+        except Exception as exc:
+            self._processors.pop(processor_key, None)
+            self.state.participants.pop(participant.identity, None)
+            structured_voice_log(
+                "voice.processor.create_failed",
+                room_id=self.state.room_id or self.state.room_name,
+                room_name=self.state.room_name,
+                user_identity=participant.identity,
+                track_sid=publication.sid,
+                error=str(exc),
+            )
+            return
         structured_voice_log(
-            "voice.track_subscribed",
+            "voice.processor.created",
             room_id=self.state.room_id or self.state.room_name,
             room_name=self.state.room_name,
             user_identity=participant.identity,
@@ -780,28 +1259,43 @@ class LiveKitRoomBridge:
         asyncio.create_task(self._stop_participant(participant.identity, reason="participant_disconnected"))
 
     async def _stop_participant_if_matching(self, identity: str, track_sid: str, reason: str = "track_unsubscribed") -> None:
-        processor = self._participant_processors.get(identity)
-        if processor is None or processor.state.track_sid != track_sid:
+        processor_key = (identity, track_sid)
+        processor = self._processors.get(processor_key)
+        if processor is None:
             return
-        await self._stop_participant(identity, reason=reason)
+        await self._stop_processor(processor_key, reason=reason)
 
-    async def _stop_participant(self, identity: str, reason: str = "participant_stop") -> None:
-        processor = self._participant_processors.pop(identity, None)
-        self.state.participants.pop(identity, None)
+    async def _stop_processor(self, processor_key: tuple[str, str], reason: str = "participant_stop") -> None:
+        processor = self._processors.pop(processor_key, None)
         if processor is None:
             return
         await processor.stop(reason=reason)
         structured_voice_log(
-            "voice.participant_cleanup",
+            "voice.processor.cleanup",
             room_id=self.state.room_id or self.state.room_name,
             room_name=self.state.room_name,
-            user_identity=identity,
+            user_identity=processor_key[0],
+            track_sid=processor_key[1],
             reason=reason,
         )
 
+    async def _stop_participant(self, identity: str, reason: str = "participant_stop") -> None:
+        matching_keys = [key for key in self._processors if key[0] == identity]
+        self.state.participants.pop(identity, None)
+        for key in matching_keys:
+            await self._stop_processor(key, reason=reason)
+        if not matching_keys:
+            structured_voice_log(
+                "voice.participant_cleanup.no_processor",
+                room_id=self.state.room_id or self.state.room_name,
+                room_name=self.state.room_name,
+                user_identity=identity,
+                reason=reason,
+            )
+
     async def _stop_all_participants(self) -> None:
-        for identity in list(self._participant_processors.keys()):
-            await self._stop_participant(identity, reason="room_shutdown")
+        for key in list(self._processors.keys()):
+            await self._stop_processor(key, reason="room_shutdown")
 
     async def _broadcast_worker_error(self, error_message: str) -> None:
         if self.publisher is None or not self.room.isconnected():
@@ -817,9 +1311,10 @@ class LiveKitRoomBridge:
 
 
 class VoiceWorkerManager:
-    def __init__(self) -> None:
+    def __init__(self, *, context_provider=None) -> None:
         self._sessions: dict[str, LiveKitRoomBridge] = {}
         self._lock = asyncio.Lock()
+        self.context_provider = context_provider
 
     async def ensure_session(self, room_name: str) -> bool:
         if not livekit_voice_stack_is_configured():
@@ -840,7 +1335,7 @@ class VoiceWorkerManager:
             if existing is not None:
                 bridge = existing
             else:
-                bridge = LiveKitRoomBridge(room_name)
+                bridge = LiveKitRoomBridge(room_name, context_provider=self.context_provider)
                 self._sessions[room_name] = bridge
                 bridge.start()
                 structured_voice_log("voice.session_started", room_id=room_name, room_name=room_name)

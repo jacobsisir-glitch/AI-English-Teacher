@@ -127,6 +127,47 @@ Browser (Vue 3 SPA)
 - Main branch: `main`
 - Currently uncommitted: `.vscode/settings.json`, textbook 05 edits, new textbooks 06 and 07
 
+## Current handoff: Two-Channel Commit voice input
+
+Status: implemented and user-tested successfully. Do not reintroduce automatic `partial_fallback` submission in normal chat.
+
+What changed:
+
+- Voice input now uses a Two-Channel Commit model.
+- Preview Channel: `stt.partial` is only for live UI preview (`正在识别：...`) and must never call `submitVoiceTranscript()`.
+- Commit Channel: only offline/server final transcripts may become `stt.final` and enter `/chat_stream` or `/class_chat_stream`.
+- Normal chat blocks `partial_fallback`, `timeout_partial_fallback`, and obvious fragments such as `下你`, `课程`, `her`, `loheris`, `singgoing`.
+- No-final cases publish `voice.state = recognition_incomplete`; frontend shows `我听到了一部分，但还没拿到完整识别结果，请再说一遍。` and does not submit to Lumina.
+- Micro-lesson pending-question mode allows guarded short-answer fallback only while backend class state is waiting for an answer, with whitelist examples like `Birds`, `主语`, `yes`, `好`.
+- `PartialAccumulator` remains for preview/debug/incomplete recognition context, not as a normal-chat commit source.
+
+Key files:
+
+- `voice/utterance_manager.py`: `CommitGate`, `CommitContext`, ack lifecycle helpers.
+- `voice/livekit_room_bridge.py`: CommitGate integration before publishing `stt.final`, `recognition_incomplete` state, participant/track processor handling.
+- `voice/funasr_client.py`: safer FunASR final routing, explicit `wav_name` handling, longer final wait strategy.
+- `voice/transcript_publisher.py`: `stt.final` can include `source`.
+- `frontend/index.html`: partial preview only, final-only submit, no-final UI handling, one-submit-per-utterance guard.
+- `main.py`: backend class/pending-question state is exposed to voice worker through `VoiceWorkerManager(context_provider=...)`.
+
+Important caveat:
+
+- The frontend `结束本句` button is experimental. It currently uses `setMicrophoneEnabled(false)` then `setMicrophoneEnabled(true)`, which may trigger LiveKit track rebuilds. Prefer a future data topic or HTTP control signal that asks the backend to finish the current utterance without closing the microphone track.
+
+Verification already run:
+
+- `python -m py_compile voice\funasr_client.py voice\livekit_room_bridge.py voice\utterance_manager.py voice\partial_accumulator.py voice\transcript_publisher.py main.py config.py`
+- `git diff --check` passes; only Windows LF-to-CRLF warnings appear.
+- CommitGate simulation confirms normal chat blocks `下你` / `课程` / `her`, allows offline final Chinese/English long sentences, and allows pending-question short answers `Birds` / `主语` / `yes` / `好`.
+- User reports live tests passed for Chinese long sentences, English sentence, no-final prompt, and pending-question short answers.
+
+Current pre-commit state:
+
+- No staged files yet.
+- `.env` is not modified/staged.
+- New files to include in commit: `voice/partial_accumulator.py`, `voice/utterance_manager.py`.
+- Suggested commit message: `fix: enforce final-only voice transcript commit`
+
 ## Language
 
 The user and this project are Chinese. Comments, docs, UI strings, prompts are predominantly Chinese or bilingual. English grammar teaching examples are in English.

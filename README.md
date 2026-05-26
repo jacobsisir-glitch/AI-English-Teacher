@@ -149,11 +149,14 @@ FUNASR_WS_URL=wss://127.0.0.1:10095
 FUNASR_MODE=2pass
 FUNASR_MODEL_NAME=
 
-FUNASR_FINAL_WAIT_OFFLINE_MS=5000
-FUNASR_FINAL_WAIT_FALLBACK_MS=1000
-FUNASR_FINAL_DRAIN_WINDOW_MS=4000
+FUNASR_FINAL_WAIT_OFFLINE_MS=6000
+FUNASR_FINAL_WAIT_FALLBACK_MS=0
+FUNASR_FINAL_DRAIN_MS=1000
 FUNASR_FINAL_RESCUE_WAIT_MS=6000
 FUNASR_LATE_FINAL_GRACE_MS=12000
+VOICE_FINAL_ACK_TIMEOUT_MS=1000
+VOICE_FINAL_ACK_RETRY=2
+VOICE_STOP_WAIT_FINAL_MS=8000
 
 SILERO_VAD_THRESHOLD=0.38
 SILERO_MIN_SILENCE_MS=1200
@@ -304,6 +307,11 @@ http://127.0.0.1:8000/frontend/index.html
 - 前端增加了更多语音与聊天流式调试日志
 - 语音转文本结果现在会更稳定地回流到聊天消息区
 
+注意：前端的“结束本句”按钮目前是实验功能。当前实现仍通过
+`setMicrophoneEnabled(false)` / `setMicrophoneEnabled(true)` 临时关闭再重开浏览器麦克风，
+这可能触发 LiveKit track 重建。后续更稳的方案应单独实现 data topic 或 HTTP 控制信号，
+由后端直接 finish 当前 utterance，而不是关闭麦克风 track。
+
 本次关键配置位于：
 
 - [config.py](/d:/AIEnglish_grammar_teacher/config.py)
@@ -408,4 +416,3 @@ http://127.0.0.1:8000/frontend/index.html
 ## License
 
 当前仓库未单独声明开源许可证；如果准备公开分发，建议补充 `LICENSE` 文件。
-

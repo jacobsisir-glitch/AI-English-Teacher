@@ -25,17 +25,20 @@ class LiveKitTranscriptPublisher:
             },
         )
 
-    async def publish_final(self, user_identity: str, *, utterance_id: str, text: str) -> None:
+    async def publish_final(self, user_identity: str, *, utterance_id: str, text: str, source: str = "") -> None:
+        payload = {
+            "roomName": self.room_name,
+            "roomId": self.room_id,
+            "userIdentity": user_identity,
+            "utteranceId": utterance_id,
+            "text": text,
+        }
+        if source:
+            payload["source"] = source
         await self._send_topic(
             "stt.final",
             user_identity,
-            {
-                "roomName": self.room_name,
-                "roomId": self.room_id,
-                "userIdentity": user_identity,
-                "utteranceId": utterance_id,
-                "text": text,
-            },
+            payload,
         )
 
     async def publish_state(self, user_identity: str, *, state: str, payload: dict[str, Any] | None = None) -> None:

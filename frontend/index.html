@@ -649,6 +649,18 @@
                     <span class="whitespace-nowrap">{{ isStopping ? '正在停止…' : '结束语音' }}</span>
                 </button>
                 <button
+                    @click="finishCurrentUtterance"
+                    :disabled="voiceState !== 'connected' || isStopping"
+                    :class="[
+                        'mb-1 inline-flex h-12 items-center justify-center rounded-2xl px-4 text-sm font-medium transition-all',
+                        voiceState === 'connected' && !isStopping
+                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    ]">
+                    <i class="fa-solid fa-check mr-2"></i>
+                    <span class="whitespace-nowrap">结束本句</span>
+                </button>
+                <button
                     @click="sendMessage"
                     :disabled="!inputText.trim() || isThinking || isInputLocked"
                     :class="['mb-1 flex h-12 w-12 items-center justify-center rounded-2xl transition-all',
@@ -999,6 +1011,7 @@
     };
     const DASHBOARD_CACHE_KEY = 'aiTeacherDashboardCache';
     const PPT_MODE_ENABLED = true;
+    const VOICE_STOP_WAIT_FINAL_MS = 8000;
     const WHITEBOARD_EVENT_PACKET_REGEX = /<WBEVENT>([\s\S]*?)<\/WBEVENT>/g;
     const WHITEBOARD_EVENT_OPEN = '<WBEVENT>';
     const WHITEBOARD_EVENT_CLOSE = '</WBEVENT>';
@@ -1171,6 +1184,7 @@
             let pendingDisconnectMeta = null;
             let pendingVoiceStopWaiter = null;
             let pendingVoiceDisconnectWaiter = null;
+            const _submittedVoiceUtterances = new Map();
             const pendingWhiteboardStages = [];
             const activatedWhiteboardStageKeys = new Set();
             const SUBTITLE_MIN_WEAK_BREAK_CHARS = 8;
@@ -2939,6 +2953,7 @@
                 if (!keepFinal) {
                     voiceFinalTranscript.value = '';
                 }
+                _submittedVoiceUtterances.clear();
             };
             const toggleVoiceDebugPanel = () => {
                 isVoiceDebugExpanded.value = !isVoiceDebugExpanded.value;
@@ -3037,15 +3052,57 @@
                 try {
                     const payload = JSON.parse(rawText);
                     if (topic === 'stt.partial') {
-                        voicePartialTranscript.value = String(payload.text || '').trim();
+                        const partialText = String(payload.text || '').trim();
+                        voicePartialTranscript.value = partialText;
                         voiceDebug.value.lastPartialAt = nowLabel();
+                        // Only show partial in subtitle if TTS is NOT currently speaking,
+                        // to avoid clobbering Lumina's spoken subtitle.
+                        if (partialText && voiceState.value === 'connected' && !isSpeechSubtitleActive.value) {
+                            setImmediateSubtitle('正在识别：' + partialText);
+                        }
                         return;
                     }
                     if (topic === 'stt.final') {
-                        voiceFinalTranscript.value = String(payload.text || '').trim();
+                        const payloadText = String(payload.text || '').trim();
+                        const utteranceId = String(payload.utteranceId || '');
                         voiceDebug.value.lastFinalAt = nowLabel();
                         resolvePendingVoiceStopWaiter('stt.final');
-                        await submitVoiceTranscript(String(payload.text || '').trim());
+                        if (!payloadText) {
+                            logChatEvent('[voice] stt.final.empty_text', {
+                                utteranceId,
+                                raw: rawText.substring(0, 200),
+                                source: 'voice'
+                            });
+                            return;
+                        }
+                        // Always send ack so backend doesn't retry
+                        sendVoiceAck(utteranceId, payloadText);
+                        voiceFinalTranscript.value = payloadText;
+                        if (utteranceId && _submittedVoiceUtterances.has(utteranceId)) {
+                            const prevText = _submittedVoiceUtterances.get(utteranceId);
+                            if (prevText === payloadText) {
+                                logChatEvent('[voice] stt.final.duplicate', {
+                                    text: payloadText,
+                                    utteranceId,
+                                    source: 'voice'
+                                });
+                                return;
+                            }
+                            // Upgrade: update tracked text and display, but do NOT re-submit
+                            // to Lumina (same utterance_id already submitted).
+                            _submittedVoiceUtterances.set(utteranceId, payloadText);
+                            logChatEvent('[voice] stt.final.upgrade', {
+                                prevText,
+                                newText: payloadText,
+                                utteranceId,
+                                source: 'voice'
+                            });
+                            return;
+                        }
+                        if (utteranceId) {
+                            _submittedVoiceUtterances.set(utteranceId, payloadText);
+                        }
+                        await submitVoiceTranscript(payloadText, utteranceId);
                         return;
                     }
                     if (topic === 'voice.state') {
@@ -3071,6 +3128,7 @@
                             if (voiceState.value === 'connected') {
                                 voiceBackendState.value = 'worker.failed';
                             }
+                            showVoiceStatusBanner('语音识别服务异常：' + voiceWorkerError.value, 'error');
                         } else if (nextState === 'track.subscribed') {
                             voiceDebug.value.trackSubscribed = true;
                         } else if (nextState === 'audio.first_frame') {
@@ -3104,6 +3162,21 @@
                             voiceDebug.value.lastFunasrMessageAt = nowLabel();
                         } else if (nextState === 'utterance.complete') {
                             resolvePendingVoiceStopWaiter('utterance.complete');
+                        } else if (nextState === 'recognition_incomplete') {
+                            const message = String(
+                                payload.message
+                                || '我听到了一部分，但还没拿到完整识别结果，请再说一遍。'
+                            ).trim();
+                            const previewText = String(payload.previewText || '').trim();
+                            voicePartialTranscript.value = previewText;
+                            voiceFinalTranscript.value = '';
+                            resolvePendingVoiceStopWaiter('recognition_incomplete');
+                            setImmediateSubtitle(message);
+                            logVoiceEvent('voice.recognition_incomplete', {
+                                utteranceId: String(payload.utteranceId || ''),
+                                reason: String(payload.reason || ''),
+                                previewText
+                            });
                         }
                     }
                 } catch (error) {
@@ -3121,6 +3194,36 @@
                     await handleIncomingVoiceTextStream('voice.state', reader);
                 });
             };
+            const finishCurrentUtterance = async () => {
+                const room = livekitRoom;
+                if (!room || isStopping.value || voiceState.value !== 'connected') {
+                    return;
+                }
+                logVoiceEvent('finish_utterance.begin', {
+                    roomName: voiceRoomName.value || room.name || ''
+                });
+                setImmediateSubtitle('正在完成当前句识别...');
+                try {
+                    await room.localParticipant.setMicrophoneEnabled(false);
+                    logVoiceEvent('finish_utterance.mic_off');
+                } catch (error) {
+                    console.warn('[AI Teacher] finishCurrentUtterance mic off failed.', error);
+                }
+                const finishResult = await waitForVoiceFlushOrFinal(VOICE_STOP_WAIT_FINAL_MS);
+                logVoiceEvent('finish_utterance.wait_result', { result: finishResult });
+                try {
+                    if (livekitRoom === room && voiceState.value === 'connected') {
+                        await room.localParticipant.setMicrophoneEnabled(true);
+                        logVoiceEvent('finish_utterance.mic_on');
+                    }
+                } catch (error) {
+                    console.warn('[AI Teacher] finishCurrentUtterance mic on failed.', error);
+                }
+                if (voiceState.value === 'connected') {
+                    setImmediateSubtitle('语音接通中，请继续讲话。');
+                }
+            };
+
             const stopVoice = async () => {
                 const room = livekitRoom;
                 voiceError.value = '';
@@ -3132,7 +3235,8 @@
                     roomName: voiceRoomName.value || room.name || '',
                     vadState: voiceDebug.value.vadState || 'unknown'
                 });
-                setImmediateSubtitle('正在停止语音...');
+                // Phase 1: Turn off microphone, keep LiveKit room alive
+                setImmediateSubtitle('正在完成识别...');
                 try {
                     await room.localParticipant.setMicrophoneEnabled(false);
                     logVoiceEvent('voice.mic.unpublish.success');
@@ -3140,12 +3244,10 @@
                     console.warn('[AI Teacher] Failed to unpublish microphone cleanly.', error);
                 }
                 try {
-                    const stopWaitMs = (
-                        voiceDebug.value.vadState === 'speech'
-                        || Boolean(voicePartialTranscript.value.trim())
-                    ) ? 1800 : 900;
-                    const stopResult = await waitForVoiceFlushOrFinal(stopWaitMs);
-                    logVoiceEvent('voice.stop.flush.wait.result', { result: stopResult });
+                    // Phase 2: Wait for pending stt.final or utterance.complete
+                    const stopResult = await waitForVoiceFlushOrFinal(VOICE_STOP_WAIT_FINAL_MS);
+                    logVoiceEvent('voice.stop.flush.wait.result', { result: stopResult, waitMs: VOICE_STOP_WAIT_FINAL_MS });
+                    // Phase 3: Disconnect room
                     if (stopResult !== 'room.disconnected') {
                         if (stopResult === 'timeout') {
                             logVoiceEvent('stop_voice.force_disconnect', {
@@ -4502,29 +4604,79 @@
                 }
             };
 
-            const submitVoiceTranscript = async (transcriptText) => {
+            const isTextNoise = (text) => {
+                const t = String(text || '').trim().toLowerCase();
+                if (!t) return true;
+                const noiseWords = new Set(['嗯', '啊', '哦', '呃', '额', '唔', 'um', 'uh', 'er', 'ah', 'oh', 'eh', 'hm', 'hmm', 'mmm']);
+                if (noiseWords.has(t)) return true;
+                return false;
+            };
+
+            let _voiceStatusTimer = null;
+            const showVoiceStatusBanner = (message, level = 'info') => {
+                setImmediateSubtitle(message);
+                console.info(`[AI Teacher][Voice] status: [${level}] ${message}`);
+                if (_voiceStatusTimer) {
+                    window.clearTimeout(_voiceStatusTimer);
+                }
+                if (level === 'warning' || level === 'error') {
+                    _voiceStatusTimer = window.setTimeout(() => {
+                        if (voiceState.value === 'connected') {
+                            setImmediateSubtitle('语音接通中，请讲话...');
+                        }
+                    }, 4000);
+                }
+            };
+
+            const sendVoiceAck = (utteranceId, text) => {
+                if (!utteranceId || !text) return;
+                const ackPayload = {
+                    utterance_id: utteranceId,
+                    text: text,
+                    received_at: Date.now() / 1000
+                };
+                axios.post(API_BASE_URL + '/api/voice/ack', ackPayload)
+                    .then(() => {
+                        logChatEvent('[voice] ack.sent', { utteranceId, text, source: 'voice' });
+                    })
+                    .catch((error) => {
+                        console.warn('[AI Teacher] Failed to send voice ack.', error);
+                        logChatEvent('[voice] ack.failed', {
+                            utteranceId,
+                            text,
+                            error: String(error),
+                            source: 'voice'
+                        });
+                    });
+            };
+
+            const submitVoiceTranscript = async (transcriptText, utteranceId = '') => {
                 const normalizedText = String(transcriptText || '').trim();
-                logChatEvent('[voice] submitVoiceTranscript.begin', {
+                logVoiceEvent('transcript.submit.frontend.begin', {
                     text: normalizedText,
                     content: voiceFinalTranscript.value || '',
-                    source: 'voice'
+                    utteranceId
                 });
                 if (!normalizedText) {
-                    logChatEvent('[voice] submitVoiceTranscript.end', {
-                        text: normalizedText,
-                        content: '',
-                        source: 'voice'
+                    logVoiceEvent('transcript.submit.frontend.failed', {
+                        reason: 'empty_text',
+                        utteranceId
                     });
                     return;
                 }
                 try {
                     await submitStudentInput(normalizedText, { source: 'voice' });
-                } finally {
-                    logChatEvent('[voice] submitVoiceTranscript.end', {
+                    logVoiceEvent('transcript.submit.frontend.success', {
                         text: normalizedText,
-                        content: voiceFinalTranscript.value || '',
-                        source: 'voice'
+                        utteranceId
                     });
+                } catch (error) {
+                    logVoiceEvent('transcript.submit.frontend.failed', {
+                        text: normalizedText,
+                        utteranceId,
+                        error: String(error)
+                    });
+                    throw error;
                 }
             };
 
@@ -4642,7 +4794,7 @@
                 isStopping,
                 recentHistoryMessages, shouldShowVoiceSummary, chatFeedRef,
                 isDashboardOpen, dashboardLoading, dashboardError, dashboardData, latestDashboardTime,
-                autoResize, handleEnter, sendMessage, startClass, exitClass, startNewChat, startVoice, stopVoice, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage, toggleQuestionDrawer, handleQuestionDrawerMouseEnter, handleQuestionDrawerMouseLeave,
+                autoResize, handleEnter, sendMessage, startClass, exitClass, startNewChat, startVoice, stopVoice, finishCurrentUtterance, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage, toggleQuestionDrawer, handleQuestionDrawerMouseEnter, handleQuestionDrawerMouseLeave,
                 openDashboard, closeDashboard, formatDashboardTime,
                 switchToLocalApi, switchToProdApi, switchToAutoApi
             };

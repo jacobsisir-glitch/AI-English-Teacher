@@ -32,6 +32,7 @@ from livekit_utils import create_livekit_participant_token, livekit_is_configure
 from tts_client import TTSClientError, list_voices as tts_list_voices, stream_speech, synthesize_speech
 from voice.livekit_room_bridge import VoiceWorkerManager
 from voice.session_state import structured_voice_log
+from voice.utterance_manager import receive_ack
 from llm_wrapper import (
     bg_summarize_chat_history,
     chat_with_teacher_stream,
@@ -1563,7 +1564,21 @@ def _arm_pending_question(task_info: dict) -> bool:
 
 app = FastAPI(title="AI English Teacher API")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
-voice_worker_manager = VoiceWorkerManager()
+
+
+def _get_voice_commit_context() -> dict:
+    is_in_class = bool(student_state.get("is_in_class"))
+    awaiting_answer = bool(student_state.get("awaiting_answer"))
+    return {
+        "mode": "pending_question" if is_in_class and awaiting_answer else ("class_mode" if is_in_class else "normal_chat"),
+        "class_mode": is_in_class,
+        "pending_question": awaiting_answer,
+        "pending_question_text": str(student_state.get("pending_question_text") or ""),
+        "short_answer_allowed": False,
+    }
+
+
+voice_worker_manager = VoiceWorkerManager(context_provider=_get_voice_commit_context)
 
 
 @app.on_event("startup")
@@ -1621,6 +1636,12 @@ class LiveKitTokenRequest(BaseModel):
     roomName: str | None = None
     userId: str | None = None
     displayName: str | None = None
+
+
+class VoiceAckRequest(BaseModel):
+    utterance_id: str
+    text: str
+    received_at: float | None = None
 
 
 class TTSSpeakRequest(BaseModel):
@@ -1775,6 +1796,19 @@ async def create_livekit_token(request: LiveKitTokenRequest):
 @app.get("/api/livekit/worker-status")
 async def get_livekit_worker_status(roomName: str):
     return voice_worker_manager.get_status(roomName)
+
+
+@app.post("/api/voice/ack")
+async def voice_ack(request: VoiceAckRequest):
+    """Frontend acknowledges receipt of a stt.final transcript."""
+    delivered = receive_ack(request.utterance_id, request.text)
+    if not delivered:
+        structured_voice_log(
+            "voice.ack.received_unknown_utterance",
+            utterance_id=request.utterance_id,
+            text=request.text,
+        )
+    return {"status": "ok", "delivered": delivered}
 
 
 @app.get("/api/tts/voices")

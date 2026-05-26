@@ -68,12 +68,26 @@ FUNASR_MODE = os.getenv("FUNASR_MODE", "2pass").strip() or "2pass"
 FUNASR_MODEL_NAME = os.getenv("FUNASR_MODEL_NAME", "").strip()
 FUNASR_CHUNK_SIZE = _get_int_list_env("FUNASR_CHUNK_SIZE", "5,8,4")
 FUNASR_CHUNK_INTERVAL = int(os.getenv("FUNASR_CHUNK_INTERVAL", "8") or "8")
-FUNASR_FINAL_WAIT_OFFLINE_MS = int(os.getenv("FUNASR_FINAL_WAIT_OFFLINE_MS", "5000") or "5000")
-FUNASR_FINAL_WAIT_FALLBACK_MS = int(os.getenv("FUNASR_FINAL_WAIT_FALLBACK_MS", "1000") or "1000")
-FUNASR_FINAL_DRAIN_WINDOW_MS = int(os.getenv("FUNASR_FINAL_DRAIN_WINDOW_MS", "4000") or "4000")
+FUNASR_FINAL_WAIT_OFFLINE_MS = int(os.getenv("FUNASR_FINAL_WAIT_OFFLINE_MS", "6000") or "6000")
+FUNASR_FINAL_WAIT_FALLBACK_MS = int(os.getenv("FUNASR_FINAL_WAIT_FALLBACK_MS", "0") or "0")
+FUNASR_FINAL_DRAIN_MS: int
+_old_drain_window = os.getenv("FUNASR_FINAL_DRAIN_WINDOW_MS", "").strip()
+if _old_drain_window and not os.getenv("FUNASR_FINAL_DRAIN_MS", "").strip():
+    import warnings
+    warnings.warn(
+        "FUNASR_FINAL_DRAIN_WINDOW_MS is deprecated. Use FUNASR_FINAL_DRAIN_MS instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    FUNASR_FINAL_DRAIN_MS = int(_old_drain_window)
+else:
+    FUNASR_FINAL_DRAIN_MS = int(os.getenv("FUNASR_FINAL_DRAIN_MS", "1000") or "1000")
 FUNASR_FINAL_RESCUE_WAIT_MS = int(os.getenv("FUNASR_FINAL_RESCUE_WAIT_MS", "6000") or "6000")
 FUNASR_LATE_FINAL_GRACE_MS = int(os.getenv("FUNASR_LATE_FINAL_GRACE_MS", "12000") or "12000")
 FUNASR_FALLBACK_MIN_STABLE_MS = int(os.getenv("FUNASR_FALLBACK_MIN_STABLE_MS", "240") or "240")
+VOICE_FINAL_ACK_TIMEOUT_MS = int(os.getenv("VOICE_FINAL_ACK_TIMEOUT_MS", "1000") or "1000")
+VOICE_FINAL_ACK_RETRY = int(os.getenv("VOICE_FINAL_ACK_RETRY", "2") or "2")
+VOICE_STOP_WAIT_FINAL_MS = int(os.getenv("VOICE_STOP_WAIT_FINAL_MS", "8000") or "8000")
 SILERO_SAMPLE_RATE = int(os.getenv("SILERO_SAMPLE_RATE", "16000") or "16000")
 SILERO_CHANNELS = int(os.getenv("SILERO_CHANNELS", "1") or "1")
 SILERO_VAD_THRESHOLD = float(os.getenv("SILERO_VAD_THRESHOLD", "0.38") or "0.38")
