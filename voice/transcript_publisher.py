@@ -52,6 +52,9 @@ class LiveKitTranscriptPublisher:
             message.update(payload)
         await self._send_topic("voice.state", user_identity, message)
 
+    async def publish_text(self, topic: str, user_identity: str, payload: dict[str, Any]) -> None:
+        await self._send_topic(topic, user_identity, payload)
+
     async def _send_topic(self, topic: str, user_identity: str, payload: dict[str, Any]) -> None:
         if not self.room.isconnected():
             return

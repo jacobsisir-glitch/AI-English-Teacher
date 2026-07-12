@@ -25,6 +25,10 @@ from config import (
     TTS_DEFAULT_VOICE,
     TTS_ENABLED,
     TTS_PROVIDER,
+    VOICE_CONVERSATION_PROVIDER,
+    QWEN_REALTIME_API_KEY,
+    QWEN_REALTIME_BASE_URL,
+    QWEN_REALTIME_WORKSPACE_ID,
 )
 from database.database import Base, SessionLocal, engine, get_db
 from database.models import ErrorBook, KnowledgeMastery, Student, StudentQuestion
@@ -704,7 +708,7 @@ def _build_spoken_reference_summary(reference_text: str) -> str:
 
     summary_lines: list[str] = []
     if formula_lines:
-        summary_lines.append("黑板上已经写好了当前知识点的核心公式。你只需要用中文解释它表示什么、怎么判断、什么时候容易错。")
+        summary_lines.append("黑板上已经写好了当前知识点的核心公式。你用英文主讲这个公式，需要时用中文确保理解。解释它表示什么、怎么判断、什么时候容易错。")
         for line in formula_lines[:2]:
             focus = re.sub(r"^-\s+", "", line).strip()
             if "=" in focus:
@@ -712,7 +716,7 @@ def _build_spoken_reference_summary(reference_text: str) -> str:
             if focus:
                 summary_lines.append(f"- 当前板书关键词：{focus}")
     if example_lines:
-        summary_lines.append("黑板上已经给了对错对比。你只解释错因、修改理由和判断依据。必要时可以点一个很短的英文例句，但不要整段照念。")
+        summary_lines.append("黑板上已经给了对错对比。你用英文解释错因和改法，必要时用一句中文补充判断依据。英文例句单独成句。")
     if note_lines:
         summary_lines.append("你可以借用下面这些人设钩子、比喻或讲解节奏，但要自然说人话，不要逐条朗读提示词。")
         for line in note_lines[:6]:
@@ -1768,6 +1772,14 @@ async def create_livekit_token(request: LiveKitTokenRequest):
                 "Please set LIVEKIT_WS_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and VOICE_DEFAULT_ROOM."
             ),
         )
+    if VOICE_CONVERSATION_PROVIDER == "qwen_omni_realtime":
+        if not QWEN_REALTIME_API_KEY:
+            raise HTTPException(status_code=503, detail="QWEN_REALTIME_API_KEY is required for qwen_omni_realtime.")
+        if not (QWEN_REALTIME_WORKSPACE_ID or QWEN_REALTIME_BASE_URL):
+            raise HTTPException(
+                status_code=503,
+                detail="QWEN_REALTIME_WORKSPACE_ID is required for qwen_omni_realtime unless QWEN_REALTIME_BASE_URL is set.",
+            )
 
     try:
         token_payload = create_livekit_participant_token(
@@ -1790,7 +1802,9 @@ async def create_livekit_token(request: LiveKitTokenRequest):
         await voice_worker_manager.ensure_session(token_payload.room_name)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=f"Voice worker startup failed: {exc}") from exc
-    return token_payload.as_response()
+    response_payload = token_payload.as_response()
+    response_payload["voiceConversationProvider"] = VOICE_CONVERSATION_PROVIDER
+    return response_payload
 
 
 @app.get("/api/livekit/worker-status")
@@ -1993,7 +2007,20 @@ async def websocket_tts_stream(websocket: WebSocket):
 
         chunk_count = 0
         total_bytes = 0
+        first_audio_logged = False
         async for chunk in stream_speech(text=text, voice=voice, lang=lang, speed=speed):
+            if not first_audio_logged:
+                first_audio_logged = True
+                first_chunk_elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+                structured_tts_log(
+                    "tts.backend.first_chunk",
+                    text_length=len(text),
+                    voice=voice,
+                    lang=lang,
+                    speed=speed,
+                    provider=TTS_PROVIDER,
+                    elapsed_ms=first_chunk_elapsed_ms,
+                )
             chunk_count += 1
             total_bytes += len(chunk)
             await websocket.send_bytes(chunk)

@@ -1,14 +1,14 @@
 ﻿# AI English Teacher
 
-一个以 `FastAPI + 前端直播间 UI + LiveKit + FunASR` 为核心的 AI 英语老师项目。
+一个以 `FastAPI + 前端直播间 UI + LiveKit` 为核心的 AI 英语老师项目，当前同时保留 legacy 语音链路和 Qwen Omni Realtime 原生语音链路。
 
 当前仓库已经不只是传统聊天页，而是同时支持：
 
 - 文本闲聊 / 答疑
 - 微课白板讲解
 - 实时语音输入转写
-- 语音结果回流到原有聊天链路
-- 老师语音输出：豆包 V3 双向流式 TTS
+- Legacy 语音结果回流到原有聊天链路
+- 老师语音输出：legacy 使用豆包 V3 双向流式 TTS，Qwen 模式使用 Qwen 原生语音
 
 ## 项目概览
 
@@ -19,7 +19,7 @@
 - `POST /class_chat_stream`
   处理带白板节奏的微课讲解
 - `POST /api/livekit/token`
-  为浏览器语音模式签发 LiveKit token，并确保房间级语音 worker 已启动
+  为浏览器语音模式签发 LiveKit token，并确保房间级语音 worker 已启动；会根据 `VOICE_CONVERSATION_PROVIDER` 选择 legacy 或 Qwen Realtime
 - `GET /api/livekit/worker-status`
   返回房间语音 worker 的状态和最近一次关键事件
 - `GET /api/tts/voices`
@@ -27,25 +27,30 @@
 - `POST /api/tts/speak`
   兼容接口：通过当前 TTS provider 生成完整音频
 - `WebSocket /api/tts/stream`
-  当前老师语音输出主路径：豆包 V3 bidirection WebSocket 音频转发
+  legacy 老师语音输出主路径：豆包 V3 bidirection WebSocket 音频转发
 
-语音模式下，浏览器麦克风音频会先进入 LiveKit 房间，再由后端 worker 订阅、做 VAD 切分、送入 FunASR，最终把识别出的 `partial` / `final` 文本重新送回前端，并把 `final` 文本提交到原有聊天链路。
+legacy 语音模式下，浏览器麦克风音频会先进入 LiveKit 房间，再由后端 worker 订阅、做 VAD 切分、送入 FunASR，最终把识别出的 `partial` / `final` 文本重新送回前端，并把 `final` 文本提交到原有聊天链路。
+
+Qwen Realtime 模式下，学生麦克风音频仍经 LiveKit 进入后端，但后端会直接把 `16k PCM` 推给 Qwen Omni Realtime；Qwen 同时生成老师文本和 `24k PCM` 原生语音，后端再把老师语音发布成 LiveKit 音轨给浏览器播放。
 
 ## 当前能力
 
 - 文本聊天：支持流式返回 AI 回复
 - 微课模式：支持教材驱动、白板事件驱动和阶段化讲解
-- 语音模式：支持浏览器直接说话，实时显示 partial / final transcript
-- 语音回流：最终识别结果会自动作为学生输入进入聊天区
-- 语音输出：老师回复可通过豆包 V3 双向流式 TTS 自动播报
+- Legacy 语音模式：支持浏览器直接说话，实时显示 FunASR partial / final transcript
+- Qwen Realtime 模式：支持学生语音直达 Qwen，实时显示学生识别与 Lumina 回复字幕
+- 语音回流：legacy final 会自动作为学生输入进入聊天区；Qwen 模式禁止重复调用旧聊天接口
+- 语音输出：legacy 使用豆包 V3 双向流式 TTS；Qwen 模式使用 Qwen 原生音色并通过 LiveKit 音轨播放
 - 中英同声线：中文讲解与英文例句使用同一豆包音色
 - 打断能力：学生新输入或开始语音输入时会中断旧播报
 - 调试能力：前端有语音调试面板，后端有结构化语音日志
 - 一键启动：提供 Windows 启动脚本 [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)
 
-## 语音输出：豆包 V3 双向流式 TTS
+## 语音架构
 
-当前老师语音输出主链路已经切换为“豆包 V3 双向流式 TTS”：
+### Legacy：FunASR + LLM + 豆包 TTS
+
+legacy 模式保留原有“FunASR -> LLM -> 豆包 V3 双向流式 TTS”链路：
 
 ```text
 frontend/index.html
@@ -72,6 +77,30 @@ TTS_FALLBACK_ON_ERROR=false
 旧 Melo/OpenVoice 已经变成 `local_melo` legacy fallback，不再是主路径。旧 Kokoro 也属于 legacy 实验链路。使用豆包 TTS 时，不需要再启动 `127.0.0.1:8012` 的 Melo/OpenVoice 服务。
 
 更详细的配置、错误排查和验证步骤见 [docs/doubao_tts_v3_setup.md](/d:/AIEnglish_grammar_teacher/docs/doubao_tts_v3_setup.md)。
+
+### Qwen Omni Realtime：原生理解与原生语音
+
+Qwen 模式由 `VOICE_CONVERSATION_PROVIDER=qwen_omni_realtime` 启用：
+
+```text
+student microphone
+→ LiveKit room
+→ voice/qwen_room_processor.py
+→ voice/providers/qwen_omni_realtime.py
+→ Qwen Omni Realtime WebSocket
+→ response.audio_transcript.delta / response.audio.delta
+→ LiveKit teacher audio track
+→ frontend/index.html subtitles + RemoteAudioTrack playback
+```
+
+Qwen 模式要求：
+
+- API Key 只从后端环境变量读取，前端不接触密钥。
+- 使用 `QWEN_REALTIME_WORKSPACE_ID` 构造北京地域 WebSocket 地址。
+- 输入音频为 `16kHz PCM`，输出音频为 `24kHz PCM`。
+- `QWEN_REALTIME_VOICE` 可填内置音色，如 `Tina`，也可填声音复刻得到的自定义 voice ID。
+- `QWEN_AUDIO_PLAYBACK_BUFFER_MS` 只做每轮 response 的初始播放缓冲，不对每个 chunk sleep。
+- Qwen 官方事件没有逐词时间戳，因此字幕和音频只能做句子/短语级近同步，不能声明 word-level sync。
 
 ## 目录结构
 
@@ -144,6 +173,7 @@ LIVEKIT_WS_URL=wss://your-livekit-host
 LIVEKIT_API_KEY=your_livekit_api_key
 LIVEKIT_API_SECRET=your_livekit_api_secret
 VOICE_DEFAULT_ROOM=ai-teacher-room
+VOICE_CONVERSATION_PROVIDER=legacy
 
 FUNASR_WS_URL=wss://127.0.0.1:10095
 FUNASR_MODE=2pass
@@ -173,11 +203,45 @@ DOUBAO_TTS_RESOURCE_ID=seed-icl-2.0
 DOUBAO_TTS_VOICE_TYPE=S_D9gzp4Q12
 DOUBAO_TTS_ENABLE_STREAM=true
 TTS_FALLBACK_ON_ERROR=false
+
+# Qwen native realtime mode. Enable with:
+# VOICE_CONVERSATION_PROVIDER=qwen_omni_realtime
+QWEN_REALTIME_API_KEY=your_real_qwen_key_only_in_dotenv
+QWEN_REALTIME_WORKSPACE_ID=your_workspace_id
+QWEN_REALTIME_MODEL=qwen3.5-omni-flash-realtime
+QWEN_REALTIME_REGION=beijing
+QWEN_REALTIME_VOICE=Tina
+QWEN_REALTIME_VAD_MODE=semantic_vad
+QWEN_AUDIO_PLAYBACK_BUFFER_MS=300
 ```
 
 完整示例见 [.env.example](/d:/AIEnglish_grammar_teacher/.env.example)。
 
-注意：真实 `DOUBAO_API_KEY`、Access Token、LiveKit Secret 只能写入 `.env`，不能提交到 Git。
+注意：真实 `DOUBAO_API_KEY`、`QWEN_REALTIME_API_KEY`、Access Token、LiveKit Secret 只能写入 `.env`，不能提交到 Git。
+
+### Qwen Realtime 与 Legacy 语音链路
+
+`VOICE_CONVERSATION_PROVIDER=legacy` 仍是默认兼容模式：
+
+```text
+student audio -> LiveKit/FunASR/Silero -> LLM -> Doubao TTS
+```
+
+`VOICE_CONVERSATION_PROVIDER=qwen_omni_realtime` 使用 Qwen 原生实时语音：
+
+```text
+student audio -> Qwen understand/reply -> Qwen native voice -> LiveKit audio track
+```
+
+Qwen 模式使用 `QWEN_REALTIME_VOICE` 选择内置音色或声音复刻得到的自定义 voice ID；Legacy 模式继续使用现有 Doubao TTS 音色配置。`QWEN_AUDIO_PLAYBACK_BUFFER_MS` 控制 Qwen 音频发布到 LiveKit 前的每轮初始缓冲，`0` 表示最低延迟，`200/300/400`ms 可按真实日志中的 `qwen.sync.*` 延迟再取舍。Qwen 官方没有提供逐词时间戳，因此这里只能做句子/短语级近同步，不能声明 word-level sync。
+
+未来可以探索混合链路：
+
+```text
+student audio -> Qwen native understanding -> Qwen text -> Doubao TTS
+```
+
+当前未实现该混合模式。
 
 ## 启动方式
 
@@ -244,6 +308,54 @@ http://127.0.0.1:8000/frontend/index.html
 
 预期：老师语音能自动播放，中文清晰，英文例句与中文讲解保持同一声线，新输入可打断旧语音。
 
+## Qwen Realtime 验证步骤
+
+### 1. 低成本真实握手
+
+```powershell
+python scripts\verify_qwen_realtime_connection.py
+```
+
+这个脚本只做 WebSocket 握手、`session.created`、`session.update`、`session.updated` 验证，不上传学生录音，也不会输出 API Key。没有真实 API Key 或当前环境无法访问阿里云时，不代表线上链路已失败，只能说明本机未完成真实连接验证。
+
+### 2. Mock 事件链路
+
+```powershell
+python scripts\test_qwen_realtime_mock.py
+```
+
+覆盖官方事件字段映射、Qwen 输出文本/音频 delta、response cancel 后 late audio 丢弃、LiveKit AudioFrame 分帧、prompt 共享人设和 Qwen voice 配置。
+
+### 3. 声音复刻 dry-run 校验
+
+```powershell
+python scripts\qwen_voice_enroll.py `
+  --audio D:\path\lumina_voice.wav `
+  --preferred-name lumina `
+  --target-model qwen3.5-omni-flash-realtime `
+  --confirm-rights
+```
+
+该脚本默认只做本地文件和参数校验，不会真实调用声音复刻接口，不复制音频进仓库，不输出音频 Base64 或密钥。成功复刻后的 voice ID 需要手动写入 `.env`：
+
+```env
+QWEN_REALTIME_VOICE=<voice ID>
+```
+
+### 4. 浏览器端验收重点
+
+打开前端后启用语音模式，重点看控制台：
+
+- `qwen.livekit.start_audio.success`
+- `qwen.livekit.audio_track_subscribed`
+- `qwen.livekit.audio_attached`
+- `qwen.livekit.audio_playing`
+- `qwen.sync.first_audio_delta`
+- `qwen.sync.first_transcript_delta`
+- `qwen.sync.audio_buffer_released`
+
+如果 `response.audio.delta` 已经到达后端，但没有声音，优先看 LiveKit track SID、`qwen.livekit.audio_frame_captured`、浏览器 `audio_playing` 和 autoplay 错误。
+
 ### 方式二：Windows 一键启动
 
 仓库已提供 [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)。
@@ -282,10 +394,14 @@ http://127.0.0.1:8000/frontend/index.html
   做音频缓存、归一化和预缓冲
 - [voice/transcript_publisher.py](/d:/AIEnglish_grammar_teacher/voice/transcript_publisher.py)
   把识别结果发布回 LiveKit 文本流
+- [voice/providers/qwen_omni_realtime.py](/d:/AIEnglish_grammar_teacher/voice/providers/qwen_omni_realtime.py)
+  负责 Qwen Realtime WebSocket 协议、事件映射、字段校验、脱敏日志和共享 Lumina instructions
+- [voice/qwen_room_processor.py](/d:/AIEnglish_grammar_teacher/voice/qwen_room_processor.py)
+  负责 Qwen 模式下学生音频送入、老师 LiveKit 音轨发布、24k PCM 分帧和初始播放缓冲
 - [voice/session_state.py](/d:/AIEnglish_grammar_teacher/voice/session_state.py)
   负责结构化日志和会话状态
 
-语音模式的大致流程：
+legacy 语音模式的大致流程：
 
 1. 浏览器请求 `POST /api/livekit/token`
 2. 后端签发 token，并确保房间 worker 已启动
@@ -296,10 +412,30 @@ http://127.0.0.1:8000/frontend/index.html
 7. FunASR 返回 `partial` 和 `final`
 8. `final` 文本发布到前端并自动提交到聊天链路
 
+Qwen 语音模式的大致流程：
+
+1. 浏览器请求 `POST /api/livekit/token`
+2. 后端签发 token，并按 `VOICE_CONVERSATION_PROVIDER=qwen_omni_realtime` 启动 Qwen worker
+3. 浏览器加入 LiveKit 房间并发布学生麦克风
+4. 后端只订阅目标学生的 microphone 音轨，过滤老师自己发布的音轨
+5. 后端把学生音频转为 `16k PCM` 并追加到 Qwen input buffer
+6. Qwen 返回学生输入转写、老师文本 delta 和 `24k PCM` 音频 delta
+7. 后端把老师音频分帧发布到 LiveKit LocalAudioTrack
+8. 浏览器订阅老师 RemoteAudioTrack，attach 到隐藏 audio element 并播放
+9. 老师字幕实时显示在主字幕区域，完整回复只在 done 时写入左侧历史一次
+
 ## 最近这批语音更新
 
-这次上传的更新重点在“长句语音识别稳定性”和“前端流式显示链路”：
+这次上传的更新重点在 Qwen Realtime 原生语音接入、前端字幕/音频链路，以及 legacy 长句语音识别稳定性：
 
+- 新增 `qwen_omni_realtime` 会话 provider，默认仍保留 `legacy`
+- 新增 Qwen Realtime mock 测试和最小真实连接脚本
+- Qwen 模式禁止重复调用旧聊天接口和豆包 TTS
+- Qwen 老师音频通过 LiveKit 音轨播放，支持 response 级初始缓冲
+- 主字幕改为最新 3 行滚动显示，不再 ellipsis 截断长句
+- 共享 Lumina prompt 增加 spoken-only 规则，禁止把动作、表情、舞台提示读出来
+- Qwen 音色通过 `QWEN_REALTIME_VOICE` 配置，支持内置音色和自定义 voice ID
+- 新增 Qwen 声音复刻 dry-run 校验脚本
 - 增加了更长的 FunASR `offline final` 等待与补救窗口
 - 增加了 late final recovery，尽量救回超时后才到达的 `2pass-offline`
 - 对过短 partial fallback 做了更严格的抑制
@@ -324,7 +460,10 @@ http://127.0.0.1:8000/frontend/index.html
 
 - 豆包 TTS：已接入 V3 bidirection，并通过第一阶段验收。
 - 豆包 ASR：尚未接入。
-- 语音输入：仍使用 LiveKit + FunASR + Silero VAD。
+- Legacy 语音输入：使用 LiveKit + FunASR + Silero VAD。
+- Qwen 语音输入：使用 LiveKit + Qwen Omni Realtime；真实 API Key 和 Workspace 只在后端 `.env` 中配置。
+- Qwen 字幕同步：官方没有逐词时间戳，目前只能做句子/短语级近同步。
+- Qwen 声音复刻：仓库只提供 dry-run 校验脚本，不会自动创建或保存 voice ID。
 - Melo/OpenVoice：暂时保留为 legacy fallback / 归档对象。
 - Kokoro：外部工具链保留为 legacy 实验对象。
 

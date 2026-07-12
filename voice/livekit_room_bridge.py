@@ -12,6 +12,7 @@ from config import (
     FUNASR_MODEL_NAME,
     FUNASR_WS_URL,
     LIVEKIT_WS_URL,
+    VOICE_CONVERSATION_PROVIDER,
     SILERO_CHANNELS,
     SILERO_MIN_SILENCE_MS,
     SILERO_MIN_SPEECH_MS,
@@ -25,6 +26,7 @@ from config import (
 from livekit_utils import create_livekit_worker_token, livekit_voice_stack_is_configured
 from voice.audio_buffer import LiveKitAudioNormalizer
 from voice.funasr_client import FunASRClient, FunASRTranscriptEvent
+from voice.qwen_room_processor import QwenParticipantVoiceProcessor
 from voice.session_state import (
     ParticipantSessionState,
     RoomSessionState,
@@ -998,7 +1000,7 @@ class LiveKitRoomBridge:
         self.room = rtc.Room()
         self.context_provider = context_provider
         self.publisher: LiveKitTranscriptPublisher | None = None
-        self._processors: dict[tuple[str, str], ParticipantVoiceProcessor] = {}
+        self._processors: dict[tuple[str, str], ParticipantVoiceProcessor | QwenParticipantVoiceProcessor] = {}
         self._session_task: asyncio.Task | None = None
         self._closed = asyncio.Event()
         self._ready = asyncio.Event()
@@ -1106,6 +1108,7 @@ class LiveKitRoomBridge:
                 room_name=self.state.room_name,
                 user_identity=self.state.worker_identity,
                 local_participant_identity=self.state.local_participant_identity,
+                conversation_provider=VOICE_CONVERSATION_PROVIDER,
             )
             self.room.on("participant_connected", self._on_participant_connected)
             self.room.on("track_subscribed", self._on_track_subscribed)
@@ -1212,7 +1215,12 @@ class LiveKitRoomBridge:
                 reason="publisher_not_ready",
             )
             return
-        processor = ParticipantVoiceProcessor(
+        processor_cls = (
+            QwenParticipantVoiceProcessor
+            if VOICE_CONVERSATION_PROVIDER == "qwen_omni_realtime"
+            else ParticipantVoiceProcessor
+        )
+        processor = processor_cls(
             room_name=self.state.room_name,
             room_id_getter=lambda: self.state.room_id or self.state.room_name,
             room_state=self.state,
@@ -1245,6 +1253,7 @@ class LiveKitRoomBridge:
             room_name=self.state.room_name,
             user_identity=participant.identity,
             track_sid=publication.sid,
+            conversation_provider=VOICE_CONVERSATION_PROVIDER,
         )
 
     def _on_track_unsubscribed(
@@ -1374,6 +1383,7 @@ class VoiceWorkerManager:
                 "localParticipantIdentity": "",
                 "roomId": "",
                 "lastError": "",
+                "conversation_provider": VOICE_CONVERSATION_PROVIDER,
                 "last_vad_event": "",
                 "last_audio_chunk_sent": "",
                 "last_flush_sent": "",
@@ -1389,6 +1399,7 @@ class VoiceWorkerManager:
             "localParticipantIdentity": bridge.state.local_participant_identity,
             "roomId": bridge.state.room_id,
             "lastError": bridge.state.last_error,
+            "conversation_provider": VOICE_CONVERSATION_PROVIDER,
             "last_vad_event": bridge.state.last_vad_event,
             "last_audio_chunk_sent": bridge.state.last_audio_chunk_sent,
             "last_flush_sent": bridge.state.last_flush_sent,

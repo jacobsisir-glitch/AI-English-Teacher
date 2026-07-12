@@ -11,6 +11,7 @@ from config import (
     LIVEKIT_API_KEY,
     LIVEKIT_API_SECRET,
     LIVEKIT_WS_URL,
+    VOICE_CONVERSATION_PROVIDER,
     VOICE_DEFAULT_ROOM,
 )
 
@@ -40,6 +41,8 @@ def livekit_is_configured() -> bool:
 
 
 def livekit_voice_stack_is_configured() -> bool:
+    if VOICE_CONVERSATION_PROVIDER == "qwen_omni_realtime":
+        return livekit_is_configured()
     return livekit_is_configured() and bool(FUNASR_WS_URL)
 
 
@@ -121,10 +124,10 @@ def create_livekit_worker_token(
     grants = api.VideoGrants(
         room_join=True,
         room=resolved_room_name,
-        can_publish=False,
+        can_publish=VOICE_CONVERSATION_PROVIDER == "qwen_omni_realtime",
         can_subscribe=True,
         can_publish_data=True,
-        hidden=True,
+        hidden=VOICE_CONVERSATION_PROVIDER != "qwen_omni_realtime",
         agent=True,
     )
     participant_token = (
