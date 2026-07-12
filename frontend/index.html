@@ -70,11 +70,20 @@
             pointer-events: none;
         }
         .subtitle-mask {
-            white-space: nowrap;
             text-shadow: 0 2px 10px rgba(255, 255, 255, 0.55);
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            line-height: 1.55;
         }
         .subtitle-stack {
             position: relative;
+        }
+        .subtitle-scroll {
+            scrollbar-width: none;
+        }
+        .subtitle-scroll::-webkit-scrollbar {
+            display: none;
         }
         .subtitle-stack-enter-active,
         .subtitle-stack-leave-active,
@@ -125,6 +134,87 @@
     transform: translateX(-50%) translateY(2px) scale(1.02);
     box-shadow: 0 16px 30px rgba(245, 158, 11, 0.18);
     background: #fffbeb; /* 统一成实色的暖黄底 */
+        }
+        /* ── PPT Slide Player ── */
+        .slide-player {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .slide-image-wrap {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .slide-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            background: #0f172a;
+        }
+        .slide-fallback {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            color: #64748b;
+        }
+        .slide-fallback i {
+            font-size: 3rem;
+            opacity: 0.4;
+        }
+        .slide-fallback span {
+            font-size: 1rem;
+            font-weight: 500;
+            letter-spacing: 0.04em;
+        }
+        .slide-caption {
+            width: 100%;
+            text-align: center;
+            padding: 0.75rem 0 0;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: #64748b;
+            letter-spacing: 0.06em;
+        }
+        .slide-overlay-question,
+        .slide-overlay-answer {
+            position: absolute;
+            bottom: 4.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 35;
+            pointer-events: auto;
+            max-width: min(90%, 42rem);
+            padding: 1rem 1.5rem;
+            border-radius: 1.25rem;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            line-height: 1.6;
+            box-shadow: 0 18px 50px rgba(0,0,0,0.18);
+            backdrop-filter: blur(12px);
+            animation: slideOverlayIn 0.4s ease-out;
+        }
+        .slide-overlay-question {
+            background: rgba(255,255,255,0.94);
+            border: 1.5px solid #fbbf24;
+            color: #1e293b;
+        }
+        .slide-overlay-answer {
+            background: rgba(240,253,244,0.94);
+            border: 1.5px solid #34d399;
+            color: #065f46;
+        }
+        @keyframes slideOverlayIn {
+            from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+            to   { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
         @keyframes wbBlockFlash {
             0% {
@@ -276,7 +366,7 @@
     <div class="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-amber-100/70 to-transparent pointer-events-none"></div>
     <div class="absolute inset-x-0 bottom-0 h-64 bg-gradient-to-t from-stone-100/80 via-stone-50/70 to-transparent pointer-events-none"></div>
 
-    <div class="control-deck fixed left-4 top-4 z-40 w-[calc(100vw-2rem)] max-w-sm rounded-3xl p-4 md:left-6 md:top-6 md:w-80">
+    <div class="control-deck fixed left-4 top-4 z-40 w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] max-w-sm overflow-y-auto rounded-3xl p-4 md:left-6 md:top-6 md:w-80 md:max-h-[calc(100vh-3rem)]">
         <div class="flex items-start justify-between gap-3">
             <div>
                 <p class="text-[11px] uppercase tracking-[0.34em] text-sky-600/80">Immersive Live</p>
@@ -316,6 +406,35 @@
             </div>
             <div class="mt-3 truncate rounded-xl border border-slate-200 bg-white/80 px-3 py-2 text-[11px] text-slate-500">{{ currentApiBaseUrl }}</div>
         </div>
+
+        <div class="mt-4 rounded-2xl border border-slate-200 bg-white/70 px-4 py-4 shadow-xl">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">历史对话</p>
+                    <p class="mt-1 text-[11px] leading-5 text-slate-500">这里保留最近几轮学生提问和老师回复。</p>
+                </div>
+                <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">
+                    {{ recentHistoryMessages.length }} 条
+                </span>
+            </div>
+            <div class="mt-3 max-h-64 overflow-y-auto space-y-3 pr-1">
+                <div v-if="recentHistoryMessages.length === 0" class="rounded-2xl border border-dashed border-slate-200 bg-white/70 px-3 py-4 text-xs leading-5 text-slate-400">
+                    还没有历史消息。等学生开口后，这里会开始积累最近对话。
+                </div>
+                <div v-for="(message, idx) in recentHistoryMessages" :key="`history-${idx}-${message.role}-${message.content}`" :class="message.role === 'user' ? 'flex justify-end' : 'flex justify-start'">
+                    <div :class="message.role === 'user'
+                        ? 'max-w-[92%] rounded-[1.2rem] bg-sky-100 px-3 py-2 text-xs leading-5 text-sky-900 whitespace-pre-wrap shadow-sm'
+                        : 'max-w-[92%] rounded-[1.2rem] border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-700 shadow-sm'">
+                        <template v-if="message.role === 'user'">
+                            {{ message.content }}
+                        </template>
+                        <template v-else>
+                            <div class="prose prose-sm prose-slate max-w-none text-left" v-html="renderMarkdown(message.content || '')"></div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <main class="relative z-10 flex h-full flex-col items-center px-4 pb-44 pt-24 md:px-8 md:pt-10">
@@ -328,7 +447,44 @@
             </span>
         </div>
 
-        <section class="stage-shell w-11/12 max-w-6xl h-[65vh] mx-auto mt-6 bg-white/90 backdrop-blur-xl border border-slate-200 shadow-[0_20px_60px_rgba(0,0,0,0.05)] rounded-3xl relative overflow-hidden">
+        <!-- ═══ PPT 课件播放器 ═══ -->
+        <section v-if="pptMode" class="w-11/12 max-w-6xl h-[65vh] mx-auto mt-6 rounded-3xl relative overflow-hidden bg-gray-900">
+            <div class="slide-player">
+                <!-- 图片加载成功 -->
+                <div v-if="currentSlideSrc" class="slide-image-wrap">
+                    <img :src="currentSlideSrc"
+                         :alt="currentSlideLabel"
+                         class="slide-image"
+                         @error="handleSlideError" />
+                </div>
+                <!-- Fallback 占位 -->
+                <div v-else class="slide-fallback">
+                    <i class="fa-solid fa-image"></i>
+                    <span>{{ slideManifestError ? '课件清单加载失败' : '等待课件加载...' }}</span>
+                </div>
+
+                <!-- 题目 overlay -->
+                <div v-if="slideQuestionVisible" class="slide-overlay-question">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-circle-question text-amber-500"></i>
+                        <span class="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-600">练习题目</span>
+                    </div>
+                    <div class="whitespace-pre-line">{{ slideQuestionText }}</div>
+                </div>
+
+                <!-- 答案 overlay -->
+                <div v-if="slideAnswerVisible" class="slide-overlay-answer">
+                    <div class="flex items-center gap-2 mb-2">
+                        <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                        <span class="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-600">参考答案</span>
+                    </div>
+                    <div class="whitespace-pre-line">{{ slideAnswerText }}</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══ 旧白板展示区（PPT 模式关闭时显示） ═══ -->
+        <section v-if="!pptMode" class="stage-shell w-11/12 max-w-6xl h-[65vh] mx-auto mt-6 bg-white/90 backdrop-blur-xl border border-slate-200 shadow-[0_20px_60px_rgba(0,0,0,0.05)] rounded-3xl relative overflow-hidden">
             <div class="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(125,211,252,0.16),transparent_32%)] pointer-events-none"></div>
             <div class="absolute inset-x-10 top-8 flex items-center justify-between text-[11px] uppercase tracking-[0.36em] text-slate-400">
                 <span>Whiteboard Stage</span>
@@ -360,7 +516,6 @@
     v-if="isQuestionDrawerAvailable"
     :class="[
         'pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center overflow-hidden transition-[height,padding] duration-500 ease-out',
-        /* 👇 修改点 1：微调父容器高度，展开给 h-[17.5rem]，收起给 h-14，保证挂在外面的把手不被 overflow-hidden 切掉 */
         isQuestionDrawerOpen ? 'h-[17.5rem] pt-16' : 'h-14 pt-0'
     ]"
 >
@@ -385,7 +540,7 @@
             </div>
             <div class="mt-3 whitespace-pre-line rounded-2xl bg-amber-50 px-4 py-3 text-left text-sm font-medium leading-7 text-slate-800 md:text-base">{{ currentWhiteboardPage.question }}</div>
         </div>
-        
+
         <button
             type="button"
             class="wb-question-handle absolute left-1/2 top-full z-10 flex -translate-x-1/2 -mt-px items-center gap-2 rounded-full border border-amber-300 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-700 shadow-[0_14px_28px_rgba(245,158,11,0.16)]"
@@ -427,19 +582,28 @@
 
     </main>
 
-    <div class="fixed bottom-36 left-1/2 z-40 w-4/5 max-w-4xl -translate-x-1/2 pointer-events-none">
-        <div class="mx-auto h-20 w-full overflow-hidden">
+    <div class="fixed bottom-48 left-1/2 z-40 w-4/5 max-w-4xl -translate-x-1/2 pointer-events-none">
+        <div ref="subtitleScrollRef" class="subtitle-scroll mx-auto max-h-28 w-full overflow-y-auto overflow-x-hidden">
+            <!-- TTS 语音驱动字幕：立即显示，不经过慢速字幕队列 -->
+            <div v-if="currentSpokenSubtitle" class="flex min-h-20 w-full flex-col justify-end text-center">
+                <p class="subtitle-mask max-w-full px-4 text-lg font-medium tracking-wide text-gray-800 md:text-xl" :title="currentSpokenSubtitle">
+                    {{ currentSpokenSubtitle }}
+                </p>
+            </div>
+            <!-- 普通字幕队列：打字机节奏，TTS 未播放时使用 -->
             <transition-group
+                v-else
                 name="subtitle-stack"
                 tag="div"
-                class="subtitle-stack flex h-full w-full flex-col justify-end gap-1 overflow-hidden text-center"
+                class="subtitle-stack flex min-h-20 w-full flex-col justify-end gap-1 text-center"
             >
                 <p
                     v-for="line in subtitleLines"
                     :key="line.id"
                     :class="line.tone === 'current'
-                        ? 'subtitle-mask max-w-full truncate px-4 text-lg font-medium tracking-wide text-gray-800 md:text-xl'
-                        : 'subtitle-mask max-w-full truncate px-4 text-base font-medium tracking-wide text-gray-400 md:text-lg'"
+                        ? 'subtitle-mask max-w-full px-4 text-lg font-medium tracking-wide text-gray-800 md:text-xl'
+                        : 'subtitle-mask max-w-full px-4 text-base font-medium tracking-wide text-gray-400 md:text-lg'"
+                    :title="line.text"
                 >
                     {{ line.text }}
                 </p>
@@ -471,6 +635,42 @@
                     class="flex-1 max-h-[150px] min-h-[40px] bg-transparent py-2.5 px-2 text-slate-800 placeholder:text-slate-400 disabled:cursor-not-allowed disabled:opacity-60"
                 ></textarea>
                 <button
+                    @click="startVoice"
+                    :disabled="voiceState === 'connecting' || voiceState === 'connected'"
+                    :class="[
+                        'mb-1 inline-flex h-12 items-center justify-center rounded-2xl px-4 text-sm font-medium transition-all',
+                        voiceState === 'connecting' || voiceState === 'connected'
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-sky-100 text-sky-700 hover:bg-sky-50 border border-sky-200'
+                    ]">
+                    <i class="fa-solid fa-microphone mr-2"></i>
+                    <span class="whitespace-nowrap">开始语音</span>
+                </button>
+                <button
+                    @click="stopVoice"
+                    :disabled="voiceState === 'idle' || isStopping"
+                    :class="[
+                        'mb-1 inline-flex h-12 items-center justify-center rounded-2xl px-4 text-sm font-medium transition-all',
+                        voiceState === 'idle' || isStopping
+                            ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                            : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                    ]">
+                    <i class="fa-solid fa-microphone-slash mr-2"></i>
+                    <span class="whitespace-nowrap">{{ isStopping ? '正在停止…' : '结束语音' }}</span>
+                </button>
+                <button
+                    @click="finishCurrentUtterance"
+                    :disabled="voiceState !== 'connected' || isStopping"
+                    :class="[
+                        'mb-1 inline-flex h-12 items-center justify-center rounded-2xl px-4 text-sm font-medium transition-all',
+                        voiceState === 'connected' && !isStopping
+                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                            : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                    ]">
+                    <i class="fa-solid fa-check mr-2"></i>
+                    <span class="whitespace-nowrap">结束本句</span>
+                </button>
+                <button
                     @click="sendMessage"
                     :disabled="!inputText.trim() || isThinking || isInputLocked"
                     :class="['mb-1 flex h-12 w-12 items-center justify-center rounded-2xl transition-all',
@@ -478,6 +678,46 @@
                     <i class="fa-solid fa-paper-plane"></i>
                 </button>
             </div>
+            <div class="mt-2 flex items-center justify-between gap-3 px-2 text-xs">
+                <div v-if="shouldShowVoiceSummary" class="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2 text-slate-500">
+                    <p class="truncate">Voice: <span class="font-medium text-slate-700">{{ voiceState }}</span> · STT: <span class="font-medium text-slate-700">{{ voiceBackendState }}</span></p>
+                    <p class="truncate">Partial: <span class="text-slate-700">{{ voicePartialTranscript || '...' }}</span></p>
+                    <p class="truncate">Final: <span class="text-slate-700">{{ voiceFinalTranscript || '...' }}</span></p>
+                </div>
+                <button
+                    type="button"
+                    @click="toggleVoiceDebugPanel"
+                    class="inline-flex shrink-0 items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-sky-300 hover:text-sky-700"
+                >
+                    {{ isVoiceDebugExpanded ? '收起调试' : '展开调试' }}
+                </button>
+            </div>
+            <div v-if="isVoiceDebugExpanded" class="mt-2 rounded-2xl border border-slate-200 bg-white/70 px-3 py-3 text-[11px] leading-5 text-slate-500 space-y-1">
+                <p class="font-semibold uppercase tracking-[0.2em] text-slate-600">Voice Debug</p>
+                <p>worker 入房：{{ voiceDebug.workerJoined ? 'yes' : 'no' }}</p>
+                <p>已订阅用户音轨：{{ voiceDebug.trackSubscribed ? 'yes' : 'no' }}</p>
+                <p>收到第一帧音频：{{ voiceDebug.firstAudioFrame ? 'yes' : 'no' }}</p>
+                <p>最近 speech_start：{{ voiceDebug.lastSpeechStartAt || '--' }}</p>
+                <p>最近 speech_end：{{ voiceDebug.lastSpeechEndAt || '--' }}</p>
+                <p>最近 partial：{{ voiceDebug.lastPartialAt || '--' }}</p>
+                <p>最近 final：{{ voiceDebug.lastFinalAt || '--' }}</p>
+                <p>最近 audio_chunk_sent：{{ voiceDebug.lastAudioChunkSentAt || '--' }}</p>
+                <p>最近 flush_sent：{{ voiceDebug.lastFlushSentAt || '--' }}</p>
+                <p>最近 force_flush_on_stop：{{ voiceDebug.lastForceFlushOnStopAt || '--' }}</p>
+                <p>最近 funasr_message：{{ voiceDebug.lastFunasrMessageAt || '--' }}</p>
+                <p>当前 vad_state：{{ voiceDebug.vadState || '--' }}</p>
+                <p>worker last_vad_event：{{ voiceDebug.workerLastVadEvent || '--' }}</p>
+                <p>worker last_audio_chunk_sent：{{ voiceDebug.workerLastAudioChunkSent || '--' }}</p>
+                <p>worker last_flush_sent：{{ voiceDebug.workerLastFlushSent || '--' }}</p>
+                <p>worker last_funasr_message：{{ voiceDebug.workerLastFunasrMessage || '--' }}</p>
+                <p>worker last_funasr_final：{{ voiceDebug.workerLastFunasrFinal || '--' }}</p>
+                <p>worker last_stage：{{ voiceDebug.workerLastStage || '--' }}</p>
+                <p>browser_disconnected：{{ voiceBrowserDisconnected ? 'yes' : 'no' }}</p>
+                <p>disconnect_reason：{{ voiceDisconnectReason || '--' }}</p>
+                <p>last_disconnect_source：{{ voiceLastDisconnectSource || '--' }}</p>
+                <p>worker_error：{{ voiceWorkerError || '--' }}</p>
+            </div>
+            <p v-if="voiceError" class="mt-2 px-2 text-xs leading-5 text-rose-600">{{ voiceError }}</p>
         </div>
     </div>
 
@@ -780,6 +1020,8 @@
         }
     };
     const DASHBOARD_CACHE_KEY = 'aiTeacherDashboardCache';
+    const PPT_MODE_ENABLED = true;
+    const VOICE_STOP_WAIT_FINAL_MS = 8000;
     const WHITEBOARD_EVENT_PACKET_REGEX = /<WBEVENT>([\s\S]*?)<\/WBEVENT>/g;
     const WHITEBOARD_EVENT_OPEN = '<WBEVENT>';
     const WHITEBOARD_EVENT_CLOSE = '</WBEVENT>';
@@ -802,15 +1044,61 @@
             const isInputLocked = ref(false);
             const currentSubtitle = ref('老师正在准备教材...');
             const subtitleLines = ref([{ id: 'subtitle-0', text: currentSubtitle.value, tone: 'current' }]);
+            const currentSpokenSubtitle = ref('');
+            const isSpeechSubtitleActive = ref(false);
             const whiteboardPages = ref([]);
             const currentPageIndex = ref(-1);
             const hasUnreadWhiteboardUpdate = ref(false);
+            const pptMode = ref(PPT_MODE_ENABLED);
+            const slideManifest = ref(null);
+            const slideManifestError = ref('');
+            const currentSlideId = ref('');
+            const slideQuestionText = ref('');
+            const slideAnswerText = ref('');
+            const slideQuestionVisible = ref(false);
+            const slideAnswerVisible = ref(false);
             const isDashboardOpen = ref(false);
             const currentApiBaseUrl = API_BASE_URL;
             const currentApiMode = API_ROUTE_MODE;
             const currentApiKind = ACTIVE_API_KIND;
             const currentApiModeLabel = API_MODE_LABEL;
             const currentApiStatusText = API_STATUS_TEXT;
+            const voiceState = ref('idle');
+            const voiceError = ref('');
+            const voiceRoomName = ref('');
+            const voiceIdentity = ref('');
+            const voiceConversationProvider = ref('legacy');
+            const voiceBackendState = ref('idle');
+            const voiceWorkerError = ref('');
+            const voiceBrowserDisconnected = ref(false);
+            const voiceDisconnectReason = ref('');
+            const voiceLastDisconnectSource = ref('');
+            const voicePartialTranscript = ref('');
+            const voiceFinalTranscript = ref('');
+            const isStopping = ref(false);
+            const isVoiceDebugExpanded = ref(false);
+            const chatFeedRef = ref(null);
+            const subtitleScrollRef = ref(null);
+            const voiceDebug = ref({
+                workerJoined: false,
+                trackSubscribed: false,
+                firstAudioFrame: false,
+                lastSpeechStartAt: '',
+                lastSpeechEndAt: '',
+                lastPartialAt: '',
+                lastFinalAt: '',
+                lastAudioChunkSentAt: '',
+                lastFlushSentAt: '',
+                lastForceFlushOnStopAt: '',
+                lastFunasrMessageAt: '',
+                vadState: 'idle',
+                workerLastVadEvent: '',
+                workerLastAudioChunkSent: '',
+                workerLastFlushSent: '',
+                workerLastFunasrMessage: '',
+                workerLastFunasrFinal: '',
+                workerLastStage: ''
+            });
             const dashboardLoading = ref(false);
             const dashboardError = ref('');
             const dashboardData = ref({
@@ -824,12 +1112,47 @@
             let radarChart = null;
             let radarResizeFrame = null;
             let radarResizeObserver = null;
+            const qwenRemoteAudioElements = new Map();
+            let qwenAssistantMessageId = '';
+            let qwenAssistantDraft = '';
+            let qwenActiveResponseId = '';
+            let qwenLastStableSubtitle = '';
             // 🌟 读取本地小仓库：如果有历史记录就加载，没有就为空数组
             const savedHistory = localStorage.getItem('aiTeacherChatHistory');
             const messages = ref(savedHistory ? JSON.parse(savedHistory) : []);
+            const isSpeaking = ref(false);
+            const currentAudio = ref(null);
+            const currentLiveSubtitleText = ref('');
+            const ttsSentenceQueue = ref([]);
+            const recentHistoryMessages = computed(() => messages.value.slice(-8));
+            const shouldShowVoiceSummary = computed(() => {
+                if (isVoiceDebugExpanded.value) {
+                    return true;
+                }
+                if (voiceError.value || voiceWorkerError.value) {
+                    return true;
+                }
+                if (voiceState.value !== 'idle') {
+                    return true;
+                }
+                if (voiceBackendState.value && voiceBackendState.value !== 'idle') {
+                    return true;
+                }
+                return false;
+            });
+            const scrollChatFeedToBottom = () => {
+                nextTick(() => {
+                    const container = chatFeedRef.value;
+                    if (!container) {
+                        return;
+                    }
+                    container.scrollTop = container.scrollHeight;
+                });
+            };
             // 🌟 开启自动存档雷达：只要 messages 发生任何变化，立刻写进硬盘！
             watch(messages, (newVal) => {
                 localStorage.setItem('aiTeacherChatHistory', JSON.stringify(newVal));
+                scrollChatFeedToBottom();
             }, { deep: true }); // deep: true 意思是深度监听，连数组里面某个属性变了也能察觉到
 
             const subtitleQueue = ref([]);
@@ -841,17 +1164,140 @@
             const SUBTITLE_BASE_MS = 1000;
             const SUBTITLE_CHAR_MS = 150;
             const SUBTITLE_MAX_MS = 4000;
-            const SUBTITLE_DELIMITER_REGEX = /[，,。！？!?；;：:]/;
+            const SUBTITLE_DELIMITER_REGEX = /[。！？!?；;]/;
+            const SUBTITLE_CONTINUE_END_REGEX = /[，,、：:]$/;
+            const SUBTITLE_SENTENCE_END_REGEX = /[。！？!?；;]/;
+            const TTS_MIN_SENTENCE_CHARS = 12;
+            const TTS_SHORT_SENTENCE_CHARS = 18;
+            const TTS_FIRST_CHUNK_MAX_ZH = 56;
+            const TTS_FIRST_CHUNK_MAX_EN = 128;
+            const TTS_MAX_CHARS_ZH = 96;
+            const TTS_MAX_CHARS_EN = 240;
+            const TTS_IDLE_FLUSH_MS = 800;
+            const TTS_ENGLISH_EXAMPLE_WORDS = 4;
+            const TTS_ENGLISH_EXAMPLE_LETTERS = 18;
             let subtitleHoldTimer = null;
+            let speechSubtitleClearTimer = null;
             let subtitleLineSeed = 1;
+            let chatMessageSeed = 0;
             let whiteboardFlashTimer = null;
             let questionDrawerAutoHideTimer = null;
             let questionDrawerHoverCollapseTimer = null;
+            let livekitRoom = null;
+            let workerStatusPollTimer = null;
+            let livekitClientModulePromise = null;
+            let activeAssistantAbortController = null;
+            let currentAudioUrl = '';
+            let ttsIdleTimer = null;
+            let ttsSentenceBuffer = '';
+            let pendingSubtitleTtsFinalFlush = false;
+            let currentPlayingTtsSentenceKey = '';
+            let currentPlayingTtsChunk = null;
+            let ttsPlaybackToken = 0;
+            let ttsPlaybackBusy = false;
+            let currentTtsStreamSocket = null;
+            let pendingShortTtsSentence = null;
+            let ttsChunkSeqSeed = 0;
+            let lastTtsPlaybackEndMs = 0;
+            let lastTtsPlaybackStartMs = 0;
+            let ttsSynthInFlight = 0;
+            const TTS_PREFETCH_CONCURRENCY = 2;
+            const TTS_MAX_SYNTH_CONCURRENCY = TTS_PREFETCH_CONCURRENCY;
+            const TTS_READY_BUFFER_TARGET = 2;
+            const TTS_MAX_PENDING_SYNTH = 3;
+            const ttsSynthQueue = [];
+            const ttsReadyAudioQueue = new Map();
+            const ttsActiveSynthSeqIds = new Set();
+            let pendingDisconnectMeta = null;
+            let pendingVoiceStopWaiter = null;
+            let pendingVoiceDisconnectWaiter = null;
+            const _submittedVoiceUtterances = new Map();
             const pendingWhiteboardStages = [];
             const activatedWhiteboardStageKeys = new Set();
             const SUBTITLE_MIN_WEAK_BREAK_CHARS = 8;
-            const SUBTITLE_HARD_BREAK_CHARS = 26;
+            const SUBTITLE_HARD_BREAK_CHARS = 40;
             const STRONG_SUBTITLE_DELIMITER_REGEX = /[。！？!?]/;
+            const nextChatMessageId = () => {
+                chatMessageSeed += 1;
+                return `msg-${Date.now()}-${chatMessageSeed}`;
+            };
+            const ensureChatMessageId = (message) => {
+                if (!message || typeof message !== 'object') {
+                    return '';
+                }
+                const existingId = String(message.id || '').trim();
+                if (existingId) {
+                    return existingId;
+                }
+                const nextId = nextChatMessageId();
+                message.id = nextId;
+                return nextId;
+            };
+            const createChatMessage = (role, content = '', extra = {}) => ({
+                id: nextChatMessageId(),
+                role,
+                content,
+                ...extra
+            });
+            const resolveChatMessageTarget = ({ messageId = '', messageIndex = -1 } = {}) => {
+                const normalizedId = String(messageId || '').trim();
+                if (normalizedId) {
+                    const resolvedIndex = messages.value.findIndex((message) => ensureChatMessageId(message) === normalizedId);
+                    if (resolvedIndex >= 0) {
+                        return {
+                            messageIndex: resolvedIndex,
+                            messageId: normalizedId,
+                            message: messages.value[resolvedIndex]
+                        };
+                    }
+                }
+                if (
+                    Number.isInteger(messageIndex)
+                    && messageIndex >= 0
+                    && messageIndex < messages.value.length
+                ) {
+                    const message = messages.value[messageIndex];
+                    return {
+                        messageIndex,
+                        messageId: ensureChatMessageId(message),
+                        message
+                    };
+                }
+                return {
+                    messageIndex: -1,
+                    messageId: normalizedId || '',
+                    message: null
+                };
+            };
+            const buildChatLogPayload = ({
+                text = '',
+                content = '',
+                response = null,
+                messageIndex = null,
+                messageId = '',
+                source = '',
+                chunkLength = null
+            } = {}) => ({
+                source: source || undefined,
+                messageCount: messages.value.length,
+                textLength: String(text || '').length,
+                contentLength: String(content || '').length,
+                isThinking: Boolean(isThinking.value),
+                isInputLocked: Boolean(isInputLocked.value),
+                isStoppingVoice: Boolean(isStopping.value),
+                responseOk: response ? Boolean(response.ok) : null,
+                responseStatus: response ? Number(response.status) : null,
+                hasBody: response ? Boolean(response.body) : null,
+                messageIndex: Number.isInteger(messageIndex) ? messageIndex : null,
+                messageId: String(messageId || '').trim() || null,
+                chunkLength: typeof chunkLength === 'number' ? chunkLength : null
+            });
+            const logChatEvent = (label, meta = {}) => {
+                console.info(label, buildChatLogPayload(meta));
+            };
+            messages.value.forEach((message) => {
+                ensureChatMessageId(message);
+            });
             const buildQuestionDisplayKey = (pageIndex, question) => {
                 const normalizedQuestion = String(question || '').trim();
                 if (pageIndex < 0 || !normalizedQuestion) {
@@ -883,6 +1329,1302 @@
                 && questionDrawerOpen.value
                 && questionDrawerActiveKey.value === currentQuestionDisplayKey.value
             ));
+            const currentSlide = computed(() => {
+                if (!slideManifest.value || !currentSlideId.value) return null;
+                const slides = slideManifest.value.slides || [];
+                return slides.find((s) => s.id === currentSlideId.value) || null;
+            });
+            const currentSlideSrc = computed(() => {
+                return currentSlide.value?.image || '';
+            });
+            const currentSlideLabel = computed(() => {
+                return currentSlide.value?.title || currentSlide.value?.id || '';
+            });
+            const voiceStatusDotClass = computed(() => {
+                if (voiceState.value === 'connected') return 'bg-emerald-500';
+                if (voiceState.value === 'connecting') return 'bg-amber-500';
+                if (voiceState.value === 'failed') return 'bg-rose-500';
+                return 'bg-slate-300';
+            });
+            const nowLabel = () => new Date().toLocaleTimeString('zh-CN', {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            const logVoiceEvent = (eventName, payload = {}) => {
+                console.info(`[AI Teacher][Voice] ${eventName}`, payload);
+            };
+            const logTtsPlayEvent = (eventName, payload = {}) => {
+                const elapsedMs = Math.round(performance.now());
+                console.info(eventName, { _t: elapsedMs, ...payload });
+                return elapsedMs;
+            };
+            const nextTtsChunkSeqId = () => {
+                ttsChunkSeqSeed += 1;
+                return ttsChunkSeqSeed;
+            };
+            const buildTtsChunkLogPayload = (chunkItem, extra = {}) => ({
+                seqId: chunkItem?.seqId || 0,
+                state: chunkItem?.lifecycleState || '',
+                originalTextLength: chunkItem?.originalTextLength || 0,
+                finalChunkLength: String(chunkItem?.text || '').length,
+                chunkLang: chunkItem?.chunkLang || '',
+                chunkType: chunkItem?.chunkType || '',
+                splitReason: chunkItem?.splitReason || '',
+                ...extra
+            });
+            const assignTtsChunkSeqId = (chunkItem) => {
+                if (!chunkItem) {
+                    return 0;
+                }
+                if (!chunkItem.seqId) {
+                    chunkItem.seqId = nextTtsChunkSeqId();
+                }
+                return chunkItem.seqId;
+            };
+            const markTtsChunkState = (chunkItem, lifecycleState, extra = {}) => {
+                if (!chunkItem) {
+                    return;
+                }
+                assignTtsChunkSeqId(chunkItem);
+                chunkItem.lifecycleState = lifecycleState;
+                const eventMap = {
+                    emitted: 'tts.chunk.emitted',
+                    prefetched: 'tts.chunk.prefetched',
+                    ready: 'tts.chunk.ready',
+                    playing: 'tts.chunk.playing',
+                    ended: 'tts.chunk.ended',
+                    dropped: 'tts.chunk.dropped'
+                };
+                const eventName = eventMap[lifecycleState];
+                if (!eventName) {
+                    return;
+                }
+                logTtsPlayEvent(eventName, buildTtsChunkLogPayload(chunkItem, extra));
+            };
+            const clearTtsIdleTimer = () => {
+                if (ttsIdleTimer) {
+                    clearTimeout(ttsIdleTimer);
+                    ttsIdleTimer = null;
+                }
+            };
+            const cleanupAssistantSpeech = ({ audio = currentAudio.value, audioUrl = currentAudioUrl } = {}) => {
+                if (audio) {
+                    audio.onended = null;
+                    audio.onerror = null;
+                    audio.onpause = null;
+                    try {
+                        audio.pause();
+                    } catch (error) {
+                        console.warn('[AI Teacher][TTS] Failed to pause audio during cleanup.', error);
+                    }
+                    try {
+                        audio.removeAttribute('src');
+                    } catch (error) {
+                        console.warn('[AI Teacher][TTS] Failed to clear audio src during cleanup.', error);
+                    }
+                }
+                if (audioUrl) {
+                    URL.revokeObjectURL(audioUrl);
+                }
+                if (!currentAudio.value || currentAudio.value === audio) {
+                    currentAudio.value = null;
+                }
+                if (!currentAudioUrl || currentAudioUrl === audioUrl) {
+                    currentAudioUrl = '';
+                }
+                if (!currentAudio.value) {
+                    isSpeaking.value = false;
+                }
+            };
+            const dropQueuedTtsChunk = (chunkItem, reason) => {
+                if (!chunkItem?.seqId) {
+                    return;
+                }
+                markTtsChunkState(chunkItem, 'dropped', { reason });
+            };
+            const closeTtsChunkStream = (chunkItem, reason = 'stream_interrupt') => {
+                const socket = chunkItem?.streamSocket;
+                if (!socket) {
+                    return;
+                }
+                try {
+                    if (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN) {
+                        logTtsPlayEvent('frontend.tts.stream.interrupt', {
+                            reason,
+                            seqId: chunkItem.seqId || 0,
+                            textLength: String(chunkItem.text || '').length
+                        });
+                        socket.close(1000, reason);
+                    }
+                } catch (error) {
+                    console.warn('[AI Teacher][TTS] Failed to close TTS stream socket.', error);
+                }
+                chunkItem.streamSocket = null;
+                if (currentTtsStreamSocket === socket) {
+                    currentTtsStreamSocket = null;
+                }
+            };
+            const stopAssistantSpeech = (reason = 'manual_interrupt') => {
+                logTtsPlayEvent('tts.interrupt.begin', {
+                    reason,
+                    isSpeaking: Boolean(isSpeaking.value),
+                    audioExists: Boolean(currentAudio.value),
+                    audioPaused: currentAudio.value ? currentAudio.value.paused : null,
+                    ttsQueueLength: ttsSentenceQueue.value.length,
+                    subtitleQueueLength: subtitleQueue.value.length
+                });
+                ttsPlaybackToken += 1;
+                clearTtsIdleTimer();
+                if (currentPlayingTtsChunk?.seqId) {
+                    closeTtsChunkStream(currentPlayingTtsChunk, reason);
+                    dropQueuedTtsChunk(currentPlayingTtsChunk, reason);
+                }
+                ttsSentenceQueue.value.forEach((chunkItem) => {
+                    closeTtsChunkStream(chunkItem, reason);
+                    dropQueuedTtsChunk(chunkItem, reason);
+                });
+                logTtsPlayEvent('tts.interrupt.queue.clear', {
+                    reason,
+                    clearedCount: ttsSentenceQueue.value.length
+                });
+                ttsSentenceQueue.value = [];
+                ttsSynthQueue.length = 0;
+                ttsReadyAudioQueue.clear();
+                ttsActiveSynthSeqIds.clear();
+                if (currentTtsStreamSocket) {
+                    try {
+                        logTtsPlayEvent('tts.interrupt.controller.abort', { reason, socketReadyState: currentTtsStreamSocket.readyState });
+                        logTtsPlayEvent('frontend.tts.stream.interrupt', { reason, seqId: 0, textLength: 0 });
+                        currentTtsStreamSocket.close(1000, reason);
+                    } catch (error) {
+                        console.warn('[AI Teacher][TTS] Failed to close active TTS stream socket.', error);
+                    }
+                    currentTtsStreamSocket = null;
+                }
+                ttsSentenceBuffer = '';
+                pendingShortTtsSentence = null;
+                pendingSubtitleTtsFinalFlush = false;
+                currentPlayingTtsSentenceKey = '';
+                currentPlayingTtsChunk = null;
+                ttsPlaybackBusy = false;
+                ttsSynthInFlight = 0;
+                lastTtsPlaybackEndMs = 0;
+                if (currentAudio.value) {
+                    logTtsPlayEvent('tts.interrupt.audio.pause', {
+                        reason,
+                        audioPaused: currentAudio.value.paused,
+                        audioSrc: Boolean(currentAudio.value.getAttribute('src'))
+                    });
+                }
+                cleanupAssistantSpeech();
+                isSpeaking.value = false;
+                resetSubtitleQueue({ keepCurrent: false });
+                logTtsPlayEvent('tts.interrupt.end', {
+                    reason,
+                    isSpeaking: Boolean(isSpeaking.value),
+                    audioExists: Boolean(currentAudio.value),
+                    ttsQueueLength: ttsSentenceQueue.value.length,
+                    subtitleQueueLength: subtitleQueue.value.length
+                });
+            };
+            const appendSpeechText = (baseText, nextText) => {
+                const left = String(baseText || '');
+                const right = String(nextText || '');
+                if (!left) {
+                    return right;
+                }
+                if (!right) {
+                    return left;
+                }
+                if (/[A-Za-z0-9]$/.test(left) && /^[A-Za-z0-9]/.test(right)) {
+                    return `${left} ${right}`;
+                }
+                return `${left}${right}`;
+            };
+            const resolveMandarinSpeechRoute = () => ({
+                lang: 'zh',
+                voice: 'doubao_default',
+                speed: 1.0,
+                backend: 'doubao',
+                fallbackReason: null
+            });
+            const detectSentenceSpeechLanguage = (text) => {
+                const normalizedText = String(text || '');
+                const chineseChars = (normalizedText.match(/[\u3400-\u9fff]/g) || []).length;
+                const englishLetters = (normalizedText.match(/[A-Za-z]/g) || []).length;
+                const englishWords = (normalizedText.match(/\b[A-Za-z][A-Za-z'-]*\b/g) || []).length;
+                if (englishLetters >= 6 && chineseChars === 0) {
+                    return 'en';
+                }
+                if (englishLetters >= 24 && englishWords >= 4 && englishLetters > (chineseChars * 3)) {
+                    return 'en';
+                }
+                return 'zh';
+            };
+            const resolveTtsRoute = (sentenceText, requestedLanguageOverride = '') => {
+                const requestedLanguage = requestedLanguageOverride || detectSentenceSpeechLanguage(sentenceText);
+                const mandarinRoute = requestedLanguage === 'zh' ? resolveMandarinSpeechRoute() : null;
+                const route = mandarinRoute || {
+                    lang: 'en',
+                    voice: 'doubao_default',
+                    speed: 1.0,
+                    backend: 'doubao',
+                    fallbackReason: null
+                };
+                logTtsPlayEvent('tts.backend.select', {
+                    requestedLang: requestedLanguage,
+                    backend: route.backend,
+                    chosenLang: route.lang,
+                    chosenVoice: route.voice
+                });
+                if (route.fallbackReason) {
+                    logTtsPlayEvent('tts.voice.fallback', {
+                        requestedLang: requestedLanguage,
+                        chosenLang: route.lang,
+                        chosenVoice: route.voice,
+                        fallbackReason: route.fallbackReason
+                    });
+                }
+                logTtsPlayEvent('tts.voice.select', {
+                    requestedLang: requestedLanguage,
+                    chosenLang: route.lang,
+                    chosenVoice: route.voice
+                });
+                logTtsPlayEvent('tts.lang.route', {
+                    textLength: String(sentenceText || '').length,
+                    requestedLang: requestedLanguage,
+                    backend: route.backend,
+                    chosenLang: route.lang,
+                    chosenVoice: route.voice,
+                    fallbackReason: route.fallbackReason || null
+                });
+                return route;
+            };
+            const createTtsQueueItem = (text, {
+                isFinalFlush = false,
+                chunkLang = '',
+                chunkType = 'zh_explanation',
+                splitReason = 'sentence_enqueue',
+                originalTextLength = 0
+            } = {}) => ({
+                text,
+                isFinalFlush,
+                chunkLang,
+                chunkType,
+                splitReason,
+                originalTextLength: originalTextLength || String(text || '').length,
+                seqId: 0,
+                lifecycleState: '',
+                prefetchedBlob: null,
+                prefetchPromise: null,
+                streamSocket: null,
+                route: null
+            });
+            const buildTtsStreamUrl = () => {
+                const base = API_BASE_URL
+                    ? new URL(API_BASE_URL, window.location.origin)
+                    : new URL(window.location.origin);
+                const streamUrl = new URL('/api/tts/stream', base.origin);
+                streamUrl.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
+                return streamUrl.toString();
+            };
+            const fetchTtsAudioViaHttp = async (sentenceItem, route) => {
+                const response = await fetch(API_BASE_URL + '/api/tts/speak', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: sentenceItem.text,
+                        voice: route.voice,
+                        lang: route.lang,
+                        speed: route.speed
+                    })
+                });
+                if (!response.ok) {
+                    const errorText = await response.text().catch(() => '');
+                    throw new Error(`HTTP ${response.status}: ${String(errorText || '').slice(0, 200)}`);
+                }
+                return response.blob();
+            };
+            const fetchTtsAudioViaStream = async (sentenceItem, route) => new Promise((resolve, reject) => {
+                const playbackTokenAtStart = ttsPlaybackToken;
+                const chunks = [];
+                let mediaType = 'audio/mpeg';
+                let completed = false;
+                let opened = false;
+                let socket = null;
+                let firstAudioChunkLogged = false;
+                const ttsRequestStartMs = logTtsPlayEvent('tts.request.start', {
+                    seqId: sentenceItem.seqId || 0,
+                    textLength: String(sentenceItem.text || '').length,
+                    chosenLang: route.lang,
+                    chosenVoice: route.voice,
+                    backend: route.backend
+                });
+                const rejectInterrupted = (reason) => {
+                    const error = new Error(reason);
+                    error.isTtsInterrupted = true;
+                    reject(error);
+                };
+                try {
+                    socket = new WebSocket(buildTtsStreamUrl());
+                    socket.binaryType = 'arraybuffer';
+                    sentenceItem.streamSocket = socket;
+                    currentTtsStreamSocket = socket;
+                    logTtsPlayEvent('frontend.tts.stream.begin', {
+                        seqId: sentenceItem.seqId || 0,
+                        textLength: String(sentenceItem.text || '').length,
+                        chosenLang: route.lang,
+                        chosenVoice: route.voice,
+                        backend: route.backend
+                    });
+                } catch (error) {
+                    reject(error);
+                    return;
+                }
+                socket.onopen = () => {
+                    opened = true;
+                    if (playbackTokenAtStart !== ttsPlaybackToken) {
+                        rejectInterrupted('stream_interrupted_before_send');
+                        socket.close(1000, 'interrupted');
+                        return;
+                    }
+                    socket.send(JSON.stringify({
+                        text: sentenceItem.text,
+                        voice: route.voice,
+                        lang: route.lang,
+                        speed: route.speed
+                    }));
+                };
+                socket.onmessage = async (event) => {
+                    if (playbackTokenAtStart !== ttsPlaybackToken) {
+                        rejectInterrupted('stream_interrupted_during_receive');
+                        socket.close(1000, 'interrupted');
+                        return;
+                    }
+                    if (typeof event.data === 'string') {
+                        let payload = null;
+                        try {
+                            payload = JSON.parse(event.data);
+                        } catch (error) {
+                            reject(new Error(`Invalid stream metadata: ${String(event.data || '').slice(0, 120)}`));
+                            socket.close(1002, 'invalid_metadata');
+                            return;
+                        }
+                        if (payload.type === 'begin') {
+                            mediaType = payload.media_type || mediaType;
+                            return;
+                        }
+                        if (payload.type === 'error') {
+                            reject(new Error(payload.detail || 'TTS stream error'));
+                            socket.close(1011, 'stream_error');
+                            return;
+                        }
+                        if (payload.type === 'end') {
+                            completed = true;
+                            sentenceItem.streamSocket = null;
+                            if (currentTtsStreamSocket === socket) {
+                                currentTtsStreamSocket = null;
+                            }
+                            logTtsPlayEvent('tts.audio.ready', {
+                                seqId: sentenceItem.seqId || 0,
+                                textLength: String(sentenceItem.text || '').length,
+                                chunkCount: chunks.length,
+                                totalBytes: chunks.reduce((sum, c) => sum + (c.byteLength || c.length || 0), 0),
+                                elapsedMs: Math.round(performance.now() - ttsRequestStartMs),
+                                chosenLang: route.lang,
+                                chosenVoice: route.voice
+                            });
+                            resolve(new Blob(chunks, { type: mediaType }));
+                            return;
+                        }
+                        return;
+                    }
+                    if (!firstAudioChunkLogged) {
+                        firstAudioChunkLogged = true;
+                        logTtsPlayEvent('tts.first_audio_chunk', {
+                            seqId: sentenceItem.seqId || 0,
+                            textLength: String(sentenceItem.text || '').length,
+                            elapsedMs: Math.round(performance.now() - ttsRequestStartMs),
+                            chosenLang: route.lang,
+                            chosenVoice: route.voice
+                        });
+                    }
+                    if (event.data instanceof Blob) {
+                        chunks.push(await event.data.arrayBuffer());
+                    } else {
+                        chunks.push(event.data);
+                    }
+                };
+                socket.onerror = () => {
+                    reject(new Error(opened ? 'TTS stream socket error' : 'TTS stream socket open failed'));
+                };
+                socket.onclose = () => {
+                    sentenceItem.streamSocket = null;
+                    if (currentTtsStreamSocket === socket) {
+                        currentTtsStreamSocket = null;
+                    }
+                    if (!completed && playbackTokenAtStart !== ttsPlaybackToken) {
+                        rejectInterrupted('stream_interrupted_on_close');
+                        return;
+                    }
+                    if (!completed) {
+                        reject(new Error('TTS stream closed before completion'));
+                    }
+                };
+            });
+            const fetchTtsAudioBlob = async (sentenceItem, { prefetch = false } = {}) => {
+                if (!sentenceItem?.text) {
+                    return null;
+                }
+                assignTtsChunkSeqId(sentenceItem);
+                const readyAudioBlob = ttsReadyAudioQueue.get(sentenceItem.seqId);
+                if (readyAudioBlob) {
+                    sentenceItem.prefetchedBlob = readyAudioBlob;
+                    return readyAudioBlob;
+                }
+                if (sentenceItem.prefetchedBlob) {
+                    if (prefetch) {
+                        logTtsPlayEvent('tts.prefetch.skip', {
+                            originalTextLength: sentenceItem.originalTextLength,
+                            finalChunkLength: String(sentenceItem.text || '').length,
+                            chunkLang: sentenceItem.chunkLang || detectSentenceSpeechLanguage(sentenceItem.text),
+                            chunkType: sentenceItem.chunkType || 'unknown',
+                            splitReason: sentenceItem.splitReason || 'prefetched_blob_reuse',
+                            reason: 'already_ready'
+                        });
+                    }
+                    return sentenceItem.prefetchedBlob;
+                }
+                if (sentenceItem.prefetchPromise) {
+                    if (prefetch) {
+                        logTtsPlayEvent('tts.prefetch.skip', {
+                            originalTextLength: sentenceItem.originalTextLength,
+                            finalChunkLength: String(sentenceItem.text || '').length,
+                            chunkLang: sentenceItem.chunkLang || detectSentenceSpeechLanguage(sentenceItem.text),
+                            chunkType: sentenceItem.chunkType || 'unknown',
+                            splitReason: sentenceItem.splitReason || 'prefetch_inflight',
+                            reason: 'request_in_flight'
+                        });
+                    }
+                    return sentenceItem.prefetchPromise;
+                }
+                const route = sentenceItem.route || resolveTtsRoute(sentenceItem.text, sentenceItem.chunkLang);
+                sentenceItem.route = route;
+                if (prefetch) {
+                    logTtsPlayEvent('tts.prefetch.begin', {
+                        originalTextLength: sentenceItem.originalTextLength,
+                        finalChunkLength: String(sentenceItem.text || '').length,
+                        chunkLang: sentenceItem.chunkLang || route.lang,
+                        chunkType: sentenceItem.chunkType || 'unknown',
+                        splitReason: sentenceItem.splitReason || 'prefetch',
+                        chosenLang: route.lang,
+                        chosenVoice: route.voice
+                    });
+                }
+                const requestPromise = (async () => {
+                    let audioBlob = null;
+                    const fetchStartMs = performance.now();
+                    try {
+                        audioBlob = await fetchTtsAudioViaStream(sentenceItem, route);
+                    } catch (error) {
+                        if (error?.isTtsInterrupted) {
+                            throw error;
+                        }
+                        logTtsPlayEvent('frontend.tts.stream.fallback', {
+                            seqId: sentenceItem.seqId || 0,
+                            textLength: String(sentenceItem.text || '').length,
+                            chosenLang: route.lang,
+                            chosenVoice: route.voice,
+                            backend: route.backend,
+                            reason: String(error?.message || error)
+                        });
+                        audioBlob = await fetchTtsAudioViaHttp(sentenceItem, route);
+                    }
+                    sentenceItem.prefetchedBlob = audioBlob;
+                    if (audioBlob) {
+                        ttsReadyAudioQueue.set(sentenceItem.seqId, audioBlob);
+                    }
+                    if (prefetch) {
+                        markTtsChunkState(sentenceItem, 'prefetched', { chosenLang: route.lang, chosenVoice: route.voice });
+                        logTtsPlayEvent('tts.prefetch.ready', {
+                            originalTextLength: sentenceItem.originalTextLength,
+                            finalChunkLength: String(sentenceItem.text || '').length,
+                            chunkLang: sentenceItem.chunkLang || route.lang,
+                            chunkType: sentenceItem.chunkType || 'unknown',
+                            splitReason: sentenceItem.splitReason || 'prefetch',
+                            chosenLang: route.lang,
+                            chosenVoice: route.voice
+                        });
+                    }
+                    markTtsChunkState(sentenceItem, 'ready', { chosenLang: route.lang, chosenVoice: route.voice, prefetched: Boolean(prefetch) });
+                    return audioBlob;
+                })();
+                sentenceItem.prefetchPromise = requestPromise
+                    .catch((error) => {
+                        if (prefetch) {
+                            logTtsPlayEvent('tts.prefetch.skip', {
+                                originalTextLength: sentenceItem.originalTextLength,
+                                finalChunkLength: String(sentenceItem.text || '').length,
+                                chunkLang: sentenceItem.chunkLang || route.lang,
+                                chunkType: sentenceItem.chunkType || 'unknown',
+                                splitReason: sentenceItem.splitReason || 'prefetch_failed',
+                                reason: String(error?.message || error)
+                            });
+                        }
+                        throw error;
+                    })
+                    .finally(() => {
+                        sentenceItem.prefetchPromise = null;
+                    });
+                return sentenceItem.prefetchPromise;
+            };
+            const isTtsChunkAudioReady = (chunkItem) => Boolean(
+                chunkItem?.prefetchedBlob
+                || (chunkItem?.seqId && ttsReadyAudioQueue.has(chunkItem.seqId))
+            );
+            const isTtsChunkSynthPending = (chunkItem) => Boolean(
+                chunkItem?.prefetchPromise
+                || (chunkItem?.seqId && ttsActiveSynthSeqIds.has(chunkItem.seqId))
+                || ttsSynthQueue.some((queuedItem) => queuedItem?.seqId === chunkItem?.seqId)
+            );
+            const enqueueTtsSynthJob = (chunkItem, reason = 'playback_queue') => {
+                if (!chunkItem?.text) {
+                    return false;
+                }
+                assignTtsChunkSeqId(chunkItem);
+                if (isTtsChunkAudioReady(chunkItem) || isTtsChunkSynthPending(chunkItem)) {
+                    return false;
+                }
+                if ((ttsSynthQueue.length + ttsActiveSynthSeqIds.size) >= TTS_MAX_PENDING_SYNTH) {
+                    logTtsPlayEvent('tts.synth.enqueue.skip', {
+                        reason: 'max_pending_synth',
+                        seqId: chunkItem.seqId,
+                        synthQueueLength: ttsSynthQueue.length,
+                        synthInFlight: ttsActiveSynthSeqIds.size,
+                        maxPendingSynth: TTS_MAX_PENDING_SYNTH
+                    });
+                    return false;
+                }
+                ttsSynthQueue.push(chunkItem);
+                ttsSynthQueue.sort((left, right) => (left.seqId || 0) - (right.seqId || 0));
+                logTtsPlayEvent('tts.synth.enqueue', {
+                    reason,
+                    seqId: chunkItem.seqId,
+                    textLength: String(chunkItem.text || '').length,
+                    chunkLang: chunkItem.chunkLang || detectSentenceSpeechLanguage(chunkItem.text),
+                    chunkType: chunkItem.chunkType || 'unknown',
+                    synthQueueLength: ttsSynthQueue.length,
+                    readyQueueLength: ttsReadyAudioQueue.size,
+                    playbackQueueLength: ttsSentenceQueue.value.length
+                });
+                return true;
+            };
+            const processTtsSynthQueue = (playbackTokenAtSchedule = ttsPlaybackToken) => {
+                while (
+                    ttsActiveSynthSeqIds.size < TTS_PREFETCH_CONCURRENCY
+                    && ttsSynthQueue.length > 0
+                ) {
+                    const item = ttsSynthQueue.shift();
+                    if (!item?.text || isTtsChunkAudioReady(item) || isTtsChunkSynthPending(item)) {
+                        continue;
+                    }
+                    assignTtsChunkSeqId(item);
+                    ttsActiveSynthSeqIds.add(item.seqId);
+                    ttsSynthInFlight = ttsActiveSynthSeqIds.size;
+                    logTtsPlayEvent('tts.synth.start', {
+                        seqId: item.seqId,
+                        textLength: String(item.text || '').length,
+                        chunkLang: item.chunkLang || detectSentenceSpeechLanguage(item.text),
+                        chunkType: item.chunkType || 'unknown',
+                        synthQueueLength: ttsSynthQueue.length,
+                        synthInFlight: ttsSynthInFlight,
+                        maxConcurrency: TTS_PREFETCH_CONCURRENCY
+                    });
+                    void fetchTtsAudioBlob(item, { prefetch: true })
+                        .then((audioBlob) => {
+                            if (playbackTokenAtSchedule !== ttsPlaybackToken) {
+                                markTtsChunkState(item, 'dropped', { reason: 'playback_token_changed_after_synth' });
+                                return;
+                            }
+                            if (audioBlob) {
+                                ttsReadyAudioQueue.set(item.seqId, audioBlob);
+                            }
+                            logTtsPlayEvent('tts.synth.ready', {
+                                seqId: item.seqId,
+                                textLength: String(item.text || '').length,
+                                chunkLang: item.chunkLang || detectSentenceSpeechLanguage(item.text),
+                                chunkType: item.chunkType || 'unknown',
+                                readyQueueLength: ttsReadyAudioQueue.size,
+                                playbackQueueLength: ttsSentenceQueue.value.length
+                            });
+                        })
+                        .catch((error) => {
+                            if (!error?.isTtsInterrupted) {
+                                logTtsPlayEvent('tts.synth.error', {
+                                    seqId: item.seqId || 0,
+                                    textLength: String(item.text || '').length,
+                                    error: String(error?.message || error)
+                                });
+                            }
+                        })
+                        .finally(() => {
+                            ttsActiveSynthSeqIds.delete(item.seqId);
+                            ttsSynthInFlight = ttsActiveSynthSeqIds.size;
+                            if (playbackTokenAtSchedule === ttsPlaybackToken) {
+                                processTtsSynthQueue(playbackTokenAtSchedule);
+                                scheduleTtsPrefetch();
+                            }
+                        });
+                }
+            };
+            const scheduleTtsPrefetch = () => {
+                const queueItems = [...ttsSentenceQueue.value]
+                    .filter((item) => item?.text)
+                    .sort((left, right) => (left.seqId || 0) - (right.seqId || 0));
+                const readyOrPendingCount = queueItems.filter((item) => (
+                    isTtsChunkAudioReady(item) || isTtsChunkSynthPending(item)
+                )).length;
+                let neededCount = Math.min(
+                    Math.max(0, TTS_READY_BUFFER_TARGET - readyOrPendingCount),
+                    TTS_MAX_PENDING_SYNTH - (ttsSynthQueue.length + ttsActiveSynthSeqIds.size)
+                );
+                if (neededCount <= 0) {
+                    return;
+                }
+                for (const item of queueItems) {
+                    if (neededCount <= 0) {
+                        break;
+                    }
+                    if (enqueueTtsSynthJob(item, 'ready_buffer')) {
+                        neededCount -= 1;
+                    }
+                }
+                processTtsSynthQueue(ttsPlaybackToken);
+            };
+            const playTtsSentence = async (sentenceItem) => {
+                const normalizedText = normalizeSubtitleTextForSpeech(sentenceItem?.text || '');
+                if (!normalizedText) {
+                    return;
+                }
+                clearSpeechSubtitleTimer();
+                currentSpokenSubtitle.value = normalizedText;
+                isSpeechSubtitleActive.value = true;
+                logTtsPlayEvent('subtitle.speech.activate', {
+                    textLength: normalizedText.length,
+                    queueLength: ttsSentenceQueue.value.length
+                });
+                assignTtsChunkSeqId(sentenceItem);
+                const route = sentenceItem.route || resolveTtsRoute(normalizedText, sentenceItem?.chunkLang || '');
+                sentenceItem.route = route;
+                const playbackToken = ttsPlaybackToken;
+                const gapMs = lastTtsPlaybackEndMs ? Math.round(performance.now() - lastTtsPlaybackEndMs) : 0;
+                logTtsPlayEvent('tts.playback.start', {
+                    seqId: sentenceItem.seqId || 0,
+                    textLength: normalizedText.length,
+                    finalFlush: Boolean(sentenceItem?.isFinalFlush),
+                    queueLength: ttsSentenceQueue.value.length,
+                    synthInFlight: ttsSynthInFlight,
+                    gapMs,
+                    chosenLang: route.lang,
+                    chosenVoice: route.voice
+                });
+                const ttsFetchStartMs = performance.now();
+                lastTtsPlaybackStartMs = Math.round(ttsFetchStartMs);
+                if (lastTtsPlaybackEndMs) {
+                    logTtsPlayEvent('tts.playback.gap_ms', {
+                        gapMs,
+                        prevEndMs: lastTtsPlaybackEndMs,
+                        nextStartMs: lastTtsPlaybackStartMs,
+                        seqId: sentenceItem.seqId || 0,
+                        queueLength: ttsSentenceQueue.value.length
+                    });
+                }
+                const audioBlob = await fetchTtsAudioBlob(sentenceItem, { prefetch: false });
+                if (sentenceItem?.seqId) {
+                    ttsReadyAudioQueue.delete(sentenceItem.seqId);
+                }
+                if (playbackToken !== ttsPlaybackToken) {
+                    markTtsChunkState(sentenceItem, 'dropped', { reason: 'playback_token_changed_before_play' });
+                    return;
+                }
+                if (currentAudio.value && !currentAudio.value.paused) {
+                    logTtsPlayEvent('tts.queue.blocked', {
+                        reason: 'audio_already_playing',
+                        textLength: normalizedText.length,
+                        finalFlush: Boolean(sentenceItem?.isFinalFlush),
+                        queueLength: ttsSentenceQueue.value.length
+                    });
+                    markTtsChunkState(sentenceItem, 'dropped', { reason: 'audio_already_playing' });
+                    currentSpokenSubtitle.value = '';
+                    isSpeechSubtitleActive.value = false;
+                    return;
+                }
+                const audioUrl = URL.createObjectURL(audioBlob);
+                const audio = new Audio(audioUrl);
+                currentAudio.value = audio;
+                currentAudioUrl = audioUrl;
+                currentPlayingTtsChunk = sentenceItem;
+                isSpeaking.value = true;
+                scheduleTtsPrefetch();
+                await new Promise((resolve, reject) => {
+                    markTtsChunkState(sentenceItem, 'playing', { chosenLang: route.lang, chosenVoice: route.voice });
+                    audio.onended = () => {
+                        lastTtsPlaybackEndMs = Math.round(performance.now());
+                        markTtsChunkState(sentenceItem, 'ended', { chosenLang: route.lang, chosenVoice: route.voice });
+                        logTtsPlayEvent('tts.playback.end', {
+                            seqId: sentenceItem.seqId || 0,
+                            textLength: normalizedText.length,
+                            finalFlush: Boolean(sentenceItem?.isFinalFlush),
+                            queueLength: ttsSentenceQueue.value.length,
+                            chunkType: sentenceItem?.chunkType || 'unknown',
+                            splitReason: sentenceItem?.splitReason || 'sentence_enqueue',
+                            chosenLang: route.lang,
+                            chosenVoice: route.voice,
+                            durationMs: Math.round(performance.now() - lastTtsPlaybackStartMs)
+                        });
+                        cleanupAssistantSpeech({ audio, audioUrl });
+                        resolve();
+                    };
+                    audio.onerror = (event) => {
+                        markTtsChunkState(sentenceItem, 'dropped', { reason: String(event?.type || 'audio_element_error') });
+                        cleanupAssistantSpeech({ audio, audioUrl });
+                        reject(new Error(String(event?.type || 'audio_element_error')));
+                    };
+                    audio.onpause = () => {
+                        if (playbackToken !== ttsPlaybackToken || !audio.getAttribute('src')) {
+                            cleanupAssistantSpeech({ audio, audioUrl });
+                            resolve();
+                        }
+                    };
+                    audio.play().catch((error) => {
+                        cleanupAssistantSpeech({ audio, audioUrl });
+                        reject(error);
+                    });
+                });
+            };
+            const drainTtsSentenceQueue = async () => {
+                if (ttsSentenceQueue.value.length === 0) {
+                    return;
+                }
+                if (ttsPlaybackBusy || isSpeaking.value || (currentAudio.value && !currentAudio.value.paused)) {
+                    logTtsPlayEvent('tts.queue.blocked', {
+                        reason: ttsPlaybackBusy ? 'playback_busy' : 'audio_active',
+                        queueLength: ttsSentenceQueue.value.length,
+                        isSpeaking: Boolean(isSpeaking.value)
+                    });
+                    return;
+                }
+                ttsPlaybackBusy = true;
+                const nextSentence = ttsSentenceQueue.value.shift();
+                if (!nextSentence?.text) {
+                    ttsPlaybackBusy = false;
+                    return;
+                }
+                const expectedSeqId = Math.min(...ttsSentenceQueue.value.map((chunkItem) => chunkItem.seqId || Number.MAX_SAFE_INTEGER), nextSentence.seqId || Number.MAX_SAFE_INTEGER);
+                if ((nextSentence.seqId || 0) !== expectedSeqId) {
+                    logTtsPlayEvent('tts.queue.blocked', {
+                        reason: 'seq_out_of_order',
+                        seqId: nextSentence.seqId || 0,
+                        expectedSeqId,
+                        queueLength: ttsSentenceQueue.value.length
+                    });
+                    ttsSentenceQueue.value.unshift(nextSentence);
+                    ttsSentenceQueue.value.sort((left, right) => left.seqId - right.seqId);
+                    ttsPlaybackBusy = false;
+                    return;
+                }
+                currentPlayingTtsSentenceKey = normalizeSubtitleDedupKey(nextSentence.text);
+                currentPlayingTtsChunk = nextSentence;
+                logTtsPlayEvent('tts.queue.dequeue', {
+                    seqId: nextSentence.seqId || 0,
+                    textLength: String(nextSentence.text || '').length,
+                    finalFlush: Boolean(nextSentence.isFinalFlush),
+                    queueLength: ttsSentenceQueue.value.length,
+                    chunkType: nextSentence.chunkType || 'unknown',
+                    splitReason: nextSentence.splitReason || 'sentence_enqueue'
+                });
+                try {
+                    await playTtsSentence(nextSentence);
+                } catch (error) {
+                    logTtsPlayEvent('tts.play.error', {
+                        textLength: String(nextSentence.text || '').length,
+                        finalFlush: Boolean(nextSentence.isFinalFlush),
+                        queueLength: ttsSentenceQueue.value.length,
+                        chunkType: nextSentence.chunkType || 'unknown',
+                        splitReason: nextSentence.splitReason || 'sentence_enqueue',
+                        error: String(error?.message || error),
+                        detail: String(error)
+                    });
+                    currentSpokenSubtitle.value = '';
+                    isSpeechSubtitleActive.value = false;
+                    clearSpeechSubtitleTimer();
+                    logTtsPlayEvent('subtitle.speech.clear', {
+                        reason: 'tts_error',
+                        error: String(error?.message || error)
+                    });
+                } finally {
+                    currentPlayingTtsSentenceKey = '';
+                    currentPlayingTtsChunk = null;
+                    ttsPlaybackBusy = false;
+                    scheduleTtsPrefetch();
+                    if (ttsSentenceQueue.value.length > 0) {
+                        void drainTtsSentenceQueue();
+                    } else {
+                        clearSpeechSubtitleTimer();
+                        speechSubtitleClearTimer = window.setTimeout(() => {
+                            currentSpokenSubtitle.value = '';
+                            isSpeechSubtitleActive.value = false;
+                            speechSubtitleClearTimer = null;
+                            logTtsPlayEvent('subtitle.speech.clear', {
+                                reason: 'all_sentences_done'
+                            });
+                        }, 1200);
+                    }
+                }
+            };
+            const isPauseOnlySentence = (text) => {
+                const stripped = String(text || '')
+                    .replace(/[，。！？；：、“”"'`、,.!?;:()\[\]（）【】\-—\s]/g, '')
+                    .trim();
+                return !stripped;
+            };
+            const looksLikeIndependentEnglishExample = (text) => {
+                const normalizedText = String(text || '').trim();
+                const chineseChars = (normalizedText.match(/[\u3400-\u9fff]/g) || []).length;
+                const englishLetters = (normalizedText.match(/[A-Za-z]/g) || []).length;
+                const englishWords = (normalizedText.match(/\b[A-Za-z][A-Za-z'-]*\b/g) || []).length;
+                return englishWords >= TTS_ENGLISH_EXAMPLE_WORDS
+                    && englishLetters >= TTS_ENGLISH_EXAMPLE_LETTERS
+                    && englishLetters > (chineseChars * 3);
+            };
+            const shouldMergeShortSentence = (text, { isFinalFlush = false } = {}) => {
+                const normalizedText = normalizeSubtitleTextForSpeech(text);
+                const length = Array.from(normalizedText).length;
+                if (!normalizedText) {
+                    return false;
+                }
+                if (isFinalFlush) {
+                    return false;
+                }
+                return length < TTS_SHORT_SENTENCE_CHARS || isPauseOnlySentence(normalizedText);
+            };
+            const findLastBreakIndex = (text, maxIndex) => {
+                for (let index = Math.min(maxIndex, text.length - 1); index >= 0; index -= 1) {
+                    if (/[。！？!?；;，,、:：]/.test(text[index])) {
+                        return index + 1;
+                    }
+                }
+                return -1;
+            };
+            const trimStandaloneSpeechMarker = (text, { trimPrefixOnly = false } = {}) => {
+                let normalizedText = String(text || '').trim();
+                normalizedText = normalizedText.replace(/^(?:例如|比如|例句|英文例句|请看例句|来看例句|我们来看例句|我们看例句|看这个句子|来看这个句子|我们来看这个句子)[:：]?\s*/g, '');
+                if (!trimPrefixOnly) {
+                    normalizedText = normalizedText.replace(/(?:例如|比如|例句|英文例句|请看例句|来看例句|我们来看例句|我们看例句|看这个句子|来看这个句子|我们来看这个句子)[:：]?\s*$/g, '');
+                }
+                return normalizedText.trim();
+            };
+            const classifyTtsChunkType = (text, forcedLang = '') => {
+                const normalizedText = String(text || '').trim();
+                const detectedLang = forcedLang || detectSentenceSpeechLanguage(normalizedText);
+                if (detectedLang === 'en') {
+                    return 'en_example';
+                }
+                if (/^(?:注意|记住|所以|因此|也就是说|换句话说|这说明|这里要注意|总结一下|最后提醒|补充一下)/.test(normalizedText)) {
+                    return 'zh_commentary';
+                }
+                return 'zh_explanation';
+            };
+            const endsWithUnnaturalSpeechBoundary = (text, { nextChunkLang = '', nextChunkType = '' } = {}) => {
+                const normalizedText = String(text || '').trim();
+                if (!normalizedText) {
+                    return true;
+                }
+                if (/[:：]\s*$/.test(normalizedText) && nextChunkLang === 'en') {
+                    return true;
+                }
+                if (/[“"'‘（(【]\s*$/.test(normalizedText)) {
+                    return true;
+                }
+                if (/(?:既然你要求了|别再写出|我们来看|请看|来看|比如说|例如说)\s*$/.test(normalizedText)) {
+                    return true;
+                }
+                return /(?:如果|因为|所以|但是|不过|然后|并且|而且|或者|以及|就是|尤其是)\s*$/.test(normalizedText);
+            };
+            const findSafeBreakIndex = (text, maxIndex, { nextChunkLang = '', nextChunkType = '' } = {}) => {
+                for (let index = Math.min(maxIndex, text.length - 1); index >= 0; index -= 1) {
+                    if (!/[。！？!?；;，,、]/.test(text[index])) {
+                        continue;
+                    }
+                    const candidate = normalizeSubtitleTextForSpeech(text.slice(0, index + 1));
+                    if (!candidate) {
+                        continue;
+                    }
+                    if (endsWithUnnaturalSpeechBoundary(candidate, { nextChunkLang, nextChunkType })) {
+                        continue;
+                    }
+                    return index + 1;
+                }
+                return -1;
+            };
+            const shouldUseFastStartChunking = () => (
+                !isSpeaking.value
+                && !ttsPlaybackBusy
+                && !currentAudio.value
+                && !currentPlayingTtsChunk?.seqId
+                && ttsSentenceQueue.value.length === 0
+            );
+            const splitSentenceBySpeechHints = (text) => {
+                const segments = [];
+                let cursor = 0;
+                for (let index = 0; index < text.length; index += 1) {
+                    const currentChar = text[index];
+                    let shouldSplit = /[。！？!?；;]/.test(currentChar);
+                    if (!shouldSplit) {
+                        continue;
+                    }
+                    const segment = normalizeSubtitleTextForSpeech(text.slice(cursor, index + 1));
+                    if (segment) {
+                        segments.push(segment);
+                    }
+                    cursor = index + 1;
+                }
+                const rest = normalizeSubtitleTextForSpeech(text.slice(cursor));
+                if (rest) {
+                    segments.push(rest);
+                }
+                return segments;
+            };
+            const splitMixedLanguageChunk = (text, originalTextLength) => {
+                const segments = [];
+                const englishSpanRegex = /\b[A-Za-z][A-Za-z'-]*\b(?:[\s,;:]+[A-Za-z][A-Za-z'-]*\b){3,}(?:[.?!])?/g;
+                let cursor = 0;
+                let carryoverZhBridge = '';
+                for (const match of text.matchAll(englishSpanRegex)) {
+                    const englishSpan = normalizeSubtitleTextForSpeech(match[0]);
+                    if (!looksLikeIndependentEnglishExample(englishSpan)) {
+                        continue;
+                    }
+                    const prefix = normalizeSubtitleTextForSpeech(trimStandaloneSpeechMarker(text.slice(cursor, match.index), { trimPrefixOnly: false }));
+                    if (prefix) {
+                        if (detectSentenceSpeechLanguage(prefix) === 'zh' && endsWithUnnaturalSpeechBoundary(prefix, { nextChunkLang: 'en', nextChunkType: 'en_example' })) {
+                            carryoverZhBridge = appendSpeechText(carryoverZhBridge, prefix);
+                        } else {
+                            const prefixLang = detectSentenceSpeechLanguage(prefix);
+                            segments.push(createTtsQueueItem(prefix, {
+                                chunkLang: prefixLang,
+                                chunkType: classifyTtsChunkType(prefix, prefixLang),
+                                splitReason: 'language_transition_prefix',
+                                originalTextLength
+                            }));
+                        }
+                    }
+                    segments.push(createTtsQueueItem(englishSpan, {
+                        chunkLang: 'en',
+                        chunkType: 'en_example',
+                        splitReason: 'language_transition_en_example',
+                        originalTextLength
+                    }));
+                    cursor = match.index + match[0].length;
+                }
+                const suffixBase = normalizeSubtitleTextForSpeech(trimStandaloneSpeechMarker(text.slice(cursor), { trimPrefixOnly: true }));
+                const suffix = carryoverZhBridge && detectSentenceSpeechLanguage(suffixBase) !== 'en'
+                    ? normalizeSubtitleTextForSpeech(appendSpeechText(carryoverZhBridge, suffixBase))
+                    : suffixBase;
+                if (suffix) {
+                    const suffixLang = detectSentenceSpeechLanguage(suffix);
+                    segments.push(createTtsQueueItem(suffix, {
+                        chunkLang: suffixLang,
+                        chunkType: classifyTtsChunkType(suffix, suffixLang),
+                        splitReason: carryoverZhBridge ? 'language_bridge_suffix' : (segments.length > 0 ? 'language_transition_suffix' : 'semantic_sentence'),
+                        originalTextLength
+                    }));
+                }
+                return segments;
+            };
+            const splitSemanticTtsChunks = (text) => {
+                const normalizedText = normalizeSubtitleTextForSpeech(text);
+                const originalTextLength = String(normalizedText || '').length;
+                if (!normalizedText) {
+                    return [];
+                }
+                const structuredSegments = [];
+                splitSentenceBySpeechHints(normalizedText).forEach((segmentText) => {
+                    const mixedSegments = splitMixedLanguageChunk(segmentText, originalTextLength);
+                    if (mixedSegments.length > 0) {
+                        structuredSegments.push(...mixedSegments);
+                        return;
+                    }
+                    const cleanedSegmentText = normalizeSubtitleTextForSpeech(trimStandaloneSpeechMarker(segmentText, { trimPrefixOnly: false }));
+                    if (!cleanedSegmentText) {
+                        return;
+                    }
+                    const chunkLang = detectSentenceSpeechLanguage(cleanedSegmentText);
+                    structuredSegments.push(createTtsQueueItem(cleanedSegmentText, {
+                        chunkLang,
+                        chunkType: classifyTtsChunkType(cleanedSegmentText, chunkLang),
+                        splitReason: 'semantic_sentence',
+                        originalTextLength
+                    }));
+                });
+                return structuredSegments.reduce((merged, chunkItem) => {
+                    const previousChunk = merged[merged.length - 1];
+                    if (
+                        previousChunk
+                        && previousChunk.chunkLang === chunkItem.chunkLang
+                        && (String(previousChunk.text || '').length + String(chunkItem.text || '').length) <= (chunkItem.chunkLang === 'en' ? TTS_MAX_CHARS_EN : TTS_MAX_CHARS_ZH)
+                    ) {
+                        previousChunk.text = appendSpeechText(previousChunk.text, chunkItem.text);
+                        previousChunk.splitReason = 'semantic_merge';
+                        return merged;
+                    }
+                    merged.push(chunkItem);
+                    return merged;
+                }, []);
+            };
+            const splitOversizedTtsChunk = (queueItem, { preferFastStart = false } = {}) => {
+                const normalizedText = normalizeSubtitleTextForSpeech(queueItem?.text || '');
+                const chunkLang = queueItem?.chunkLang || detectSentenceSpeechLanguage(normalizedText);
+                const maxChars = preferFastStart
+                    ? (chunkLang === 'en' ? TTS_FIRST_CHUNK_MAX_EN : TTS_FIRST_CHUNK_MAX_ZH)
+                    : (chunkLang === 'en' ? TTS_MAX_CHARS_EN : TTS_MAX_CHARS_ZH);
+                const chunks = [];
+                let buffer = normalizedText;
+                while (Array.from(buffer).length > maxChars) {
+                    const slice = buffer.slice(0, maxChars + 1);
+                    const breakIndex = findSafeBreakIndex(slice, slice.length - 1, {
+                        nextChunkLang: chunkLang,
+                        nextChunkType: queueItem?.chunkType || ''
+                    });
+                    if (breakIndex <= 0) {
+                        break;
+                    }
+                    const cutIndex = breakIndex;
+                    const chunkText = normalizeSubtitleTextForSpeech(buffer.slice(0, cutIndex));
+                    if (chunkText) {
+                        chunks.push(createTtsQueueItem(chunkText, {
+                            isFinalFlush: false,
+                            chunkLang,
+                            chunkType: queueItem.chunkType,
+                            splitReason: 'oversize_limit',
+                            originalTextLength: queueItem.originalTextLength
+                        }));
+                    }
+                    buffer = buffer.slice(cutIndex).trim();
+                    if (!buffer) {
+                        break;
+                    }
+                }
+                if (buffer) {
+                    chunks.push(createTtsQueueItem(buffer, {
+                        isFinalFlush: queueItem.isFinalFlush,
+                        chunkLang,
+                        chunkType: queueItem.chunkType,
+                        splitReason: chunks.length > 0 ? 'oversize_limit_tail' : queueItem.splitReason,
+                        originalTextLength: queueItem.originalTextLength
+                    }));
+                }
+                return chunks;
+            };
+            const flushPendingShortTtsSentence = ({ finalFlush = false, reason = 'pending_short_release' } = {}) => {
+                if (!pendingShortTtsSentence?.text) {
+                    return;
+                }
+                const releasedItem = createTtsQueueItem(pendingShortTtsSentence.text, {
+                    isFinalFlush: Boolean(finalFlush || pendingShortTtsSentence.isFinalFlush),
+                    chunkLang: pendingShortTtsSentence.chunkLang,
+                    chunkType: pendingShortTtsSentence.chunkType,
+                    splitReason: reason,
+                    originalTextLength: pendingShortTtsSentence.originalTextLength
+                });
+                pendingShortTtsSentence = null;
+                assignTtsChunkSeqId(releasedItem);
+                markTtsChunkState(releasedItem, 'emitted', { reason: releasedItem.splitReason });
+                const sentenceKey = normalizeSubtitleDedupKey(releasedItem.text);
+                const lastQueuedKey = normalizeSubtitleDedupKey(ttsSentenceQueue.value[ttsSentenceQueue.value.length - 1]?.text || '');
+                if (!releasedItem.text || !sentenceKey || sentenceKey === lastQueuedKey || sentenceKey === currentPlayingTtsSentenceKey) {
+                    markTtsChunkState(releasedItem, 'dropped', {
+                        reason: !releasedItem.text ? 'empty_after_release' : (sentenceKey === currentPlayingTtsSentenceKey ? 'dedupe_current_playing' : 'dedupe_last_queued')
+                    });
+                    return;
+                }
+                ttsSentenceQueue.value.push(releasedItem);
+                ttsSentenceQueue.value.sort((left, right) => left.seqId - right.seqId);
+                logTtsPlayEvent('tts.queue.enqueue', {
+                    seqId: releasedItem.seqId,
+                    textLength: releasedItem.text.length,
+                    finalFlush: Boolean(releasedItem.isFinalFlush),
+                    queueLength: ttsSentenceQueue.value.length,
+                    chunkType: releasedItem.chunkType,
+                    splitReason: releasedItem.splitReason
+                });
+                logTtsPlayEvent('subtitle.sentence.emit', {
+                    textLength: releasedItem.text.length,
+                    finalFlush: Boolean(releasedItem.isFinalFlush),
+                    queueLength: ttsSentenceQueue.value.length,
+                    reason: releasedItem.splitReason
+                });
+                logTtsPlayEvent('tts.chunk.type', {
+                    originalTextLength: releasedItem.originalTextLength,
+                    finalChunkLength: releasedItem.text.length,
+                    chunkLang: releasedItem.chunkLang,
+                    chunkType: releasedItem.chunkType,
+                    splitReason: releasedItem.splitReason
+                });
+                logTtsPlayEvent('tts.chunk.split_reason', {
+                    originalTextLength: releasedItem.originalTextLength,
+                    finalChunkLength: releasedItem.text.length,
+                    chunkLang: releasedItem.chunkLang,
+                    chunkType: releasedItem.chunkType,
+                    splitReason: releasedItem.splitReason
+                });
+                scheduleTtsPrefetch();
+                void drainTtsSentenceQueue();
+            };
+            const canMergePendingShortTtsSentence = (pendingItem, nextItem) => Boolean(
+                pendingItem?.text
+                && nextItem?.text
+                && pendingItem.chunkLang === nextItem.chunkLang
+            );
+            const deferShortTtsSentence = (queueItem, reason) => {
+                pendingShortTtsSentence = createTtsQueueItem(queueItem.text, {
+                    isFinalFlush: queueItem.isFinalFlush,
+                    chunkLang: queueItem.chunkLang,
+                    chunkType: queueItem.chunkType,
+                    splitReason: reason,
+                    originalTextLength: queueItem.originalTextLength
+                });
+                logTtsPlayEvent('subtitle.sentence.defer', {
+                    textLength: queueItem.text.length,
+                    finalFlush: Boolean(queueItem.isFinalFlush),
+                    queueLength: ttsSentenceQueue.value.length,
+                    reason,
+                    chunkType: queueItem.chunkType
+                });
+            };
+            const emitTtsQueueItem = (queueItem) => {
+                assignTtsChunkSeqId(queueItem);
+                logTtsPlayEvent('tts.chunk.created', {
+                    seqId: queueItem.seqId,
+                    textLength: String(queueItem.text || '').length,
+                    chunkLang: queueItem.chunkLang,
+                    chunkType: queueItem.chunkType,
+                    splitReason: queueItem.splitReason
+                });
+                markTtsChunkState(queueItem, 'emitted', { reason: queueItem.splitReason });
+                const sentenceKey = normalizeSubtitleDedupKey(queueItem.text);
+                const lastQueuedKey = normalizeSubtitleDedupKey(ttsSentenceQueue.value[ttsSentenceQueue.value.length - 1]?.text || '');
+                if (!queueItem.text || !sentenceKey || sentenceKey === lastQueuedKey || sentenceKey === currentPlayingTtsSentenceKey) {
+                    markTtsChunkState(queueItem, 'dropped', {
+                        reason: !queueItem.text ? 'empty_after_emit' : (sentenceKey === currentPlayingTtsSentenceKey ? 'dedupe_current_playing' : 'dedupe_last_queued')
+                    });
+                    return;
+                }
+                ttsSentenceQueue.value.push(queueItem);
+                ttsSentenceQueue.value.sort((left, right) => left.seqId - right.seqId);
+                logTtsPlayEvent('tts.queue.enqueue', {
+                    seqId: queueItem.seqId,
+                    textLength: queueItem.text.length,
+                    finalFlush: Boolean(queueItem.isFinalFlush),
+                    queueLength: ttsSentenceQueue.value.length,
+                    chunkType: queueItem.chunkType,
+                    splitReason: queueItem.splitReason
+                });
+                logTtsPlayEvent('subtitle.sentence.emit', {
+                    textLength: queueItem.text.length,
+                    finalFlush: Boolean(queueItem.isFinalFlush),
+                    queueLength: ttsSentenceQueue.value.length,
+                    reason: queueItem.splitReason
+                });
+                logTtsPlayEvent('tts.chunk.type', {
+                    originalTextLength: queueItem.originalTextLength,
+                    finalChunkLength: queueItem.text.length,
+                    chunkLang: queueItem.chunkLang,
+                    chunkType: queueItem.chunkType,
+                    splitReason: queueItem.splitReason
+                });
+                logTtsPlayEvent('tts.chunk.split_reason', {
+                    originalTextLength: queueItem.originalTextLength,
+                    finalChunkLength: queueItem.text.length,
+                    chunkLang: queueItem.chunkLang,
+                    chunkType: queueItem.chunkType,
+                    splitReason: queueItem.splitReason
+                });
+                scheduleTtsPrefetch();
+                void drainTtsSentenceQueue();
+            };
+            const enqueueStructuredTtsItem = (queueItem) => {
+                const normalizedText = normalizeSubtitleTextForSpeech(queueItem?.text || '');
+                if (!normalizedText) {
+                    return;
+                }
+                let preparedItem = createTtsQueueItem(normalizedText, {
+                    isFinalFlush: queueItem.isFinalFlush,
+                    chunkLang: queueItem.chunkLang || detectSentenceSpeechLanguage(normalizedText),
+                    chunkType: queueItem.chunkType || classifyTtsChunkType(normalizedText, queueItem.chunkLang),
+                    splitReason: queueItem.splitReason || 'sentence_enqueue',
+                    originalTextLength: queueItem.originalTextLength || normalizedText.length
+                });
+                if (pendingShortTtsSentence?.text) {
+                    if (canMergePendingShortTtsSentence(pendingShortTtsSentence, preparedItem)) {
+                        const mergedText = appendSpeechText(pendingShortTtsSentence.text, preparedItem.text);
+                        logTtsPlayEvent('subtitle.sentence.merge', {
+                            textLength: mergedText.length,
+                            previousTextLength: pendingShortTtsSentence.text.length,
+                            nextTextLength: preparedItem.text.length,
+                            finalFlush: Boolean(preparedItem.isFinalFlush),
+                            queueLength: ttsSentenceQueue.value.length,
+                            chunkType: preparedItem.chunkType
+                        });
+                        preparedItem = createTtsQueueItem(mergedText, {
+                            isFinalFlush: preparedItem.isFinalFlush,
+                            chunkLang: preparedItem.chunkLang,
+                            chunkType: preparedItem.chunkType,
+                            splitReason: 'short_sentence_merge',
+                            originalTextLength: preparedItem.originalTextLength
+                        });
+                        pendingShortTtsSentence = null;
+                    } else {
+                        flushPendingShortTtsSentence({ reason: 'type_boundary_release' });
+                    }
+                }
+                if (shouldMergeShortSentence(preparedItem.text, { isFinalFlush: preparedItem.isFinalFlush })) {
+                    deferShortTtsSentence(preparedItem, preparedItem.splitReason === 'short_sentence_merge'
+                        ? 'merged_sentence_still_short'
+                        : 'short_sentence_wait_merge');
+                    return;
+                }
+                const oversizedChunks = splitOversizedTtsChunk(preparedItem, {
+                    preferFastStart: shouldUseFastStartChunking()
+                });
+                oversizedChunks.forEach((chunkItem, index) => {
+                    const emittedItem = createTtsQueueItem(chunkItem.text, {
+                        isFinalFlush: Boolean(preparedItem.isFinalFlush && index === oversizedChunks.length - 1),
+                        chunkLang: chunkItem.chunkLang,
+                        chunkType: chunkItem.chunkType,
+                        splitReason: chunkItem.splitReason,
+                        originalTextLength: chunkItem.originalTextLength
+                    });
+                    emitTtsQueueItem(emittedItem);
+                });
+            };
+            const enqueueTtsSentence = (sentenceText, { isFinalFlush = false } = {}) => {
+                const semanticChunks = splitSemanticTtsChunks(sentenceText);
+                if (semanticChunks.length === 0) {
+                    return;
+                }
+                semanticChunks.forEach((chunkItem, index) => {
+                    enqueueStructuredTtsItem(createTtsQueueItem(chunkItem.text, {
+                        isFinalFlush: Boolean(isFinalFlush && index === semanticChunks.length - 1),
+                        chunkLang: chunkItem.chunkLang,
+                        chunkType: chunkItem.chunkType,
+                        splitReason: chunkItem.splitReason,
+                        originalTextLength: chunkItem.originalTextLength
+                    }));
+                });
+            };
             watch(currentQuestionDisplayKey, (nextKey) => {
                 if (!nextKey) {
                     collapseQuestionDrawer();
@@ -906,6 +2648,29 @@
                 .replace(/_{1,3}/g, '')
                 .replace(/\s+/g, ' ')
                 .trim();
+            const normalizeSubtitleTextForSpeech = (text) => subtitleSanitize(text)
+                .replace(/^#{1,6}\s*/gm, '')
+                .replace(/`{1,3}([^`]*)`{1,3}/g, '$1')
+                .replace(/\*{1,3}/g, '')
+                .replace(/_{1,3}/g, '')
+                .replace(/~~/g, '')
+                .replace(/\[[^\]]*\]/g, ' ')
+                .replace(/\([^)]*\)/g, ' ')
+                .replace(/（[^）]*）/g, ' ')
+                .replace(/【[^】]*】/g, ' ')
+                .replace(/^\s*(?:[-*•·▪◦]+|\d+[.)]|[A-Za-z][.)])\s+/gm, '')
+                .replace(/\|/g, ' ')
+                .replace(/>\s*/g, '')
+                .replace(/[{}]/g, ' ')
+                .replace(/\b(?:Markdown|markdown)\b/g, ' ')
+                .replace(/白板核心公式/g, ' ')
+                .replace(/核心公式/g, ' ')
+                .replace(/仅展示/g, ' ')
+                .replace(/\b(?:Part\s+\d+|Chapter\s+\d+|Section\s+\d+)\b/gi, ' ')
+                .replace(/(?:教材标签|教学标签|板书提示|白板提示)[:：]?\s*/g, ' ')
+                .replace(/\s+/g, ' ')
+                .replace(/\s+([，。！？；：,.!?;:])/g, '$1')
+                .trim();
 
             const buildSubtitleLine = (text, tone = 'current') => ({
                 id: `subtitle-${subtitleLineSeed++}`,
@@ -917,17 +2682,162 @@
                 .replace(/\s+/g, '')
                 .replace(/[，。！？；：“”"'`、,.!?;:()\[\]（）【】\-—]/g, '')
                 .trim();
+            const countOccurrences = (text, regex) => (String(text || '').match(regex) || []).length;
+            const hasUnclosedSpeechPairs = (text) => {
+                const normalizedText = String(text || '');
+                if (countOccurrences(normalizedText, /\(/g) > countOccurrences(normalizedText, /\)/g)) {
+                    return true;
+                }
+                if (countOccurrences(normalizedText, /（/g) > countOccurrences(normalizedText, /）/g)) {
+                    return true;
+                }
+                if (countOccurrences(normalizedText, /\[/g) > countOccurrences(normalizedText, /\]/g)) {
+                    return true;
+                }
+                if (countOccurrences(normalizedText, /【/g) > countOccurrences(normalizedText, /】/g)) {
+                    return true;
+                }
+                if (countOccurrences(normalizedText, /“/g) > countOccurrences(normalizedText, /”/g)) {
+                    return true;
+                }
+                return countOccurrences(normalizedText, /"/g) % 2 === 1;
+            };
+            const shouldDeferStableSentence = (text, { isFinalFlush = false } = {}) => {
+                const normalizedText = normalizeSubtitleTextForSpeech(text);
+                const textLength = Array.from(normalizedText).length;
+                if (!normalizedText) {
+                    return true;
+                }
+                if (!isFinalFlush && textLength < TTS_MIN_SENTENCE_CHARS) {
+                    return true;
+                }
+                if (!isFinalFlush && SUBTITLE_CONTINUE_END_REGEX.test(normalizedText)) {
+                    return true;
+                }
+                if (!isFinalFlush && hasUnclosedSpeechPairs(normalizedText)) {
+                    return true;
+                }
+                return false;
+            };
+            const splitStableTtsSentences = (bufferText, { isFinalFlush = false } = {}) => {
+                const chunks = [];
+                let cursor = 0;
+                for (let index = 0; index < bufferText.length; index += 1) {
+                    const currentChar = bufferText[index];
+                    if (!SUBTITLE_SENTENCE_END_REGEX.test(currentChar)) {
+                        continue;
+                    }
+                    let end = index + 1;
+                    while (end < bufferText.length && /["'”’）】]/.test(bufferText[end])) {
+                        end += 1;
+                    }
+                    const sentence = normalizeSubtitleTextForSpeech(bufferText.slice(cursor, end));
+                    if (!sentence) {
+                        cursor = end;
+                        index = end - 1;
+                        continue;
+                    }
+                    if (shouldDeferStableSentence(sentence, { isFinalFlush: false })) {
+                        continue;
+                    }
+                    chunks.push(sentence);
+                    cursor = end;
+                    index = end - 1;
+                }
+                let rest = bufferText.slice(cursor);
+                if (isFinalFlush) {
+                    const finalSentence = normalizeSubtitleTextForSpeech(rest);
+                    if (finalSentence) {
+                        chunks.push(finalSentence);
+                    }
+                    rest = '';
+                }
+                return {
+                    chunks,
+                    rest
+                };
+            };
+            const flushTtsSentenceBuffer = ({ isFinalFlush = false, reason = 'live_update' } = {}) => {
+                clearTtsIdleTimer();
+                const { chunks, rest } = splitStableTtsSentences(ttsSentenceBuffer, { isFinalFlush });
+                ttsSentenceBuffer = rest;
+                chunks.forEach((sentence) => {
+                    enqueueTtsSentence(sentence, { isFinalFlush });
+                });
+                const deferredText = normalizeSubtitleTextForSpeech(ttsSentenceBuffer);
+                if (deferredText) {
+                    logTtsPlayEvent('subtitle.sentence.defer', {
+                        textLength: deferredText.length,
+                        finalFlush: Boolean(isFinalFlush),
+                        queueLength: ttsSentenceQueue.value.length,
+                        reason
+                    });
+                }
+                if (isFinalFlush && pendingShortTtsSentence?.text) {
+                    flushPendingShortTtsSentence({ finalFlush: true, reason: 'final_flush_release' });
+                }
+                if (isFinalFlush) {
+                    pendingSubtitleTtsFinalFlush = false;
+                }
+            };
+            const scheduleTtsSentenceIdleFlush = () => {
+                clearTtsIdleTimer();
+                if (!normalizeSubtitleTextForSpeech(ttsSentenceBuffer)) {
+                    return;
+                }
+                ttsIdleTimer = window.setTimeout(() => {
+                    flushTtsSentenceBuffer({ isFinalFlush: false, reason: 'idle_timeout' });
+                }, TTS_IDLE_FLUSH_MS);
+            };
+            const queueLiveSubtitleForSpeech = (text) => {
+                const cleaned = normalizeSubtitleTextForSpeech(text);
+                if (!cleaned) {
+                    return;
+                }
+                currentLiveSubtitleText.value = cleaned;
+                logTtsPlayEvent('subtitle.live.update', {
+                    textLength: cleaned.length,
+                    finalFlush: false,
+                    queueLength: ttsSentenceQueue.value.length
+                });
+                ttsSentenceBuffer = appendSpeechText(ttsSentenceBuffer, cleaned);
+                flushTtsSentenceBuffer({ isFinalFlush: false, reason: 'subtitle_live_update' });
+                scheduleTtsSentenceIdleFlush();
+            };
+            const markPendingTtsFinalFlush = () => {
+                pendingSubtitleTtsFinalFlush = true;
+                if (!isSubtitlePlaying.value && subtitleQueue.value.length === 0) {
+                    flushTtsSentenceBuffer({ isFinalFlush: true, reason: 'assistant_reply_end' });
+                }
+            };
 
             const syncSubtitleLines = (lines) => {
                 subtitleLines.value = lines
                     .filter((line) => line && line.text)
-                    .slice(-2);
+                    .slice(-3);
 
                 const currentLine = subtitleLines.value.find((line) => line.tone === 'current')
                     || subtitleLines.value[subtitleLines.value.length - 1]
                     || null;
 
                 currentSubtitle.value = currentLine ? currentLine.text : '';
+                scrollSubtitleToBottom();
+            };
+
+            const scrollSubtitleToBottom = () => {
+                requestAnimationFrame(() => {
+                    const el = subtitleScrollRef.value;
+                    if (el) {
+                        el.scrollTop = el.scrollHeight;
+                    }
+                });
+            };
+
+            const clearSpeechSubtitleTimer = () => {
+                if (speechSubtitleClearTimer) {
+                    clearTimeout(speechSubtitleClearTimer);
+                    speechSubtitleClearTimer = null;
+                }
             };
 
             const clearSubtitleTimers = () => {
@@ -935,6 +2845,7 @@
                     clearTimeout(subtitleHoldTimer);
                     subtitleHoldTimer = null;
                 }
+                clearSpeechSubtitleTimer();
             };
 
             const clearWhiteboardFxTimers = () => {
@@ -998,6 +2909,931 @@
                 }
                 openQuestionDrawer();
             };
+            const handleSlideGoto = (slideId) => {
+                if (!slideId) return;
+                const prevId = currentSlideId.value;
+                currentSlideId.value = slideId;
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
+                if (prevId !== slideId) {
+                    console.info('[SlidePlayer] goto:', slideId);
+                }
+            };
+            const handleSlideQuestion = (text) => {
+                slideQuestionText.value = String(text || '').trim();
+                slideQuestionVisible.value = Boolean(slideQuestionText.value);
+                slideAnswerVisible.value = false;
+                slideAnswerText.value = '';
+                if (slideQuestionVisible.value) {
+                    console.info('[SlidePlayer] question:', slideQuestionText.value.slice(0, 80));
+                }
+            };
+            const handleSlideRevealAnswer = (text) => {
+                slideAnswerText.value = String(text || '').trim();
+                slideAnswerVisible.value = Boolean(slideAnswerText.value);
+                if (slideAnswerVisible.value) {
+                    console.info('[SlidePlayer] answer:', slideAnswerText.value.slice(0, 80));
+                }
+            };
+            const handleSlideClearOverlay = () => {
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
+            };
+            const handleSlideError = () => {
+                console.warn('[SlidePlayer] image load failed:', currentSlideSrc.value);
+            };
+            const loadSlideManifest = async () => {
+                if (!pptMode.value) return;
+                const manifestUrl = '/frontend/slides/manifest.json';
+                console.info('[SlidePlayer] loading manifest:', manifestUrl);
+                try {
+                    const response = await fetch(manifestUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    slideManifest.value = await response.json();
+                    slideManifestError.value = '';
+                    console.info('[SlidePlayer] manifest loaded, slides:', (slideManifest.value.slides || []).length);
+                } catch (error) {
+                    slideManifestError.value = String(error.message || error);
+                    slideManifest.value = null;
+                    console.warn('[SlidePlayer] manifest load failed, slides disabled:', slideManifestError.value);
+                }
+            };
+            const loadLiveKitClient = async () => {
+                if (window.LivekitClient?.Room) {
+                    return window.LivekitClient;
+                }
+                if (!livekitClientModulePromise) {
+                    livekitClientModulePromise = import('https://cdn.jsdelivr.net/npm/livekit-client/+esm');
+                }
+                return livekitClientModulePromise;
+            };
+            const extractRequestErrorMessage = (error) => {
+                if (error?.response?.data?.detail) {
+                    return String(error.response.data.detail);
+                }
+                if (error?.message) {
+                    return String(error.message);
+                }
+                return String(error || '未知错误');
+            };
+            const resolveVoiceErrorMessage = (error) => {
+                const message = extractRequestErrorMessage(error);
+                if (
+                    error?.name === 'NotAllowedError'
+                    || /NotAllowedError|Permission denied|Permission dismissed|麦克风权限|permission/i.test(message)
+                ) {
+                    return '麦克风权限被拒绝，请在浏览器中允许麦克风访问后重试。';
+                }
+                if (/NotFoundError|Requested device not found|device/i.test(message)) {
+                    return '没有检测到可用麦克风，请检查系统输入设备。';
+                }
+                if (/LIVEKIT_|LiveKit is not configured|not configured/i.test(message)) {
+                    return '后端 LiveKit 环境变量未配置完整，无法申请语音 token。';
+                }
+                return `语音连接失败：${message}`;
+            };
+            const cancelActiveAssistantReply = (reason = 'cancelled') => {
+                if (!activeAssistantAbortController) {
+                    return;
+                }
+                activeAssistantAbortController.abort(reason);
+                activeAssistantAbortController = null;
+            };
+            const resetVoiceDebugState = () => {
+                voiceDebug.value = {
+                    workerJoined: false,
+                    trackSubscribed: false,
+                    firstAudioFrame: false,
+                    lastSpeechStartAt: '',
+                    lastSpeechEndAt: '',
+                    lastPartialAt: '',
+                    lastFinalAt: '',
+                    lastAudioChunkSentAt: '',
+                    lastFlushSentAt: '',
+                    lastForceFlushOnStopAt: '',
+                    lastFunasrMessageAt: '',
+                    vadState: 'idle',
+                    workerLastVadEvent: '',
+                    workerLastAudioChunkSent: '',
+                    workerLastFlushSent: '',
+                    workerLastFunasrMessage: '',
+                    workerLastFunasrFinal: '',
+                    workerLastStage: ''
+                };
+            };
+            const resolvePendingVoiceStopWaiter = (result = 'resolved') => {
+                if (!pendingVoiceStopWaiter) {
+                    return;
+                }
+                pendingVoiceStopWaiter.resolve(result);
+                pendingVoiceStopWaiter = null;
+            };
+            const resolvePendingVoiceDisconnectWaiter = (result = 'resolved') => {
+                if (!pendingVoiceDisconnectWaiter) {
+                    return;
+                }
+                pendingVoiceDisconnectWaiter.resolve(result);
+                pendingVoiceDisconnectWaiter = null;
+            };
+            const waitForVoiceFlushOrFinal = (timeoutMs = 4500) => new Promise((resolve) => {
+                if (pendingVoiceStopWaiter) {
+                    pendingVoiceStopWaiter.resolve('superseded');
+                }
+                const timer = window.setTimeout(() => {
+                    if (pendingVoiceStopWaiter?.timer === timer) {
+                        pendingVoiceStopWaiter = null;
+                    }
+                    resolve('timeout');
+                }, timeoutMs);
+                pendingVoiceStopWaiter = {
+                    timer,
+                    resolve: (result) => {
+                        clearTimeout(timer);
+                        resolve(result);
+                    }
+                };
+            });
+            const waitForVoiceDisconnect = (timeoutMs = 900) => new Promise((resolve) => {
+                if (pendingVoiceDisconnectWaiter) {
+                    pendingVoiceDisconnectWaiter.resolve('superseded');
+                }
+                const timer = window.setTimeout(() => {
+                    if (pendingVoiceDisconnectWaiter?.timer === timer) {
+                        pendingVoiceDisconnectWaiter = null;
+                    }
+                    resolve('timeout');
+                }, timeoutMs);
+                pendingVoiceDisconnectWaiter = {
+                    timer,
+                    resolve: (result) => {
+                        clearTimeout(timer);
+                        resolve(result);
+                    }
+                };
+            });
+            const stopWorkerStatusPolling = () => {
+                if (workerStatusPollTimer) {
+                    clearInterval(workerStatusPollTimer);
+                    workerStatusPollTimer = null;
+                }
+            };
+            const resetVoiceDisconnectDebug = () => {
+                voiceBrowserDisconnected.value = false;
+                voiceDisconnectReason.value = '';
+                voiceLastDisconnectSource.value = '';
+                pendingDisconnectMeta = null;
+            };
+            const syncWorkerStatus = async (roomName, { silenceErrors = false } = {}) => {
+                const normalizedRoomName = String(roomName || '').trim();
+                if (!normalizedRoomName) {
+                    return;
+                }
+                try {
+                    const response = await axios.get(API_BASE_URL + '/api/livekit/worker-status', {
+                        params: { roomName: normalizedRoomName }
+                    });
+                    const payload = response.data || {};
+                    const workerStatus = String(payload.status || 'idle').trim() || 'idle';
+                    if (workerStatus === 'connected') {
+                        voiceDebug.value.workerJoined = true;
+                        voiceWorkerError.value = '';
+                        if (voiceState.value === 'connected') {
+                            voiceBackendState.value = 'worker.connected';
+                        }
+                    } else if (workerStatus === 'failed') {
+                        voiceWorkerError.value = String(payload.lastError || 'worker startup failed').trim();
+                        if (voiceState.value === 'connected') {
+                            voiceBackendState.value = 'worker.failed';
+                        }
+                    }
+                    voiceDebug.value.workerLastVadEvent = String(payload.last_vad_event || '').trim();
+                    voiceDebug.value.workerLastAudioChunkSent = String(payload.last_audio_chunk_sent || '').trim();
+                    voiceDebug.value.workerLastFlushSent = String(payload.last_flush_sent || '').trim();
+                    voiceDebug.value.workerLastFunasrMessage = String(payload.last_funasr_message || '').trim();
+                    voiceDebug.value.workerLastFunasrFinal = String(payload.last_funasr_final || '').trim();
+                    voiceDebug.value.workerLastStage = String(payload.last_stage || '').trim();
+                } catch (error) {
+                    if (!silenceErrors) {
+                        console.warn('[AI Teacher] Failed to fetch worker status.', error);
+                    }
+                }
+            };
+            const startWorkerStatusPolling = (roomName) => {
+                stopWorkerStatusPolling();
+                const normalizedRoomName = String(roomName || '').trim();
+                if (!normalizedRoomName) {
+                    return;
+                }
+                syncWorkerStatus(normalizedRoomName, { silenceErrors: true });
+                workerStatusPollTimer = window.setInterval(() => {
+                    syncWorkerStatus(normalizedRoomName, { silenceErrors: true });
+                }, 2000);
+            };
+            const resetVoiceTranscriptState = ({ keepFinal = false } = {}) => {
+                voicePartialTranscript.value = '';
+                if (!keepFinal) {
+                    voiceFinalTranscript.value = '';
+                }
+                _submittedVoiceUtterances.clear();
+            };
+            const isQwenRealtimeMode = () => voiceConversationProvider.value === 'qwen_omni_realtime';
+            const cleanupQwenRemoteAudio = () => {
+                qwenRemoteAudioElements.forEach((element) => {
+                    try {
+                        element.pause?.();
+                        element.remove?.();
+                    } catch (error) {
+                        console.warn('[AI Teacher][Qwen] Failed to cleanup remote audio.', error);
+                    }
+                });
+                qwenRemoteAudioElements.clear();
+            };
+            const readQwenTextPayload = (payload, preferredField = 'text') => {
+                if (!payload || typeof payload !== 'object') {
+                    return { text: '', field: 'none' };
+                }
+                if (typeof payload[preferredField] === 'string') {
+                    return { text: payload[preferredField], field: preferredField };
+                }
+                if (typeof payload.text === 'string') {
+                    return { text: payload.text, field: 'text' };
+                }
+                if (typeof payload.transcript === 'string') {
+                    return { text: payload.transcript, field: 'transcript' };
+                }
+                if (typeof payload.delta === 'string') {
+                    return { text: payload.delta, field: 'delta' };
+                }
+                return { text: '', field: 'missing' };
+            };
+            const appendQwenAssistantText = (delta, responseId = '') => {
+                const text = String(delta || '');
+                if (!text) {
+                    return;
+                }
+                if (responseId && qwenActiveResponseId && responseId !== qwenActiveResponseId) {
+                    logVoiceEvent('qwen.output_text.delta.dropped_old_response', { responseId, activeResponseId: qwenActiveResponseId });
+                    return;
+                }
+                qwenAssistantDraft += text;
+                qwenLastStableSubtitle = qwenAssistantDraft;
+                currentLiveSubtitleText.value = normalizeSubtitleText(qwenAssistantDraft);
+                setImmediateSubtitle(qwenAssistantDraft);
+                scrollSubtitleToBottom();
+            };
+            const finalizeQwenAssistantText = (text, responseId = '') => {
+                const finalText = String(text || qwenAssistantDraft || '').trim();
+                if (!finalText) {
+                    logVoiceEvent('qwen.output_text.done.empty_ignored', { responseId });
+                    return;
+                }
+                const aiMessage = createChatMessage('ai', finalText);
+                messages.value.push(aiMessage);
+                qwenAssistantMessageId = aiMessage.id;
+                qwenAssistantDraft = '';
+                qwenActiveResponseId = '';
+                qwenLastStableSubtitle = finalText;
+                currentLiveSubtitleText.value = normalizeSubtitleText(finalText);
+                setImmediateSubtitle(finalText);
+                scrollSubtitleToBottom();
+                scrollChatFeedToBottom();
+            };
+            const attachQwenRemoteAudioTrack = (track, publication, participant) => {
+                const trackKind = String(track?.kind || '');
+                const isAudioTrack = !trackKind || trackKind === 'audio' || trackKind.toLowerCase().includes('audio');
+                const trackSid = publication?.trackSid || publication?.sid || track?.sid || `${participant?.identity || 'remote'}-${Date.now()}`;
+                logVoiceEvent('qwen.livekit.audio_track_subscribed', {
+                    trackSid,
+                    participant: participant?.identity || '',
+                    kind: trackKind
+                });
+                if (!isQwenRealtimeMode() || !track?.attach || !isAudioTrack) {
+                    return;
+                }
+                if (qwenRemoteAudioElements.has(trackSid)) {
+                    return;
+                }
+                const element = track.attach();
+                element.autoplay = true;
+                element.playsInline = true;
+                element.dataset.qwenTrackSid = trackSid;
+                element.style.display = 'none';
+                element.onplaying = () => {
+                    logVoiceEvent('qwen.livekit.audio_playing', {
+                        trackSid,
+                        paused: element.paused,
+                        readyState: element.readyState,
+                        audioPlayingAtMs: Math.round(performance.now())
+                    });
+                };
+                element.onerror = () => {
+                    logVoiceEvent('qwen.livekit.audio_blocked', {
+                        trackSid,
+                        errorType: 'audio_element_error',
+                        readyState: element.readyState
+                    });
+                };
+                document.body.appendChild(element);
+                qwenRemoteAudioElements.set(trackSid, element);
+                logVoiceEvent('qwen.livekit.audio_attached', {
+                    trackSid,
+                    participant: participant?.identity || ''
+                });
+                element.play?.().then(() => {
+                    logVoiceEvent('qwen.livekit.audio_playing', {
+                        trackSid,
+                        paused: element.paused,
+                        readyState: element.readyState,
+                        audioPlayingAtMs: Math.round(performance.now())
+                    });
+                }).catch((error) => {
+                    logVoiceEvent('qwen.livekit.audio_blocked', {
+                        trackSid,
+                        errorType: error?.name || 'play_failed'
+                    });
+                });
+            };
+            const toggleVoiceDebugPanel = () => {
+                isVoiceDebugExpanded.value = !isVoiceDebugExpanded.value;
+            };
+            const disconnectVoiceRoom = async ({ source = 'unknown', reason = '', room = null } = {}) => {
+                const targetRoom = room || livekitRoom;
+                const normalizedReason = String(reason || '').trim() || 'no reason provided';
+                voiceLastDisconnectSource.value = source;
+                voiceDisconnectReason.value = normalizedReason;
+                pendingDisconnectMeta = { source, reason: normalizedReason, ts: Date.now() };
+                logVoiceEvent('voice.disconnect.called', {
+                    source,
+                    reason: normalizedReason,
+                    roomName: voiceRoomName.value || targetRoom?.name || ''
+                });
+                console.trace('[AI Teacher][Voice] voice.disconnect.trace', { source, reason: normalizedReason });
+                if (!targetRoom) {
+                    return;
+                }
+                try {
+                    targetRoom.disconnect();
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to disconnect LiveKit room cleanly.', error);
+                }
+            };
+            const publishTeacherText = async (text, { isFinal = false } = {}) => {
+                const room = livekitRoom;
+                const normalizedText = String(text || '').trim();
+                if (!room || !normalizedText || voiceState.value !== 'connected') {
+                    return;
+                }
+                try {
+                    await room.localParticipant.sendText(JSON.stringify({
+                        text: normalizedText,
+                        isFinal,
+                        source: 'ai_teacher',
+                        roomName: voiceRoomName.value,
+                        identity: voiceIdentity.value,
+                        ts: Date.now()
+                    }), { topic: 'teacher.text' });
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to publish teacher.text stream.', error);
+                }
+            };
+            const bindLiveKitRoomEvents = (room, livekit) => {
+                room.on(livekit.RoomEvent.Reconnecting, () => {
+                    logVoiceEvent('voice.room.reconnecting');
+                    voiceState.value = 'connecting';
+                    voiceError.value = '';
+                });
+                room.on(livekit.RoomEvent.Reconnected, () => {
+                    logVoiceEvent('voice.room.reconnected');
+                    voiceState.value = 'connected';
+                    voiceError.value = '';
+                });
+                room.on(livekit.RoomEvent.Disconnected, (...args) => {
+                    const reasonPayload = args?.[0] ?? null;
+                    const derivedReason = pendingDisconnectMeta?.reason
+                        || reasonPayload?.reason
+                        || reasonPayload?.message
+                        || String(reasonPayload || '').trim()
+                        || 'unknown';
+                    const derivedSource = pendingDisconnectMeta?.source || 'room.disconnected.event';
+                    logVoiceEvent('voice.room.disconnected event', {
+                        source: derivedSource,
+                        reason: derivedReason,
+                        payload: reasonPayload
+                    });
+                    if (livekitRoom !== room) {
+                        return;
+                    }
+                    voiceBrowserDisconnected.value = true;
+                    voiceLastDisconnectSource.value = derivedSource;
+                    voiceDisconnectReason.value = derivedReason;
+                    livekitRoom = null;
+                    voiceState.value = 'idle';
+                    voiceRoomName.value = '';
+                    voiceIdentity.value = '';
+                    voiceConversationProvider.value = 'legacy';
+                    voiceBackendState.value = 'idle';
+                    voiceWorkerError.value = '';
+                    stopWorkerStatusPolling();
+                    cleanupQwenRemoteAudio();
+                    resolvePendingVoiceStopWaiter('room.disconnected');
+                    resolvePendingVoiceDisconnectWaiter('room.disconnected');
+                    isStopping.value = false;
+                    pendingDisconnectMeta = null;
+                });
+                room.on(livekit.RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                    if (isQwenRealtimeMode()) {
+                        attachQwenRemoteAudioTrack(track, publication, participant);
+                    }
+                });
+                room.on(livekit.RoomEvent.TrackUnsubscribed, (track, publication) => {
+                    const trackSid = publication?.trackSid || publication?.sid || track?.sid || '';
+                    const element = qwenRemoteAudioElements.get(trackSid);
+                    logVoiceEvent('qwen.livekit.audio_unsubscribed', { trackSid });
+                    if (element) {
+                        try {
+                            track?.detach?.(element);
+                            element.remove();
+                        } catch (error) {
+                            console.warn('[AI Teacher][Qwen] Failed to detach remote audio.', error);
+                        }
+                        qwenRemoteAudioElements.delete(trackSid);
+                    }
+                });
+            };
+            const handleIncomingVoiceTextStream = async (topic, reader) => {
+                let rawText = '';
+                for await (const chunk of reader) {
+                    rawText += String(chunk || '');
+                }
+                if (!rawText.trim()) {
+                    return;
+                }
+                try {
+                    const payload = JSON.parse(rawText);
+                    if (topic === 'stt.partial') {
+                        const partialText = String(payload.text || '').trim();
+                        voicePartialTranscript.value = partialText;
+                        voiceDebug.value.lastPartialAt = nowLabel();
+                        // Only show partial in subtitle if TTS is NOT currently speaking,
+                        // to avoid clobbering Lumina's spoken subtitle.
+                        if (partialText && voiceState.value === 'connected' && !isSpeechSubtitleActive.value) {
+                            setImmediateSubtitle('正在识别：' + partialText);
+                        }
+                        return;
+                    }
+                    if (topic === 'stt.final') {
+                        const payloadText = String(payload.text || '').trim();
+                        const utteranceId = String(payload.utteranceId || '');
+                        voiceDebug.value.lastFinalAt = nowLabel();
+                        resolvePendingVoiceStopWaiter('stt.final');
+                        if (isQwenRealtimeMode()) {
+                            voiceFinalTranscript.value = payloadText;
+                            logChatEvent('[voice] stt.final.ignored_qwen_mode', {
+                                text: payloadText,
+                                utteranceId,
+                                source: 'qwen'
+                            });
+                            return;
+                        }
+                        if (!payloadText) {
+                            logChatEvent('[voice] stt.final.empty_text', {
+                                utteranceId,
+                                raw: rawText.substring(0, 200),
+                                source: 'voice'
+                            });
+                            return;
+                        }
+                        // Always send ack so backend doesn't retry
+                        sendVoiceAck(utteranceId, payloadText);
+                        voiceFinalTranscript.value = payloadText;
+                        if (utteranceId && _submittedVoiceUtterances.has(utteranceId)) {
+                            const prevText = _submittedVoiceUtterances.get(utteranceId);
+                            if (prevText === payloadText) {
+                                logChatEvent('[voice] stt.final.duplicate', {
+                                    text: payloadText,
+                                    utteranceId,
+                                    source: 'voice'
+                                });
+                                return;
+                            }
+                            // Upgrade: update tracked text and display, but do NOT re-submit
+                            // to Lumina (same utterance_id already submitted).
+                            _submittedVoiceUtterances.set(utteranceId, payloadText);
+                            logChatEvent('[voice] stt.final.upgrade', {
+                                prevText,
+                                newText: payloadText,
+                                utteranceId,
+                                source: 'voice'
+                            });
+                            return;
+                        }
+                        if (utteranceId) {
+                            _submittedVoiceUtterances.set(utteranceId, payloadText);
+                        }
+                        await submitVoiceTranscript(payloadText, utteranceId);
+                        return;
+                    }
+                    if (topic === 'qwen.input_transcript.partial') {
+                        const { text: partialTextRaw, field } = readQwenTextPayload(payload, 'text');
+                        const partialText = String(partialTextRaw || '').trim();
+                        voicePartialTranscript.value = partialText;
+                        voiceDebug.value.lastPartialAt = nowLabel();
+                        if (partialText) {
+                            setImmediateSubtitle('正在识别：' + partialText);
+                        }
+                        logChatEvent('[qwen] input_transcript.partial', {
+                            textLength: partialText.length,
+                            field,
+                            source: 'qwen'
+                        });
+                        return;
+                    }
+                    if (topic === 'qwen.input_transcript.final') {
+                        const { text: finalTextRaw, field } = readQwenTextPayload(payload, 'text');
+                        const finalText = String(finalTextRaw || '').trim();
+                        if (finalText) {
+                            voiceFinalTranscript.value = finalText;
+                        }
+                        voicePartialTranscript.value = '';
+                        voiceDebug.value.lastFinalAt = nowLabel();
+                        resolvePendingVoiceStopWaiter('qwen.input_transcript.final');
+                        logChatEvent('[qwen] input_transcript.final', {
+                            textLength: finalText.length,
+                            field,
+                            source: 'qwen'
+                        });
+                        return;
+                    }
+                    if (topic === 'qwen.output_text.delta') {
+                        const { text: delta, field } = readQwenTextPayload(payload, 'delta');
+                        appendQwenAssistantText(delta, String(payload.responseId || ''));
+                        logVoiceEvent('qwen.output_text.delta.frontend', {
+                            responseId: String(payload.responseId || ''),
+                            textLength: String(delta || '').length,
+                            field
+                        });
+                        return;
+                    }
+                    if (topic === 'qwen.output_text.done') {
+                        const { text: doneText, field } = readQwenTextPayload(payload, 'text');
+                        finalizeQwenAssistantText(doneText, String(payload.responseId || ''));
+                        logVoiceEvent('qwen.output_text.done.frontend', {
+                            responseId: String(payload.responseId || ''),
+                            textLength: String(doneText || '').length,
+                            field
+                        });
+                        qwenAssistantMessageId = '';
+                        return;
+                    }
+                    if (topic === 'qwen.response.started') {
+                        qwenAssistantMessageId = '';
+                        qwenAssistantDraft = '';
+                        qwenActiveResponseId = String(payload.responseId || '');
+                        qwenLastStableSubtitle = '';
+                        setImmediateSubtitle('Lumina 正在回答...');
+                        logVoiceEvent('qwen.response.started.frontend', {
+                            responseId: qwenActiveResponseId
+                        });
+                        return;
+                    }
+                    if (topic === 'qwen.response.done') {
+                        qwenAssistantMessageId = '';
+                        resolvePendingVoiceStopWaiter('qwen.response.done');
+                        return;
+                    }
+                    if (topic === 'qwen.response.cancelled') {
+                        const responseId = String(payload.responseId || '');
+                        const reason = String(payload.reason || 'server_cancelled');
+                        logVoiceEvent('qwen.response.cancelled.frontend', {
+                            responseId,
+                            reason,
+                            hasDraft: Boolean(qwenAssistantDraft),
+                            livekitAudioTracks: qwenRemoteAudioElements.size
+                        });
+                        if (responseId && responseId === qwenActiveResponseId) {
+                            qwenAssistantDraft = '';
+                            qwenActiveResponseId = '';
+                            if (qwenLastStableSubtitle) {
+                                setImmediateSubtitle(qwenLastStableSubtitle);
+                            }
+                        }
+                        qwenAssistantMessageId = '';
+                        return;
+                    }
+                    if (topic === 'qwen.session.error') {
+                        const message = String(payload.message || payload.code || 'Qwen realtime session error').trim();
+                        voiceWorkerError.value = message;
+                        voiceBackendState.value = 'qwen.session.error';
+                        showVoiceStatusBanner('Qwen 实时语音异常：' + message, 'error');
+                        return;
+                    }
+                    if (topic === 'voice.state') {
+                        const nextState = String(payload.state || '').trim() || 'idle';
+                        const noisyDebugStates = new Set([
+                            'asr.audio_chunk_sent',
+                            'asr.flush_sent',
+                            'asr.force_flush_on_stop',
+                            'funasr.message.received',
+                            'vad.state_change'
+                        ]);
+                        if (!noisyDebugStates.has(nextState)) {
+                            voiceBackendState.value = nextState;
+                        }
+                        if (nextState === 'worker.joined') {
+                            voiceDebug.value.workerJoined = true;
+                            voiceWorkerError.value = '';
+                            if (voiceState.value === 'connected') {
+                                voiceBackendState.value = 'worker.connected';
+                            }
+                        } else if (nextState === 'worker.error') {
+                            voiceWorkerError.value = String(payload.error || 'worker failed').trim();
+                            if (voiceState.value === 'connected') {
+                                voiceBackendState.value = 'worker.failed';
+                            }
+                            showVoiceStatusBanner('语音识别服务异常：' + voiceWorkerError.value, 'error');
+                        } else if (nextState === 'track.subscribed') {
+                            voiceDebug.value.trackSubscribed = true;
+                        } else if (nextState === 'audio.first_frame') {
+                            voiceDebug.value.firstAudioFrame = true;
+                        } else if (nextState === 'speech.start') {
+                            logTtsPlayEvent('tts.interrupt.by_voice_start', {
+                                textLength: currentLiveSubtitleText.value.length,
+                                isSpeaking: Boolean(isSpeaking.value)
+                            });
+                            stopAssistantSpeech('voice_start_interrupt');
+                            cancelActiveAssistantReply('voice_interrupt');
+                            voicePartialTranscript.value = '';
+                            voiceFinalTranscript.value = '';
+                            voiceDebug.value.lastSpeechStartAt = nowLabel();
+                        } else if (nextState === 'speech.end') {
+                            voiceDebug.value.lastSpeechEndAt = nowLabel();
+                        } else if (nextState === 'vad.state_change') {
+                            voiceDebug.value.vadState = String(payload.vadState || '').trim() || voiceDebug.value.vadState;
+                        } else if (nextState === 'asr.audio_chunk_sent') {
+                            voiceDebug.value.lastAudioChunkSentAt = nowLabel();
+                        } else if (nextState === 'asr.flush_sent') {
+                            voiceDebug.value.lastFlushSentAt = nowLabel();
+                        } else if (nextState === 'asr.force_flush_on_stop') {
+                            voiceDebug.value.lastForceFlushOnStopAt = nowLabel();
+                        } else if (nextState === 'funasr.partial') {
+                            voiceDebug.value.lastPartialAt = nowLabel();
+                        } else if (nextState === 'funasr.final') {
+                            voiceDebug.value.lastFinalAt = nowLabel();
+                            resolvePendingVoiceStopWaiter('funasr.final');
+                        } else if (nextState === 'funasr.message.received') {
+                            voiceDebug.value.lastFunasrMessageAt = nowLabel();
+                        } else if (nextState === 'utterance.complete') {
+                            resolvePendingVoiceStopWaiter('utterance.complete');
+                        } else if (nextState === 'recognition_incomplete') {
+                            const message = String(
+                                payload.message
+                                || '我听到了一部分，但还没拿到完整识别结果，请再说一遍。'
+                            ).trim();
+                            const previewText = String(payload.previewText || '').trim();
+                            voicePartialTranscript.value = previewText;
+                            voiceFinalTranscript.value = '';
+                            resolvePendingVoiceStopWaiter('recognition_incomplete');
+                            setImmediateSubtitle(message);
+                            logVoiceEvent('voice.recognition_incomplete', {
+                                utteranceId: String(payload.utteranceId || ''),
+                                reason: String(payload.reason || ''),
+                                previewText
+                            });
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to parse LiveKit text stream payload.', topic, rawText, error);
+                }
+            };
+            const bindVoiceTextStreamHandlers = (room) => {
+                room.registerTextStreamHandler('stt.partial', async (reader) => {
+                    await handleIncomingVoiceTextStream('stt.partial', reader);
+                });
+                room.registerTextStreamHandler('stt.final', async (reader) => {
+                    await handleIncomingVoiceTextStream('stt.final', reader);
+                });
+                room.registerTextStreamHandler('voice.state', async (reader) => {
+                    await handleIncomingVoiceTextStream('voice.state', reader);
+                });
+                [
+                    'qwen.input_transcript.partial',
+                    'qwen.input_transcript.final',
+                    'qwen.output_text.delta',
+                    'qwen.output_text.done',
+                    'qwen.response.started',
+                    'qwen.response.done',
+                    'qwen.response.cancelled',
+                    'qwen.session.error'
+                ].forEach((topic) => {
+                    room.registerTextStreamHandler(topic, async (reader) => {
+                        await handleIncomingVoiceTextStream(topic, reader);
+                    });
+                });
+            };
+            const finishCurrentUtterance = async () => {
+                const room = livekitRoom;
+                if (!room || isStopping.value || voiceState.value !== 'connected') {
+                    return;
+                }
+                logVoiceEvent('finish_utterance.begin', {
+                    roomName: voiceRoomName.value || room.name || ''
+                });
+                setImmediateSubtitle('正在完成当前句识别...');
+                try {
+                    await room.localParticipant.setMicrophoneEnabled(false);
+                    logVoiceEvent('finish_utterance.mic_off');
+                } catch (error) {
+                    console.warn('[AI Teacher] finishCurrentUtterance mic off failed.', error);
+                }
+                const finishResult = await waitForVoiceFlushOrFinal(VOICE_STOP_WAIT_FINAL_MS);
+                logVoiceEvent('finish_utterance.wait_result', { result: finishResult });
+                try {
+                    if (livekitRoom === room && voiceState.value === 'connected') {
+                        await room.localParticipant.setMicrophoneEnabled(true);
+                        logVoiceEvent('finish_utterance.mic_on');
+                    }
+                } catch (error) {
+                    console.warn('[AI Teacher] finishCurrentUtterance mic on failed.', error);
+                }
+                if (voiceState.value === 'connected') {
+                    setImmediateSubtitle('语音接通中，请继续讲话。');
+                }
+            };
+
+            const stopVoice = async () => {
+                const room = livekitRoom;
+                voiceError.value = '';
+                if (!room || isStopping.value) {
+                    return;
+                }
+                isStopping.value = true;
+                logVoiceEvent('stop_voice.begin', {
+                    roomName: voiceRoomName.value || room.name || '',
+                    vadState: voiceDebug.value.vadState || 'unknown'
+                });
+                // Phase 1: Turn off microphone, keep LiveKit room alive
+                setImmediateSubtitle('正在完成识别...');
+                try {
+                    await room.localParticipant.setMicrophoneEnabled(false);
+                    logVoiceEvent('voice.mic.unpublish.success');
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to unpublish microphone cleanly.', error);
+                }
+                try {
+                    // Phase 2: Wait for pending stt.final or utterance.complete
+                    const stopResult = await waitForVoiceFlushOrFinal(VOICE_STOP_WAIT_FINAL_MS);
+                    logVoiceEvent('voice.stop.flush.wait.result', { result: stopResult, waitMs: VOICE_STOP_WAIT_FINAL_MS });
+                    // Phase 3: Disconnect room
+                    if (stopResult !== 'room.disconnected') {
+                        if (stopResult === 'timeout') {
+                            logVoiceEvent('stop_voice.force_disconnect', {
+                                roomName: voiceRoomName.value || room.name || '',
+                                reason: 'graceful stop timeout'
+                            });
+                        }
+                        await disconnectVoiceRoom({
+                            source: stopResult === 'timeout' ? 'stop_voice.force_disconnect' : 'user.stop_voice',
+                            reason: stopResult === 'timeout' ? 'graceful stop timed out' : 'user clicked 结束语音',
+                            room
+                        });
+                        await waitForVoiceDisconnect(900);
+                    }
+                    logVoiceEvent('stop_voice.end', {
+                        stopResult,
+                        roomConnected: Boolean(livekitRoom)
+                    });
+                    setImmediateSubtitle('语音已结束，浏览器麦克风已停止发布。');
+                } catch (error) {
+                    console.warn('[AI Teacher] Failed to stop voice cleanly.', error);
+                    logVoiceEvent('stop_voice.force_disconnect', {
+                        roomName: voiceRoomName.value || room.name || '',
+                        reason: extractRequestErrorMessage(error)
+                    });
+                    await disconnectVoiceRoom({
+                        source: 'stop_voice.force_disconnect',
+                        reason: `stopVoice failed: ${extractRequestErrorMessage(error)}`,
+                        room
+                    });
+                    await waitForVoiceDisconnect(900);
+                    logVoiceEvent('stop_voice.end', {
+                        stopResult: 'error_force_disconnect',
+                        roomConnected: Boolean(livekitRoom)
+                    });
+                    setImmediateSubtitle('语音已结束，浏览器麦克风已停止发布。');
+                } finally {
+                    if (livekitRoom !== room || voiceState.value === 'idle') {
+                        isStopping.value = false;
+                    } else {
+                        window.setTimeout(() => {
+                            if (livekitRoom === room && voiceState.value !== 'idle') {
+                                isStopping.value = false;
+                            }
+                        }, 300);
+                    }
+                }
+            };
+            const startVoice = async () => {
+                if (voiceState.value === 'connecting' || voiceState.value === 'connected') {
+                    return;
+                }
+                logVoiceEvent('voice.start.begin');
+                isStopping.value = false;
+                voiceError.value = '';
+                voiceState.value = 'connecting';
+                voiceBackendState.value = 'joining-room';
+                voiceWorkerError.value = '';
+                stopWorkerStatusPolling();
+                resetVoiceDisconnectDebug();
+                resetVoiceTranscriptState();
+                resetVoiceDebugState();
+                setImmediateSubtitle('正在连接 LiveKit 房间并申请麦克风权限...');
+                let room = null;
+                try {
+                    const livekit = await loadLiveKitClient();
+                    if (!livekit?.Room) {
+                        throw new Error('LiveKit JS client SDK 未正确加载。');
+                    }
+
+                    const tokenResponse = await axios.post(API_BASE_URL + '/api/livekit/token', {});
+                    const payload = tokenResponse.data || {};
+                    voiceConversationProvider.value = String(payload.voiceConversationProvider || 'legacy').trim() || 'legacy';
+                    if (isQwenRealtimeMode()) {
+                        stopAssistantSpeech('qwen_mode_start');
+                        clearTtsIdleTimer();
+                        ttsSentenceQueue.value = [];
+                        ttsSynthQueue.length = 0;
+                        ttsReadyAudioQueue.clear();
+                        ttsActiveSynthSeqIds.clear();
+                        qwenAssistantMessageId = '';
+                        qwenAssistantDraft = '';
+                        qwenActiveResponseId = '';
+                        qwenLastStableSubtitle = '';
+                    }
+                    room = new livekit.Room();
+                    bindLiveKitRoomEvents(room, livekit);
+                    bindVoiceTextStreamHandlers(room);
+
+                    logVoiceEvent('voice.room.connect.begin', {
+                        roomName: payload.roomName,
+                        identity: payload.identity,
+                        serverUrl: payload.serverUrl
+                    });
+                    await room.connect(payload.serverUrl, payload.participantToken);
+                    logVoiceEvent('voice.room.connect.success', {
+                        roomName: payload.roomName,
+                        identity: payload.identity,
+                        participantIdentity: room.localParticipant?.identity || ''
+                    });
+                    if (voiceConversationProvider.value === 'qwen_omni_realtime' && typeof room.startAudio === 'function') {
+                        try {
+                            await room.startAudio();
+                            logVoiceEvent('qwen.livekit.start_audio.success');
+                        } catch (error) {
+                            logVoiceEvent('qwen.livekit.audio_blocked', {
+                                errorType: error?.name || 'start_audio_failed'
+                            });
+                        }
+                    }
+                    await room.localParticipant.setMicrophoneEnabled(true);
+                    logVoiceEvent('voice.mic.publish.success', {
+                        roomName: payload.roomName,
+                        identity: payload.identity
+                    });
+
+                    livekitRoom = room;
+                    voiceRoomName.value = String(payload.roomName || '');
+                    voiceIdentity.value = String(payload.identity || '');
+                    voiceState.value = 'connected';
+                    voiceBackendState.value = 'browser.connected';
+                    startWorkerStatusPolling(voiceRoomName.value);
+                    setImmediateSubtitle('语音已接通，浏览器麦克风正在发布到 LiveKit room。');
+                } catch (error) {
+                    if (room) {
+                        await disconnectVoiceRoom({
+                            source: 'voice.start.rollback',
+                            reason: `startVoice failed: ${extractRequestErrorMessage(error)}`,
+                            room
+                        });
+                    }
+                    livekitRoom = null;
+                    voiceRoomName.value = '';
+                    voiceIdentity.value = '';
+                    voiceConversationProvider.value = 'legacy';
+                    voiceState.value = 'failed';
+                    voiceBackendState.value = 'failed';
+                    voiceWorkerError.value = extractRequestErrorMessage(error);
+                    voiceError.value = resolveVoiceErrorMessage(error);
+                    setImmediateSubtitle(voiceError.value);
+                    cleanupQwenRemoteAudio();
+                    console.error('[AI Teacher] LiveKit connect failed:', error);
+                }
+            };
 
             const syncWhiteboardUnreadState = () => {
                 hasUnreadWhiteboardUpdate.value = (
@@ -1018,7 +3854,8 @@
                 for (let index = 0; index < bufferText.length; index += 1) {
                     const currentChar = bufferText[index];
                     const reachedHardBreak = (index - cursor + 1) >= SUBTITLE_HARD_BREAK_CHARS;
-                    if (!SUBTITLE_DELIMITER_REGEX.test(currentChar) && !reachedHardBreak) {
+                    const allowHardBreak = reachedHardBreak && /\s|[，,、：:。！？!?；;]/.test(currentChar);
+                    if (!SUBTITLE_DELIMITER_REGEX.test(currentChar) && !allowHardBreak) {
                         continue;
                     }
 
@@ -1030,7 +3867,7 @@
                     }
 
                     const sentence = normalizeSubtitleText(bufferText.slice(cursor, end));
-                    const isStrongBreak = STRONG_SUBTITLE_DELIMITER_REGEX.test(currentChar) || reachedHardBreak;
+                    const isStrongBreak = STRONG_SUBTITLE_DELIMITER_REGEX.test(currentChar) || allowHardBreak;
                     const sentenceLength = Array.from(sentence).length;
 
                     if (!sentence) {
@@ -1040,6 +3877,10 @@
                     }
 
                     if (!isStrongBreak && sentenceLength < SUBTITLE_MIN_WEAK_BREAK_CHARS) {
+                        continue;
+                    }
+
+                    if (!allowHardBreak && shouldDeferStableSentence(sentence, { isFinalFlush: false })) {
                         continue;
                     }
 
@@ -1059,6 +3900,13 @@
                 subtitleQueue.value = [];
                 subtitleTextBuffer.value = '';
                 isSubtitlePlaying.value = false;
+                clearTtsIdleTimer();
+                ttsSentenceBuffer = '';
+                pendingSubtitleTtsFinalFlush = false;
+                currentLiveSubtitleText.value = '';
+                currentSpokenSubtitle.value = '';
+                isSpeechSubtitleActive.value = false;
+                scrollSubtitleToBottom();
                 if (!keepCurrent) {
                     syncSubtitleLines([]);
                 }
@@ -1090,6 +3938,11 @@
                 if (!cleaned) {
                     return;
                 }
+                logTtsPlayEvent('llm.chunk.received', {
+                    textLength: cleaned.length,
+                    queueLength: ttsSentenceQueue.value.length,
+                    isSpeaking: Boolean(isSpeaking.value)
+                });
 
                 const currentLine = subtitleLines.value.find((line) => line.tone === 'current')
                     || subtitleLines.value[subtitleLines.value.length - 1]
@@ -1101,6 +3954,7 @@
                 }
                 nextLines.push(buildSubtitleLine(cleaned, 'current'));
                 syncSubtitleLines(nextLines);
+                queueLiveSubtitleForSpeech(cleaned);
             };
 
             const playNextSubtitle = () => {
@@ -1117,6 +3971,9 @@
 
                 subtitleHoldTimer = window.setTimeout(() => {
                     isSubtitlePlaying.value = false;
+                    if (subtitleQueue.value.length === 0 && pendingSubtitleTtsFinalFlush) {
+                        flushTtsSentenceBuffer({ isFinalFlush: true, reason: 'subtitle_queue_drain' });
+                    }
                     playNextSubtitle();
                 }, computeSubtitleDuration(nextSentence?.text || ''));
             };
@@ -1185,6 +4042,7 @@
                 if (!cleaned) {
                     return;
                 }
+                currentLiveSubtitleText.value = '';
                 syncSubtitleLines([buildSubtitleLine(cleaned, 'current')]);
             };
 
@@ -1196,6 +4054,7 @@
                 if (isSubtitlePlaying.value || subtitleQueue.value.length > 0 || normalizeSubtitleText(subtitleTextBuffer.value)) {
                     return;
                 }
+                currentLiveSubtitleText.value = '';
                 syncSubtitleLines([buildSubtitleLine(cleaned, 'current')]);
             };
 
@@ -1502,13 +4361,28 @@
             };
 
             onMounted(() => {
+                scrollChatFeedToBottom();
                 window.addEventListener('resize', resizeRadarChart);
+                loadSlideManifest();
             });
             onBeforeUnmount(() => {
                 window.removeEventListener('resize', resizeRadarChart);
                 disconnectRadarObserver();
                 clearSubtitleTimers();
                 clearWhiteboardFxTimers();
+                if (livekitRoom) {
+                    try {
+                        disconnectVoiceRoom({
+                            source: 'app.unmount',
+                            reason: 'Vue app unmount / page closing',
+                            room: livekitRoom
+                        });
+                    } catch (error) {
+                        console.warn('[AI Teacher] Failed to disconnect LiveKit room on unmount.', error);
+                    }
+                    livekitRoom = null;
+                }
+                stopWorkerStatusPolling();
                 if (radarResizeFrame) {
                     cancelAnimationFrame(radarResizeFrame);
                     radarResizeFrame = null;
@@ -1862,11 +4736,12 @@
                 return { visibleText, nextCarry };
             };
 
-            const readStreamIntoMessage = async (url, payload, messageIndex) => {
+            const readStreamIntoMessage = async (url, payload, messageIndex, { signal = null, onTextChunk = null, onCompleted = null } = {}) => {
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(payload),
+                    signal
                 });
 
                 if (!response.ok) {
@@ -1914,6 +4789,9 @@
                         messages.value[messageIndex].systemStatus = '';
                         messages.value[messageIndex].content += segmentText;
                         enqueueSubtitleText(segmentText, { stagePageKey: activeSubtitleStagePageKey });
+                        if (typeof onTextChunk === 'function') {
+                            onTextChunk(segmentText);
+                        }
                     };
 
                     while ((match = markerRegex.exec(visibleText)) !== null) {
@@ -1927,6 +4805,21 @@
                             flushSubtitleBuffer({ stagePageKey: activeSubtitleStagePageKey });
                             messages.value[messageIndex].systemStatus = '';
                             activeSubtitleStagePageKey = normalizedStatus.slice('WB_STAGE_READY::'.length).trim();
+                        } else if (normalizedStatus.startsWith('SLIDE:GOTO:')) {
+                            const slideId = normalizedStatus.slice('SLIDE:GOTO:'.length).trim();
+                            handleSlideGoto(slideId);
+                            messages.value[messageIndex].systemStatus = '';
+                        } else if (normalizedStatus.startsWith('SLIDE:QUESTION:')) {
+                            const qText = normalizedStatus.slice('SLIDE:QUESTION:'.length).trim();
+                            handleSlideQuestion(qText);
+                            messages.value[messageIndex].systemStatus = '';
+                        } else if (normalizedStatus.startsWith('SLIDE:REVEAL_ANSWER:')) {
+                            const aText = normalizedStatus.slice('SLIDE:REVEAL_ANSWER:'.length).trim();
+                            handleSlideRevealAnswer(aText);
+                            messages.value[messageIndex].systemStatus = '';
+                        } else if (normalizedStatus.startsWith('SLIDE:CLEAR_OVERLAY')) {
+                            handleSlideClearOverlay();
+                            messages.value[messageIndex].systemStatus = '';
                         } else {
                             messages.value[messageIndex].systemStatus = normalizedStatus;
                             maybeShowStatusSubtitle(normalizedStatus, '老师正在准备下一段讲解...');
@@ -1952,21 +4845,34 @@
                     appendClassStreamChunk(finalChunk);
                 }
                 flushSubtitleBuffer({ stagePageKey: activeSubtitleStagePageKey });
+                markPendingTtsFinalFlush();
                 if (pendingWhiteboardStages.length > 0) {
                     console.warn('[WhiteboardSelfHeal] pending whiteboard stages remained after stream end.', {
                         pendingPageKeys: pendingWhiteboardStages.map((stage) => stage.pageKey || stage.nodeKey || 'unknown')
                     });
                 }
+                if (typeof onCompleted === 'function') {
+                    onCompleted(messages.value[messageIndex]?.content || '');
+                }
             };
 
-            const streamClassMessage = async (text, action) => {
+            const streamClassMessage = async (text, action, { signal = null } = {}) => {
                 const aiMessage = { role: 'ai', isClass: true, content: '', systemStatus: '' };
                 messages.value.push(aiMessage);
                 const aiMessageIndex = messages.value.length - 1;
                 const history = action === 'start' ? [] : buildRecentHistory(2, 6);
 
                 isThinking.value = false;
-                await readStreamIntoMessage(API_BASE_URL + '/class_chat_stream', { text, action, history }, aiMessageIndex);
+                await readStreamIntoMessage(
+                    API_BASE_URL + '/class_chat_stream',
+                    { text, action, history },
+                    aiMessageIndex,
+                    {
+                        signal,
+                        onTextChunk: (segmentText) => publishTeacherText(segmentText, { isFinal: false }),
+                        onCompleted: (fullText) => publishTeacherText(fullText, { isFinal: true })
+                    }
+                );
 
                 if (messages.value[aiMessageIndex].content.includes(CLASS_COMPLETED_HINT)) {
                     isInClass.value = false;
@@ -1976,44 +4882,107 @@
                 }
             };
 
-            const readChatStreamIntoMessage = async (text, messageIndex) => {
-                const history = buildRecentHistory(2, 6);
-                const response = await fetch(API_BASE_URL + '/chat_stream', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, history })
+            const readChatStreamIntoMessage = async (text, messageIndex, { signal = null, messageId = '' } = {}) => {
+                let target = resolveChatMessageTarget({ messageId, messageIndex });
+                let response = null;
+                logChatEvent('[chat] readChatStream.begin', {
+                    text,
+                    content: target.message?.content || '',
+                    messageIndex: target.messageIndex,
+                    messageId: target.messageId
                 });
+                try {
+                    const history = buildRecentHistory(2, 6);
+                    response = await fetch(API_BASE_URL + '/chat_stream', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text, history }),
+                        signal
+                    });
+                    logChatEvent('[chat] chatStream.response', {
+                        text,
+                        content: target.message?.content || '',
+                        response,
+                        messageIndex: target.messageIndex,
+                        messageId: target.messageId
+                    });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-
-                if (!response.body) {
-                    throw new Error('响应体为空，无法读取聊天流');
-                }
-
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder("utf-8");
-                let buffer = "";
-
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-
-                    buffer += decoder.decode(value, { stream: true });
-                    if (buffer) {
-                        messages.value[messageIndex].content += buffer;
-                        enqueueSubtitleText(buffer);
-                        buffer = "";
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
-                }
 
-                buffer += decoder.decode();
-                if (buffer) {
-                    messages.value[messageIndex].content += buffer;
-                    enqueueSubtitleText(buffer);
+                    if (!response.body) {
+                        throw new Error('响应体为空，无法读取聊天流');
+                    }
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder("utf-8");
+                    let buffer = "";
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        buffer += decoder.decode(value, { stream: true });
+                        if (buffer) {
+                            target = resolveChatMessageTarget({ messageId: target.messageId, messageIndex: target.messageIndex });
+                            logChatEvent('[chat] readChatStream.chunk', {
+                                text,
+                                content: buffer,
+                                response,
+                                messageIndex: target.messageIndex,
+                                messageId: target.messageId,
+                                chunkLength: buffer.length
+                            });
+                            if (!target.message) {
+                                throw new Error('AI 占位消息不存在，无法写入聊天流');
+                            }
+                            target.message.content += buffer;
+                            logChatEvent('[chat] aiMessage.updated', {
+                                text,
+                                content: target.message.content || '',
+                                response,
+                                messageIndex: target.messageIndex,
+                                messageId: target.messageId,
+                                chunkLength: buffer.length
+                            });
+                            enqueueSubtitleText(buffer);
+                            publishTeacherText(buffer, { isFinal: false });
+                            buffer = "";
+                        }
+                    }
+
+                    buffer += decoder.decode();
+                    if (buffer) {
+                        target = resolveChatMessageTarget({ messageId: target.messageId, messageIndex: target.messageIndex });
+                        if (!target.message) {
+                            throw new Error('AI 占位消息不存在，无法写入聊天流尾包');
+                        }
+                        target.message.content += buffer;
+                        logChatEvent('[chat] aiMessage.updated', {
+                            text,
+                            content: target.message.content || '',
+                            response,
+                            messageIndex: target.messageIndex,
+                            messageId: target.messageId,
+                            chunkLength: buffer.length
+                        });
+                        enqueueSubtitleText(buffer);
+                    }
+                    flushSubtitleBuffer();
+                    target = resolveChatMessageTarget({ messageId: target.messageId, messageIndex: target.messageIndex });
+                    await publishTeacherText(target.message?.content || '', { isFinal: true });
+                    markPendingTtsFinalFlush();
+                } finally {
+                    target = resolveChatMessageTarget({ messageId: target.messageId, messageIndex: target.messageIndex });
+                    logChatEvent('[chat] readChatStream.end', {
+                        text,
+                        content: target.message?.content || '',
+                        response,
+                        messageIndex: target.messageIndex,
+                        messageId: target.messageId
+                    });
                 }
-                flushSubtitleBuffer();
             };
 
             const switchToLocalApi = () => window.aiTeacherApi.useLocal();
@@ -2021,7 +4990,16 @@
             const switchToAutoApi = () => window.aiTeacherApi.useAuto();
 
             const startClass = async () => {
-                if (isInputLocked.value) return;
+                logTtsPlayEvent('tts.interrupt.by_class_start', {
+                    isInputLocked: Boolean(isInputLocked.value),
+                    isSpeaking: Boolean(isSpeaking.value),
+                    ttsQueueLength: ttsSentenceQueue.value.length,
+                    subtitleQueueLength: subtitleQueue.value.length
+                });
+                cancelActiveAssistantReply('class_start_interrupt');
+                stopAssistantSpeech('class_start_interrupt');
+                isInputLocked.value = false;
+                isThinking.value = false;
 
                 pendingWhiteboardStages.length = 0;
                 activatedWhiteboardStageKeys.clear();
@@ -2033,16 +5011,30 @@
                 clearQuestionDrawerTimers();
                 questionDrawerOpen.value = false;
                 questionDrawerActiveKey.value = '';
+                currentSlideId.value = '';
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
                 messages.value.push({ role: 'user', content: '👨‍🎓 老师好，我准备好上课了！' });
                 setImmediateSubtitle('老师正在步入教室...');
                 isInputLocked.value = true;
                 isThinking.value = true;
+                const controller = new AbortController();
+                activeAssistantAbortController = controller;
                 try {
-                    await streamClassMessage("", "start");
+                    await streamClassMessage("", "start", { signal: controller.signal });
                 } catch (error) {
+                    if (error?.name === 'AbortError') {
+                        console.warn('[AI Teacher] Class start stream aborted.', error);
+                        return;
+                    }
                     messages.value.push({ role: 'ai', content: "❌ 唤醒老师失败，请检查后端。" });
                     setImmediateSubtitle('老师没有成功上线，请检查后端。');
                 } finally {
+                    if (activeAssistantAbortController === controller) {
+                        activeAssistantAbortController = null;
+                    }
                     isInputLocked.value = false;
                     isThinking.value = false;
                 }
@@ -2050,63 +5042,206 @@
 
             // 👇 加了显微镜的退出函数
             const exitClass = async () => {
-                if (isInputLocked.value) return;
+                logTtsPlayEvent('tts.interrupt.by_class_exit', {
+                    isInputLocked: Boolean(isInputLocked.value),
+                    isSpeaking: Boolean(isSpeaking.value),
+                    ttsQueueLength: ttsSentenceQueue.value.length,
+                    subtitleQueueLength: subtitleQueue.value.length
+                });
+                cancelActiveAssistantReply('class_exit_interrupt');
+                stopAssistantSpeech('class_exit_interrupt');
+                isInputLocked.value = false;
+                isThinking.value = false;
+
+                isInClass.value = false;
+                pendingWhiteboardStages.length = 0;
+                activatedWhiteboardStageKeys.clear();
+                clearQuestionDrawerTimers();
+                questionDrawerOpen.value = false;
+                questionDrawerActiveKey.value = '';
+                currentSlideId.value = '';
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
+                messages.value.push({
+                    role: 'ai',
+                    content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算先喘口气了？很好，微课模式关闭。现在回到闲聊和答疑通道，你要是还有问题，就继续开口。'
+                });
+                setImmediateSubtitle('微课模式已关闭，直播间回到闲聊答疑。');
 
                 try {
-                    console.log("正在尝试向后端发送退出请求...");
-                    // 确保这里的接口路径和 main.py 里完全一致，不要带任何参数
                     await axios.post(API_BASE_URL + '/course/exit');
-                    
-                    console.log("后端已成功响应退出请求！");
-                    isInClass.value = false;
-                    pendingWhiteboardStages.length = 0;
-                    activatedWhiteboardStageKeys.clear();
-                    clearQuestionDrawerTimers();
-                    questionDrawerOpen.value = false;
-                    questionDrawerActiveKey.value = '';
-                    messages.value.push({ 
-                        role: 'ai', 
-                        content: '[动作：冷笑] 怎么，受不了我的残酷训练，打算先喘口气了？很好，微课模式关闭。现在回到闲聊和答疑通道，你要是还有问题，就继续开口。' 
-                    });
-                    setImmediateSubtitle('微课模式已关闭，直播间回到闲聊答疑。');
                 } catch (error) {
-                    // 🌟 这一句极其关键，它会在浏览器的控制台里打印出真正的死因！
                     console.error("❌ 退出报错详情：", error);
-                    messages.value.push({ role: 'ai', content: "❌ 退出请求失败，请按 F12 打开开发者工具查看 Console 日志。" });
-                    setImmediateSubtitle('退出微课失败，请检查网络或后端日志。');
                 }
             };
 
-            const sendMessage = async () => {
-                const text = inputText.value.trim();
-                if (!text || isThinking.value || isInputLocked.value) return;
+            const isTextNoise = (text) => {
+                const t = String(text || '').trim().toLowerCase();
+                if (!t) return true;
+                const noiseWords = new Set(['嗯', '啊', '哦', '呃', '额', '唔', 'um', 'uh', 'er', 'ah', 'oh', 'eh', 'hm', 'hmm', 'mmm']);
+                if (noiseWords.has(t)) return true;
+                return false;
+            };
 
-                messages.value.push({ role: 'user', content: text });
+            let _voiceStatusTimer = null;
+            const showVoiceStatusBanner = (message, level = 'info') => {
+                setImmediateSubtitle(message);
+                console.info(`[AI Teacher][Voice] status: [${level}] ${message}`);
+                if (_voiceStatusTimer) {
+                    window.clearTimeout(_voiceStatusTimer);
+                }
+                if (level === 'warning' || level === 'error') {
+                    _voiceStatusTimer = window.setTimeout(() => {
+                        if (voiceState.value === 'connected') {
+                            setImmediateSubtitle('语音接通中，请讲话...');
+                        }
+                    }, 4000);
+                }
+            };
+
+            const sendVoiceAck = (utteranceId, text) => {
+                if (!utteranceId || !text) return;
+                const ackPayload = {
+                    utterance_id: utteranceId,
+                    text: text,
+                    received_at: Date.now() / 1000
+                };
+                axios.post(API_BASE_URL + '/api/voice/ack', ackPayload)
+                    .then(() => {
+                        logChatEvent('[voice] ack.sent', { utteranceId, text, source: 'voice' });
+                    })
+                    .catch((error) => {
+                        console.warn('[AI Teacher] Failed to send voice ack.', error);
+                        logChatEvent('[voice] ack.failed', {
+                            utteranceId,
+                            text,
+                            error: String(error),
+                            source: 'voice'
+                        });
+                    });
+            };
+
+            const submitVoiceTranscript = async (transcriptText, utteranceId = '') => {
+                const normalizedText = String(transcriptText || '').trim();
+                logVoiceEvent('transcript.submit.frontend.begin', {
+                    text: normalizedText,
+                    content: voiceFinalTranscript.value || '',
+                    utteranceId
+                });
+                if (!normalizedText) {
+                    logVoiceEvent('transcript.submit.frontend.failed', {
+                        reason: 'empty_text',
+                        utteranceId
+                    });
+                    return;
+                }
+                try {
+                    await submitStudentInput(normalizedText, { source: 'voice' });
+                    logVoiceEvent('transcript.submit.frontend.success', {
+                        text: normalizedText,
+                        utteranceId
+                    });
+                } catch (error) {
+                    logVoiceEvent('transcript.submit.frontend.failed', {
+                        text: normalizedText,
+                        utteranceId,
+                        error: String(error)
+                    });
+                    throw error;
+                }
+            };
+
+            const submitStudentInput = async (rawText, { source = 'text' } = {}) => {
+                const text = String(rawText || '').trim();
+                const isVoiceSource = source === 'voice';
+                logChatEvent('[chat] submitStudentInput.begin', {
+                    text,
+                    source
+                });
+                if (!text) return;
+                if (isQwenRealtimeMode() && voiceState.value === 'connected') {
+                    logChatEvent('[chat] submit.blocked_qwen_realtime', {
+                        textLength: text.length,
+                        source
+                    });
+                    setImmediateSubtitle('Qwen 实时语音模式正在接管对话，请用语音输入，或先切回 legacy。');
+                    return;
+                }
+                if (!isVoiceSource && (isThinking.value || isInputLocked.value)) return;
+                if (!isVoiceSource) {
+                    logTtsPlayEvent('tts.interrupt.by_text_input', {
+                        textLength: text.length,
+                        liveSubtitleTextLength: currentLiveSubtitleText.value.length,
+                        isSpeaking: Boolean(isSpeaking.value)
+                    });
+                    stopAssistantSpeech('text_input_interrupt');
+                }
+
+                const studentMessage = createChatMessage('user', text);
+                messages.value.push(studentMessage);
+                logChatEvent('[chat] studentMessage.appended', {
+                    text,
+                    content: studentMessage.content,
+                    source,
+                    messageIndex: messages.value.length - 1,
+                    messageId: studentMessage.id
+                });
                 setImmediateSubtitle(isInClass.value ? '老师正在继续这场折磨教育...' : '老师正在接收新的弹幕...');
-                resetInputBox();
+                if (!isVoiceSource) {
+                    resetInputBox();
+                }
                 isInputLocked.value = true;
                 isThinking.value = true;
+                cancelActiveAssistantReply('new_input');
+                const controller = new AbortController();
+                activeAssistantAbortController = controller;
 
                 try {
                     if (isInClass.value) {
-                        await streamClassMessage(text, "chat");
+                        await streamClassMessage(text, "chat", { signal: controller.signal });
                     } else {
-                        const aiMessage = { role: 'ai', content: '' };
+                        const aiMessage = createChatMessage('ai', '');
                         messages.value.push(aiMessage);
                         const aiMessageIndex = messages.value.length - 1;
+                        logChatEvent('[chat] aiPlaceholder.appended', {
+                            text,
+                            content: aiMessage.content,
+                            source,
+                            messageIndex: aiMessageIndex,
+                            messageId: aiMessage.id
+                        });
                         isThinking.value = false;
-                        await readChatStreamIntoMessage(text, aiMessageIndex);
+                        await readChatStreamIntoMessage(text, aiMessageIndex, {
+                            signal: controller.signal,
+                            messageId: aiMessage.id
+                        });
                     }
                 } catch (error) {
-                    messages.value.push({ role: 'ai', content: "❌ 请求失败！请检查后端网络。" });
-                    setImmediateSubtitle('网络出了点毛病，老师暂时没接到这条消息。');
+                    if (error?.name === 'AbortError') {
+                        console.warn('[AI Teacher] Active assistant reply aborted.', error);
+                        setImmediateSubtitle('老师的上一轮回复已被新的语音输入打断。');
+                    } else {
+                        messages.value.push({ role: 'ai', content: "❌ 请求失败！请检查后端网络。" });
+                        setImmediateSubtitle('网络出了点毛病，老师暂时没接到这条消息。');
+                    }
                 } finally {
+                    if (activeAssistantAbortController === controller) {
+                        activeAssistantAbortController = null;
+                    }
                     isInputLocked.value = false;
                     isThinking.value = false;
                 }
             };
 
-            const startNewChat = () => { 
+            const sendMessage = async () => {
+                await submitStudentInput(inputText.value, { source: 'text' });
+            };
+
+            const startNewChat = () => {
+                cancelActiveAssistantReply('new_chat_interrupt');
+                stopAssistantSpeech('new_chat_interrupt');
                 messages.value = []; 
                 isInClass.value = false; 
                 isInputLocked.value = false;
@@ -2122,16 +5257,25 @@
                 clearQuestionDrawerTimers();
                 questionDrawerOpen.value = false;
                 questionDrawerActiveKey.value = '';
+                currentSlideId.value = '';
+                slideQuestionVisible.value = false;
+                slideAnswerVisible.value = false;
+                slideQuestionText.value = '';
+                slideAnswerText.value = '';
                 resetInputBox();
                 localStorage.removeItem('aiTeacherChatHistory');
             };
 
             return {
                 inputText, messages, isThinking, isInClass, isInputLocked,
-                currentSubtitle, subtitleLines, whiteboardPages, currentPageIndex, currentWhiteboardPage, canGoPrevWhiteboardPage, canGoNextWhiteboardPage, hasUnreadWhiteboardUpdate, currentQuestionDisplayKey, isQuestionDrawerAvailable, isQuestionDrawerOpen, freshWhiteboardBlockKey,
+                currentSubtitle, subtitleLines, currentSpokenSubtitle, whiteboardPages, currentPageIndex, currentWhiteboardPage, canGoPrevWhiteboardPage, canGoNextWhiteboardPage, hasUnreadWhiteboardUpdate, currentQuestionDisplayKey, isQuestionDrawerAvailable, isQuestionDrawerOpen, freshWhiteboardBlockKey,
+                pptMode, currentSlideId, currentSlide, currentSlideSrc, currentSlideLabel, slideQuestionText, slideAnswerText, slideQuestionVisible, slideAnswerVisible, slideManifestError, handleSlideError,
                 currentApiBaseUrl, currentApiMode, currentApiKind, currentApiModeLabel, currentApiStatusText,
+                voiceState, voiceError, voiceRoomName, voiceIdentity, voiceConversationProvider, voiceStatusDotClass, voiceBackendState, voiceWorkerError, voiceBrowserDisconnected, voiceDisconnectReason, voiceLastDisconnectSource, voicePartialTranscript, voiceFinalTranscript, voiceDebug, isVoiceDebugExpanded, toggleVoiceDebugPanel,
+                isStopping,
+                recentHistoryMessages, shouldShowVoiceSummary, chatFeedRef, subtitleScrollRef,
                 isDashboardOpen, dashboardLoading, dashboardError, dashboardData, latestDashboardTime,
-                autoResize, handleEnter, sendMessage, startNewChat, startClass, exitClass, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage, toggleQuestionDrawer, handleQuestionDrawerMouseEnter, handleQuestionDrawerMouseLeave,
+                autoResize, handleEnter, sendMessage, startClass, exitClass, startNewChat, startVoice, stopVoice, finishCurrentUtterance, renderMarkdown, goToPrevWhiteboardPage, goToNextWhiteboardPage, toggleQuestionDrawer, handleQuestionDrawerMouseEnter, handleQuestionDrawerMouseLeave,
                 openDashboard, closeDashboard, formatDashboardTime,
                 switchToLocalApi, switchToProdApi, switchToAutoApi
             };

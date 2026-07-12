@@ -3,5 +3,11 @@ uvicorn
 pydantic
 openai
 requests
+httpx
 python-dotenv
 sqlalchemy
+livekit-api
+livekit
+websockets
+silero-vad
+onnxruntime

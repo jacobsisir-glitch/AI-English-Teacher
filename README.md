@@ -1,347 +1,557 @@
-# AI English Teacher
-## AI 虚拟英语老师
+﻿# AI English Teacher
 
-![Frontend](https://img.shields.io/badge/Frontend-HTML%20%2F%20CSS%20%2F%20JavaScript-2563EB?style=for-the-badge)
-![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi)
-![LLM](https://img.shields.io/badge/LLM-Streaming%20Subtitles-111827?style=for-the-badge)
-![StateMachine](https://img.shields.io/badge/Class-Orchestrated%20Stages-8B5CF6?style=for-the-badge)
+一个以 `FastAPI + 前端直播间 UI + LiveKit` 为核心的 AI 英语老师项目，当前同时保留 legacy 语音链路和 Qwen Omni Realtime 原生语音链路。
 
-> 面向 B 站直播间场景的 AI 虚拟英语老师。  
-> 当前项目已经从“传统语法分析器”重构为“沉浸式直播间 + 后端控白板 + LLM 讲字幕”的微课系统。
+当前仓库已经不只是传统聊天页，而是同时支持：
 
-## 项目定位
+- 文本闲聊 / 答疑
+- 微课白板讲解
+- 实时语音输入转写
+- Legacy 语音结果回流到原有聊天链路
+- 老师语音输出：legacy 使用豆包 V3 双向流式 TTS，Qwen 模式使用 Qwen 原生语音
 
-当前系统有两条主链路：
+## 项目概览
 
-- `POST /chat_stream`：闲聊 / 英语答疑
-- `POST /class_chat_stream`：微课讲授
-
-核心原则已经变成：
-
-- 白板由后端状态机和教材结构驱动
-- 字幕由 LLM 负责口语化讲解
-- 白板与字幕共享同一套阶段推进，但不互相猜测对方内容
-
-换句话说，当前课堂不是“模型边说边决定写什么板书”，而是：
-
-1. 后端决定当前知识点、当前阶段、当前白板页
-2. 前端接收白板事件并展示对应页面
-3. LLM 只讲当前阶段该讲的内容
-4. 学生答题后，后端再决定是否重答或推进
-
-## 当前真实架构
-
-### 1. 后端状态机是唯一真相源
-
-微课节奏不再依赖前端猜字幕语义，也不再依赖模型临场控制白板。
-
-当前由 `main.py` 负责：
-
-- 维护 `COURSE_TASKS`
-- 读取教材切片
-- 构建运行时任务 `reference / llm_reference / whiteboard_question / stage_plan`
-- 按阶段发送白板事件
-- 决定何时等待学生作答、何时重试、何时推进下一节点
-
-### 2. 双轨制并行课堂
-
-当前微课链路已经固定为双轨制：
-
-- 白板轨：后端直接发送 `<WBEVENT>{json}</WBEVENT>`
-- 字幕轨：LLM 只输出中文口语解释
-
-白板事件当前主要包括：
-
-- `new_page`
-- `append`
-- `question`
-
-前端不再从模型文本里猜白板 DSL，也不再依赖旧的 `WB_TOOL` / tool calling。
-
-### 3. 教材正在迁移到“显式阶段脚本”
-
-旧教材结构主要是：
-
-- `【白板核心公式】`
-- `【经典对错对比】`
-- `【AI 主播话术与人设 Trigger】`
-
-当前项目已经开始支持新的显式阶段结构，适合更细粒度的白板与字幕同步。  
-当前已用于试点的章节包括：
-
-- `### 五大基本句型导读 (Opening Overview)`
-- `### 主谓结构 (SV Pattern)`
-
-新结构示例：
-
-```md
-#### [STAGE:HOOK]
-[WB_TITLE] 主谓结构（SV）· 开场引入
-[WB_LINES]
-- 主谓结构 = 英语句子的最低生存配置
-- 主语出场，谓语发力，句子才算真的活着
-[VOICE_GUIDE]
-- 开场要继续保持傲娇名师口吻，但重点是优雅地引出“最低骨架”这个概念。
-[STAGE_RULE]
-- 这一页只负责引出主谓结构的舞台定位，不要直接讲错句，不要提问。
-[TRANSITION]
-- 现在把主谓结构的核心公式亮出来。
-
-#### [STAGE:QUIZ]
-[QUESTION] 请用英语说“那个男孩在跑步。”你也可以自己另造一个正确的 SV 句。
-[ANSWER_RULE] 先给出英文句子，再用中文说一句为什么这里不用宾语。
-```
-
-当前支持的字段包括：
-
-- `[STAGE:HOOK|FRAME|CORE|ERROR|REINFORCE|PREVIEW|QUIZ]`
-- `[WB_TITLE]`
-- `[WB_LINES]`
-- `[VOICE_GUIDE]`
-- `[STAGE_RULE]`
-- `[TRANSITION]`
-- `[QUESTION]`
-- `[ANSWER_RULE]`
-
-这意味着每个知识点不必再强行限制为 3 页白板，而是可以按教学需要拆成 4 到 6 个阶段。
-
-### 4. LLM 只负责“讲”
-
-`llm_wrapper.py` 现在的职责是：
-
-- 构建闲聊 prompt
-- 构建微课 prompt
-- 按阶段生成字幕
-- 清洗协议碎片、旧白板标签和异常输出
-
-当前约束包括：
-
-- 不再输出白板协议或系统提示词
-- 不再把 `[WHITEBOARD: ...]`、`[WB_APPEND: ...]`、`<WBEVENT>` 漏进字幕
-- 不再使用“约会 / 暧昧 / 私人感情生活”这类老师人设
-- 对导读页允许更厚的讲解
-- 对普通知识点页要求一页一轮完整讲解
-
-### 5. 前端是直播间舞台，不是流程控制器
-
-`frontend/index.html` 当前负责：
-
-- 沉浸式直播间 UI
-- 多页白板 `whiteboardPages`
-- 双行字幕队列
-- 顶部问题悬浮窗
-- 学习报告面板
-
-但前端不负责决定课程推进。  
-推进依旧由后端状态机掌控。
-
-## 当前课堂节奏
-
-当前推荐节奏不是“一进知识点就把所有板书和问题全部抖出来”，而是：
-
-1. 进入知识点
-2. 白板显示当前阶段的一页
-3. AI teacher 只讲这一页
-4. 讲完后进入下一页
-5. 最后才挂题
-6. 学生回答
-7. 后端决定重答或推进
-
-对于当前已迁移的导读与 `SV`，大致会走：
-
-### 五大基本句型导读
-
-- `HOOK`
-- `FRAME`
-- `CORE`
-- `REINFORCE`
-- `PREVIEW`
-
-### 主谓结构（SV）
-
-- `HOOK`
-- `CORE`
-- `ERROR`
-- `REINFORCE`
-- `QUIZ`
-
-## 学生作答逻辑
-
-当前微课答题轮规则：
-
-- 学生不必死改老师给的原句
-- 也可以自己另造一个符合当前知识点的正确句子
-- 第一次答错：老师嘲讽 + 解释错因 + 要求重答
-- 第二次还错：老师给标准答案 + 点评，然后推进
-- 答对后推进到下一个知识点
-
-## 前端访问方式
-
-FastAPI 已挂载静态前端：
-
-```python
-app.mount("/frontend", StaticFiles(...), name="frontend")
-```
-
-推荐访问：
-
-```text
-http://127.0.0.1:8000/frontend/index.html
-```
-
-## 当前接口
+这个项目面向“AI 英语老师”场景，核心思路是把几条能力链路合在一起：
 
 - `POST /chat_stream`
+  处理普通聊天、问答、翻译、语法说明等文本请求
 - `POST /class_chat_stream`
-- `POST /course/exit`
-- `GET /api/dashboard/data`
-- `GET /api/memory/summary`
-- `GET /frontend/index.html`
+  处理带白板节奏的微课讲解
+- `POST /api/livekit/token`
+  为浏览器语音模式签发 LiveKit token，并确保房间级语音 worker 已启动；会根据 `VOICE_CONVERSATION_PROVIDER` 选择 legacy 或 Qwen Realtime
+- `GET /api/livekit/worker-status`
+  返回房间语音 worker 的状态和最近一次关键事件
+- `GET /api/tts/voices`
+  返回当前 TTS provider 和可用音色信息
+- `POST /api/tts/speak`
+  兼容接口：通过当前 TTS provider 生成完整音频
+- `WebSocket /api/tts/stream`
+  legacy 老师语音输出主路径：豆包 V3 bidirection WebSocket 音频转发
+
+legacy 语音模式下，浏览器麦克风音频会先进入 LiveKit 房间，再由后端 worker 订阅、做 VAD 切分、送入 FunASR，最终把识别出的 `partial` / `final` 文本重新送回前端，并把 `final` 文本提交到原有聊天链路。
+
+Qwen Realtime 模式下，学生麦克风音频仍经 LiveKit 进入后端，但后端会直接把 `16k PCM` 推给 Qwen Omni Realtime；Qwen 同时生成老师文本和 `24k PCM` 原生语音，后端再把老师语音发布成 LiveKit 音轨给浏览器播放。
+
+## 当前能力
+
+- 文本聊天：支持流式返回 AI 回复
+- 微课模式：支持教材驱动、白板事件驱动和阶段化讲解
+- Legacy 语音模式：支持浏览器直接说话，实时显示 FunASR partial / final transcript
+- Qwen Realtime 模式：支持学生语音直达 Qwen，实时显示学生识别与 Lumina 回复字幕
+- 语音回流：legacy final 会自动作为学生输入进入聊天区；Qwen 模式禁止重复调用旧聊天接口
+- 语音输出：legacy 使用豆包 V3 双向流式 TTS；Qwen 模式使用 Qwen 原生音色并通过 LiveKit 音轨播放
+- 中英同声线：中文讲解与英文例句使用同一豆包音色
+- 打断能力：学生新输入或开始语音输入时会中断旧播报
+- 调试能力：前端有语音调试面板，后端有结构化语音日志
+- 一键启动：提供 Windows 启动脚本 [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)
+
+## 语音架构
+
+### Legacy：FunASR + LLM + 豆包 TTS
+
+legacy 模式保留原有“FunASR -> LLM -> 豆包 V3 双向流式 TTS”链路：
+
+```text
+frontend/index.html
+→ /api/tts/stream 或 /api/tts/speak
+→ main.py
+→ tts_client.py
+→ speech_providers/doubao_tts.py
+→ 豆包 V3 bidirection WebSocket
+```
+
+当前验收通过的关键配置：
+
+```env
+TTS_PROVIDER=doubao
+DOUBAO_TTS_API_VERSION=v3
+DOUBAO_AUTH_MODE=api_key
+DOUBAO_TTS_V3_ENDPOINT=wss://openspeech.bytedance.com/api/v3/tts/bidirection
+DOUBAO_TTS_RESOURCE_ID=seed-icl-2.0
+DOUBAO_TTS_VOICE_TYPE=S_D9gzp4Q12
+DOUBAO_TTS_ENABLE_STREAM=true
+TTS_FALLBACK_ON_ERROR=false
+```
+
+旧 Melo/OpenVoice 已经变成 `local_melo` legacy fallback，不再是主路径。旧 Kokoro 也属于 legacy 实验链路。使用豆包 TTS 时，不需要再启动 `127.0.0.1:8012` 的 Melo/OpenVoice 服务。
+
+更详细的配置、错误排查和验证步骤见 [docs/doubao_tts_v3_setup.md](/d:/AIEnglish_grammar_teacher/docs/doubao_tts_v3_setup.md)。
+
+### Qwen Omni Realtime：原生理解与原生语音
+
+Qwen 模式由 `VOICE_CONVERSATION_PROVIDER=qwen_omni_realtime` 启用：
+
+```text
+student microphone
+→ LiveKit room
+→ voice/qwen_room_processor.py
+→ voice/providers/qwen_omni_realtime.py
+→ Qwen Omni Realtime WebSocket
+→ response.audio_transcript.delta / response.audio.delta
+→ LiveKit teacher audio track
+→ frontend/index.html subtitles + RemoteAudioTrack playback
+```
+
+Qwen 模式要求：
+
+- API Key 只从后端环境变量读取，前端不接触密钥。
+- 使用 `QWEN_REALTIME_WORKSPACE_ID` 构造北京地域 WebSocket 地址。
+- 输入音频为 `16kHz PCM`，输出音频为 `24kHz PCM`。
+- `QWEN_REALTIME_VOICE` 可填内置音色，如 `Tina`，也可填声音复刻得到的自定义 voice ID。
+- `QWEN_AUDIO_PLAYBACK_BUFFER_MS` 只做每轮 response 的初始播放缓冲，不对每个 chunk sleep。
+- Qwen 官方事件没有逐词时间戳，因此字幕和音频只能做句子/短语级近同步，不能声明 word-level sync。
 
 ## 目录结构
 
 ```text
-AIEnglish_grammar_teacher/
-|-- frontend/
-|   `-- index.html
-|-- data/
-|   |-- textbooks/
-|   |   |-- 00_Grammar_Overview.md
-|   |   |-- 01_Verb.md
-|   |   |-- 02_Subordinate_Clause.md
-|   |   `-- 03_Parts_of_Speech.md
-|   `-- ai_teacher.db
-|-- database/
-|   |-- database.py
-|   `-- models.py
-|-- tools/
-|   `-- textbook_tool.py
-|-- llm_wrapper.py
-|-- main.py
-|-- Open_AI_teacher.bat
-|-- config.py
-|-- requirements.txt
-`-- README.md
+.
+├─ frontend/                前端页面与语音 UI
+├─ voice/                   LiveKit + VAD + FunASR 语音链路
+├─ data/                    数据库与教材数据
+├─ database/                数据层代码
+├─ speech_providers/        TTS provider：豆包 V3 与相关协议实现
+├─ scripts/                 验证和辅助脚本
+├─ docs/                    接入说明与运维文档
+├─ tools/                   工具文件
+├─ main.py                  FastAPI 入口
+├─ llm_wrapper.py           LLM prompt 与流式包装
+├─ config.py                环境变量与运行参数
+├─ tts_client.py            TTS provider router 与 legacy fallback
+├─ livekit_utils.py         LiveKit token 与配置辅助
+├─ requirements.txt         Python 依赖
+└─ Open_AI_teacher.bat      Windows 一键启动脚本
 ```
 
-## 快速开始
+## 技术栈
 
-### 1. 克隆项目
+- 后端：FastAPI、Uvicorn、SQLAlchemy
+- 大模型接入：OpenAI 兼容接口
+- 实时语音：LiveKit
+- 语音识别：FunASR WebSocket
+- 语音切分：Silero VAD
+- 语音输出：豆包 V3 双向流式 TTS
+- 前端：HTML、CSS、JavaScript、Vue 3 CDN 版
 
-```bash
-git clone https://github.com/<your-account>/<your-repo>.git
-cd AIEnglish_grammar_teacher
-```
+## 运行前准备
 
-### 2. 配置环境变量
-
-```bash
-copy .env.example .env
-```
-
-示例：
-
-```env
-DEEPSEEK_API_KEY=your_api_key_here
-DATABASE_URL=sqlite:///data/ai_teacher.db
-DEFAULT_STUDENT_ID=TestUser
-```
-
-### 3. 安装依赖
+### 1. Python 依赖
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. 启动服务
+当前 [requirements.txt](/d:/AIEnglish_grammar_teacher/requirements.txt) 主要依赖：
+
+- `fastapi`
+- `uvicorn`
+- `openai`
+- `sqlalchemy`
+- `python-dotenv`
+- `livekit-api`
+- `livekit`
+- `websockets`
+- `silero-vad`
+- `onnxruntime`
+
+### 2. 环境变量
+
+先复制 `.env.example`：
 
 ```bash
-uvicorn main:app --reload
+copy .env.example .env
 ```
 
-或者使用：
+最少需要关注这些配置：
 
-```bat
-Open_AI_teacher.bat
+```env
+DEEPSEEK_API_KEY=your_api_key_here
+DATABASE_URL=sqlite:///data/ai_teacher.db
+DEFAULT_STUDENT_ID=TestUser
+
+LIVEKIT_WS_URL=wss://your-livekit-host
+LIVEKIT_API_KEY=your_livekit_api_key
+LIVEKIT_API_SECRET=your_livekit_api_secret
+VOICE_DEFAULT_ROOM=ai-teacher-room
+VOICE_CONVERSATION_PROVIDER=legacy
+
+FUNASR_WS_URL=wss://127.0.0.1:10095
+FUNASR_MODE=2pass
+FUNASR_MODEL_NAME=
+
+FUNASR_FINAL_WAIT_OFFLINE_MS=6000
+FUNASR_FINAL_WAIT_FALLBACK_MS=0
+FUNASR_FINAL_DRAIN_MS=1000
+FUNASR_FINAL_RESCUE_WAIT_MS=6000
+FUNASR_LATE_FINAL_GRACE_MS=12000
+VOICE_FINAL_ACK_TIMEOUT_MS=1000
+VOICE_FINAL_ACK_RETRY=2
+VOICE_STOP_WAIT_FINAL_MS=8000
+
+SILERO_VAD_THRESHOLD=0.38
+SILERO_MIN_SILENCE_MS=1200
+SILERO_PRE_SPEECH_MS=480
+SILERO_MIN_SPEECH_MS=320
+SILERO_SPEECH_END_HOLD_MS=720
+
+TTS_PROVIDER=doubao
+DOUBAO_TTS_API_VERSION=v3
+DOUBAO_AUTH_MODE=api_key
+DOUBAO_API_KEY=your_real_api_key_only_in_dotenv
+DOUBAO_TTS_V3_ENDPOINT=wss://openspeech.bytedance.com/api/v3/tts/bidirection
+DOUBAO_TTS_RESOURCE_ID=seed-icl-2.0
+DOUBAO_TTS_VOICE_TYPE=S_D9gzp4Q12
+DOUBAO_TTS_ENABLE_STREAM=true
+TTS_FALLBACK_ON_ERROR=false
+
+# Qwen native realtime mode. Enable with:
+# VOICE_CONVERSATION_PROVIDER=qwen_omni_realtime
+QWEN_REALTIME_API_KEY=your_real_qwen_key_only_in_dotenv
+QWEN_REALTIME_WORKSPACE_ID=your_workspace_id
+QWEN_REALTIME_MODEL=qwen3.5-omni-flash-realtime
+QWEN_REALTIME_REGION=beijing
+QWEN_REALTIME_VOICE=Tina
+QWEN_REALTIME_VAD_MODE=semantic_vad
+QWEN_AUDIO_PLAYBACK_BUFFER_MS=300
 ```
 
-### 5. 打开前端
+完整示例见 [.env.example](/d:/AIEnglish_grammar_teacher/.env.example)。
+
+注意：真实 `DOUBAO_API_KEY`、`QWEN_REALTIME_API_KEY`、Access Token、LiveKit Secret 只能写入 `.env`，不能提交到 Git。
+
+### Qwen Realtime 与 Legacy 语音链路
+
+`VOICE_CONVERSATION_PROVIDER=legacy` 仍是默认兼容模式：
+
+```text
+student audio -> LiveKit/FunASR/Silero -> LLM -> Doubao TTS
+```
+
+`VOICE_CONVERSATION_PROVIDER=qwen_omni_realtime` 使用 Qwen 原生实时语音：
+
+```text
+student audio -> Qwen understand/reply -> Qwen native voice -> LiveKit audio track
+```
+
+Qwen 模式使用 `QWEN_REALTIME_VOICE` 选择内置音色或声音复刻得到的自定义 voice ID；Legacy 模式继续使用现有 Doubao TTS 音色配置。`QWEN_AUDIO_PLAYBACK_BUFFER_MS` 控制 Qwen 音频发布到 LiveKit 前的每轮初始缓冲，`0` 表示最低延迟，`200/300/400`ms 可按真实日志中的 `qwen.sync.*` 延迟再取舍。Qwen 官方没有提供逐词时间戳，因此这里只能做句子/短语级近同步，不能声明 word-level sync。
+
+未来可以探索混合链路：
+
+```text
+student audio -> Qwen native understanding -> Qwen text -> Doubao TTS
+```
+
+当前未实现该混合模式。
+
+## 启动方式
+
+### 方式一：手动启动
+
+当前推荐启动方式：
+
+```bash
+conda activate ai_teacher
+cd D:\AIEnglish_grammar_teacher
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+前端访问：
 
 ```text
 http://127.0.0.1:8000/frontend/index.html
 ```
 
-如果只想确认后端在线：
+如果要使用语音模式，还需要额外准备：
 
-```text
-http://127.0.0.1:8000/docs
+- LiveKit 服务
+- FunASR WebSocket 服务
+- 本机浏览器麦克风权限
+
+如果只测试老师语音输出的豆包 TTS，不需要启动 8012 的 Melo/OpenVoice 服务。
+
+## 豆包 TTS 验证步骤
+
+### 1. 验证豆包 V3 provider
+
+```bash
+python scripts/verify_doubao_tts_v3.py
 ```
 
-## 当前教材说明
+成功时会生成 `doubao_v3_test.mp3`，并打印多个 `audio chunk`。
 
-教材位于 `data/textbooks/`。
+### 2. 验证 voices 接口
 
-当前重点教材：
+```powershell
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/tts/voices" -UseBasicParsing | Select-Object -ExpandProperty Content
+```
 
-- `00_Grammar_Overview.md`
-- `01_Verb.md`
-- `02_Subordinate_Clause.md`
-- `03_Parts_of_Speech.md`
+### 3. 验证 speak 兼容接口
 
-其中：
+```powershell
+$body = '{"text":"你好，欢迎来到 AI Teacher。今天我们测试豆包语音。","voice":"doubao_default","lang":"zh","speed":1.0}'
+Invoke-WebRequest -Uri "http://127.0.0.1:8000/api/tts/speak" -Method POST -ContentType "application/json" -Body $body -OutFile "doubao_v3_api_test.mp3"
+```
 
-- `00_Grammar_Overview.md` 已开始迁移到显式阶段脚本
-- `01_Verb.md` 仍以旧结构为主，但可以继续迁移
-- 系统兼容“显式阶段脚本”和“旧三段式结构”两种教材写法
+### 4. 前端页面测试
 
-## 已知现实约束
+打开：
 
-### 1. 前端当前依赖外部 CDN
+```text
+http://127.0.0.1:8000/frontend/index.html
+```
 
-当前前端入口仍直接引用：
+输入：
 
-- Tailwind CDN
-- Vue CDN
-- Axios CDN
-- Marked CDN
-- ECharts CDN
-- Font Awesome CDN
+```text
+请用中文介绍一下什么是定语从句，并给我一个英文例句。
+```
 
-如果本地网络阻断这些外链，页面可能出现样式缺失或图表加载失败。  
-这属于当前前端部署现实，不是课堂状态机本身的问题。
+预期：老师语音能自动播放，中文清晰，英文例句与中文讲解保持同一声线，新输入可打断旧语音。
 
-### 2. 阶段化教材仍在迁移中
+## Qwen Realtime 验证步骤
 
-目前不是整套教材都已经迁到 `[STAGE:...]` 格式。  
-所以当前系统是：
+### 1. 低成本真实握手
 
-- 已迁移章节：走显式阶段计划
-- 未迁移章节：走旧结构的兼容解析路径
+```powershell
+python scripts\verify_qwen_realtime_connection.py
+```
 
-### 3. 课堂节奏仍在继续打磨
+这个脚本只做 WebSocket 握手、`session.created`、`session.update`、`session.updated` 验证，不上传学生录音，也不会输出 API Key。没有真实 API Key 或当前环境无法访问阿里云时，不代表线上链路已失败，只能说明本机未完成真实连接验证。
 
-虽然当前系统已经从“白板一次性倾倒全部内容”往阶段化推进迈了一步，但：
+### 2. Mock 事件链路
 
-- 白板阶段时机
-- 字幕长度
-- 浮窗动画
-- 页间切换体感
+```powershell
+python scripts\test_qwen_realtime_mock.py
+```
 
-仍然在持续优化中。
+覆盖官方事件字段映射、Qwen 输出文本/音频 delta、response cancel 后 late audio 丢弃、LiveKit AudioFrame 分帧、prompt 共享人设和 Qwen voice 配置。
 
-## 当前最重要的文件
+### 3. 声音复刻 dry-run 校验
 
-- [main.py](./main.py)：路由、微课状态机、阶段推进、白板事件
-- [llm_wrapper.py](./llm_wrapper.py)：prompt、字幕生成、清洗规则
-- [frontend/index.html](./frontend/index.html)：直播间 UI、白板、字幕、题窗、Dashboard
-- [data/textbooks/00_Grammar_Overview.md](./data/textbooks/00_Grammar_Overview.md)：导读与五大句型教材
-- [data/textbooks/01_Verb.md](./data/textbooks/01_Verb.md)：动词体系教材
+```powershell
+python scripts\qwen_voice_enroll.py `
+  --audio D:\path\lumina_voice.wav `
+  --preferred-name lumina `
+  --target-model qwen3.5-omni-flash-realtime `
+  --confirm-rights
+```
 
-## 下一步建议
+该脚本默认只做本地文件和参数校验，不会真实调用声音复刻接口，不复制音频进仓库，不输出音频 Base64 或密钥。成功复刻后的 voice ID 需要手动写入 `.env`：
 
-如果继续沿当前架构推进，最值得优先做的是：
+```env
+QWEN_REALTIME_VOICE=<voice ID>
+```
 
-1. 把 `SVO / SVOO / SVOC / SVC` 也迁成显式阶段脚本
-2. 把导读和正式知识点的白板 / 字幕节奏继续对齐
-3. 把前端 CDN 依赖收束成本地可控资源
-4. 继续统一教材里的人设话术，避免出现和课堂主风格不一致的比喻
+### 4. 浏览器端验收重点
+
+打开前端后启用语音模式，重点看控制台：
+
+- `qwen.livekit.start_audio.success`
+- `qwen.livekit.audio_track_subscribed`
+- `qwen.livekit.audio_attached`
+- `qwen.livekit.audio_playing`
+- `qwen.sync.first_audio_delta`
+- `qwen.sync.first_transcript_delta`
+- `qwen.sync.audio_buffer_released`
+
+如果 `response.audio.delta` 已经到达后端，但没有声音，优先看 LiveKit track SID、`qwen.livekit.audio_frame_captured`、浏览器 `audio_playing` 和 autoplay 错误。
+
+### 方式二：Windows 一键启动
+
+仓库已提供 [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)。
+
+这个脚本会按顺序：
+
+1. 校验 Conda、项目目录和外部工具路径
+2. 激活指定 Conda 环境
+3. 检查并启动 LiveKit
+4. 检查并启动 FunASR
+5. 检查并启动 FastAPI 后端
+6. 自动打开前端页面
+
+脚本顶部需要按你本机环境修改这些路径和参数：
+
+- `CONDA_ACTIVATE_BAT`
+- `CONDA_ENV_NAME`
+- `PROJECT_DIR`
+- `LIVEKIT_EXE`
+- `FUNASR_WORKDIR`
+- `FUNASR_SCRIPT`
+- `FUNASR_SSL_CERT`
+- `FUNASR_SSL_KEY`
+
+## 语音链路说明
+
+当前语音链路位于 [voice/](/d:/AIEnglish_grammar_teacher/voice)：
+
+- [voice/livekit_room_bridge.py](/d:/AIEnglish_grammar_teacher/voice/livekit_room_bridge.py)
+  管理房间、参与者、音频订阅和整条实时识别流程
+- [voice/funasr_client.py](/d:/AIEnglish_grammar_teacher/voice/funasr_client.py)
+  负责与 FunASR WebSocket 通信，接收 `partial` / `final`
+- [voice/vad_controller.py](/d:/AIEnglish_grammar_teacher/voice/vad_controller.py)
+  用 Silero 做语音起止检测
+- [voice/audio_buffer.py](/d:/AIEnglish_grammar_teacher/voice/audio_buffer.py)
+  做音频缓存、归一化和预缓冲
+- [voice/transcript_publisher.py](/d:/AIEnglish_grammar_teacher/voice/transcript_publisher.py)
+  把识别结果发布回 LiveKit 文本流
+- [voice/providers/qwen_omni_realtime.py](/d:/AIEnglish_grammar_teacher/voice/providers/qwen_omni_realtime.py)
+  负责 Qwen Realtime WebSocket 协议、事件映射、字段校验、脱敏日志和共享 Lumina instructions
+- [voice/qwen_room_processor.py](/d:/AIEnglish_grammar_teacher/voice/qwen_room_processor.py)
+  负责 Qwen 模式下学生音频送入、老师 LiveKit 音轨发布、24k PCM 分帧和初始播放缓冲
+- [voice/session_state.py](/d:/AIEnglish_grammar_teacher/voice/session_state.py)
+  负责结构化日志和会话状态
+
+legacy 语音模式的大致流程：
+
+1. 浏览器请求 `POST /api/livekit/token`
+2. 后端签发 token，并确保房间 worker 已启动
+3. 浏览器加入 LiveKit 房间并发布麦克风
+4. 后端 worker 订阅音轨并转成 `16k / mono`
+5. Silero VAD 识别 `speech_start` / `speech_end`
+6. 音频片段流式发送给 FunASR
+7. FunASR 返回 `partial` 和 `final`
+8. `final` 文本发布到前端并自动提交到聊天链路
+
+Qwen 语音模式的大致流程：
+
+1. 浏览器请求 `POST /api/livekit/token`
+2. 后端签发 token，并按 `VOICE_CONVERSATION_PROVIDER=qwen_omni_realtime` 启动 Qwen worker
+3. 浏览器加入 LiveKit 房间并发布学生麦克风
+4. 后端只订阅目标学生的 microphone 音轨，过滤老师自己发布的音轨
+5. 后端把学生音频转为 `16k PCM` 并追加到 Qwen input buffer
+6. Qwen 返回学生输入转写、老师文本 delta 和 `24k PCM` 音频 delta
+7. 后端把老师音频分帧发布到 LiveKit LocalAudioTrack
+8. 浏览器订阅老师 RemoteAudioTrack，attach 到隐藏 audio element 并播放
+9. 老师字幕实时显示在主字幕区域，完整回复只在 done 时写入左侧历史一次
+
+## 最近这批语音更新
+
+这次上传的更新重点在 Qwen Realtime 原生语音接入、前端字幕/音频链路，以及 legacy 长句语音识别稳定性：
+
+- 新增 `qwen_omni_realtime` 会话 provider，默认仍保留 `legacy`
+- 新增 Qwen Realtime mock 测试和最小真实连接脚本
+- Qwen 模式禁止重复调用旧聊天接口和豆包 TTS
+- Qwen 老师音频通过 LiveKit 音轨播放，支持 response 级初始缓冲
+- 主字幕改为最新 3 行滚动显示，不再 ellipsis 截断长句
+- 共享 Lumina prompt 增加 spoken-only 规则，禁止把动作、表情、舞台提示读出来
+- Qwen 音色通过 `QWEN_REALTIME_VOICE` 配置，支持内置音色和自定义 voice ID
+- 新增 Qwen 声音复刻 dry-run 校验脚本
+- 增加了更长的 FunASR `offline final` 等待与补救窗口
+- 增加了 late final recovery，尽量救回超时后才到达的 `2pass-offline`
+- 对过短 partial fallback 做了更严格的抑制
+- 增加了 VAD 结束保持时间，减少一句话被切成多段
+- 前端增加了更多语音与聊天流式调试日志
+- 语音转文本结果现在会更稳定地回流到聊天消息区
+
+注意：前端的“结束本句”按钮目前是实验功能。当前实现仍通过
+`setMicrophoneEnabled(false)` / `setMicrophoneEnabled(true)` 临时关闭再重开浏览器麦克风，
+这可能触发 LiveKit track 重建。后续更稳的方案应单独实现 data topic 或 HTTP 控制信号，
+由后端直接 finish 当前 utterance，而不是关闭麦克风 track。
+
+本次关键配置位于：
+
+- [config.py](/d:/AIEnglish_grammar_teacher/config.py)
+- [.env.example](/d:/AIEnglish_grammar_teacher/.env.example)
+- [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)
+
+## 已知限制
+
+当前已知状态：
+
+- 豆包 TTS：已接入 V3 bidirection，并通过第一阶段验收。
+- 豆包 ASR：尚未接入。
+- Legacy 语音输入：使用 LiveKit + FunASR + Silero VAD。
+- Qwen 语音输入：使用 LiveKit + Qwen Omni Realtime；真实 API Key 和 Workspace 只在后端 `.env` 中配置。
+- Qwen 字幕同步：官方没有逐词时间戳，目前只能做句子/短语级近同步。
+- Qwen 声音复刻：仓库只提供 dry-run 校验脚本，不会自动创建或保存 voice ID。
+- Melo/OpenVoice：暂时保留为 legacy fallback / 归档对象。
+- Kokoro：外部工具链保留为 legacy 实验对象。
+
+当前项目里，启动脚本默认拉起的 FunASR 还是中文模型配置：
+
+- `speech_paraformer-large-contextual_asr_nat-zh-cn-16k-common-vocab8404`
+- `speech_paraformer-large_asr_nat-zh-cn-16k-common-vocab8404-online`
+
+这意味着：
+
+- 中文长句通常更稳
+- 英文长句能识别，但更容易出现拼写错误、碎片化 partial 和更慢的 final
+- 中英混说会比纯中文更依赖模型适配
+
+如果后续要重点优化英文长句，优先级通常是：
+
+1. 更换更适合英文或中英混说的 ASR 模型
+2. 继续拉长极端慢 final 的恢复窗口
+3. 结合浏览器控制台日志排查“后端成功了但前端没显示”的场景
+
+## 前端调试建议
+
+前端页面已经内置语音调试面板，建议重点观察：
+
+- `Voice`
+- `STT`
+- `Partial`
+- `Final`
+- `worker 入房`
+- `收到第一帧音频`
+- `最近 speech_start`
+- `最近 speech_end`
+- `最近 partial`
+- `最近 final`
+
+如果后端日志里已经出现：
+
+- `funasr.final.publish`
+- `POST /chat_stream 200 OK`
+
+但页面上仍然没有显示结果，那么问题更可能在前端流式渲染链路，而不是 ASR 本身。
+
+## 常见排障
+
+### 1. 语音按钮能点，但没有识别结果
+
+优先检查：
+
+- LiveKit 是否成功启动
+- FunASR WebSocket 是否可连
+- 浏览器是否真的发布了麦克风
+- `worker-status` 是否返回 `worker.connected`
+
+### 2. 日志里只有很多 `asr.audio_chunk_sent`
+
+这通常说明：
+
+- 音频已经送到了后端
+- 但 FunASR 还没及时给出可用 `final`
+
+这时要继续看是否出现：
+
+- `funasr.final_timeout.begin`
+- `funasr.final.publish`
+- `voice.speech_end_without_final`
+- `late_timeout_final.accepted`
+
+### 3. 英文长句输出质量差
+
+优先怀疑当前 ASR 模型适配，而不是前端按钮或聊天链路。
+
+### 4. 一键启动脚本报路径错误
+
+请先检查 [Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat) 顶部用户配置区是否与你的本机环境一致。
+
+## 开发建议
+
+- 语音链路改动后，优先观察结构化日志是否能走到 `funasr.final.publish`
+- 前端显示问题，不要只看网络面板，也要看控制台里新增的 `[voice]` 和 `[chat]` 调试日志
+- 如果准备做英文优化，建议把“模型切换”和“超晚 final 恢复”分开验证
+
+## 入口文件
+
+- 后端入口：[main.py](/d:/AIEnglish_grammar_teacher/main.py)
+- 前端页面：[frontend/index.html](/d:/AIEnglish_grammar_teacher/frontend/index.html)
+- 语音配置：[config.py](/d:/AIEnglish_grammar_teacher/config.py)
+- 一键启动：[Open_AI_teacher.bat](/d:/AIEnglish_grammar_teacher/Open_AI_teacher.bat)
+
+## License
+
+当前仓库未单独声明开源许可证；如果准备公开分发，建议补充 `LICENSE` 文件。

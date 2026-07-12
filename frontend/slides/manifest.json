@@ -1,0 +1,104 @@
+{
+  "course_id": "sentence_patterns_intro",
+  "title": "五大基本句型入门",
+  "slides": [
+    {
+      "id": "sp_intro_001",
+      "title": "五大基本句型：开场导览",
+      "image": "/frontend/slides/sentence_patterns/sp_intro_001.png",
+      "task_name": "课程导读与开场白",
+      "stage": "hook",
+      "teacher_note": "引导学生理解英语句子不是单词乱堆，而是有骨架。"
+    },
+    {
+      "id": "sp_sv_001",
+      "title": "主谓结构（SV）",
+      "image": "/frontend/slides/sentence_patterns/sp_sv_001.png",
+      "task_name": "主谓结构（SV）",
+      "stage": "core",
+      "teacher_note": "讲清主语是动作的发出者，谓语说明主语做什么。例句：Birds fly."
+    },
+    {
+      "id": "sp_sv_quiz_001",
+      "title": "主谓结构——练习",
+      "image": "/frontend/slides/sentence_patterns/sp_sv_quiz_001.png",
+      "task_name": "主谓结构（SV）",
+      "stage": "quiz",
+      "teacher_note": "让学生判断 The cat sleeps. 中的主语和谓语。",
+      "question": "The cat sleeps. 这句话中，主语是哪一个？",
+      "answer": "The cat"
+    },
+    {
+      "id": "sp_svo_001",
+      "title": "主谓宾结构（SVO）",
+      "image": "/frontend/slides/sentence_patterns/sp_svo_001.png",
+      "task_name": "主谓宾结构（SVO）",
+      "stage": "core",
+      "teacher_note": "讲清及物动词需要宾语来承接动作。例句：She reads a book."
+    },
+    {
+      "id": "sp_svo_quiz_001",
+      "title": "主谓宾结构——练习",
+      "image": "/frontend/slides/sentence_patterns/sp_svo_quiz_001.png",
+      "task_name": "主谓宾结构（SVO）",
+      "stage": "quiz",
+      "teacher_note": "让学生判断 He eats an apple. 中的宾语。",
+      "question": "He eats an apple. 这句话中，宾语是哪一个？",
+      "answer": "an apple"
+    },
+    {
+      "id": "sp_svoo_001",
+      "title": "主谓双宾结构（SVOO）",
+      "image": "/frontend/slides/sentence_patterns/sp_svoo_001.png",
+      "task_name": "主谓双宾结构（SVOO）",
+      "stage": "core",
+      "teacher_note": "强调'先给人，再给物'的语序规则。"
+    },
+    {
+      "id": "sp_svoo_quiz_001",
+      "title": "主谓双宾结构——练习",
+      "image": "/frontend/slides/sentence_patterns/sp_svoo_quiz_001.png",
+      "task_name": "主谓双宾结构（SVOO）",
+      "stage": "quiz",
+      "teacher_note": "让学生判断 She gave me a pen. 中的双宾语。",
+      "question": "She gave me a pen. 这句话中，直接宾语和间接宾语分别是什么？",
+      "answer": "直接宾语：a pen；间接宾语：me"
+    },
+    {
+      "id": "sp_svoc_001",
+      "title": "主谓宾补结构（SVOC）",
+      "image": "/frontend/slides/sentence_patterns/sp_svoc_001.png",
+      "task_name": "主谓宾补结构（SVOC）",
+      "stage": "core",
+      "teacher_note": "讲清宾补是对宾语的补充说明，和双宾不是同一回事。"
+    },
+    {
+      "id": "sp_svoc_quiz_001",
+      "title": "主谓宾补结构——练习",
+      "image": "/frontend/slides/sentence_patterns/sp_svoc_quiz_001.png",
+      "task_name": "主谓宾补结构（SVOC）",
+      "stage": "quiz",
+      "teacher_note": "让学生判断 They made him captain. 中的宾补。",
+      "question": "They made him captain. 这句话中，宾语补足语是哪一个？",
+      "answer": "captain"
+    },
+    {
+      "id": "sp_svc_001",
+      "title": "主系表结构（SVC）",
+      "image": "/frontend/slides/sentence_patterns/sp_svc_001.png",
+      "task_name": "主系表结构（SVC / SVP）",
+      "stage": "core",
+      "teacher_note": "讲清系动词不是动作动词，表语描述主语的状态或身份。"
+    },
+    {
+      "id": "sp_svc_quiz_001",
+      "title": "主系表结构——练习",
+      "image": "/frontend/slides/sentence_patterns/sp_svc_quiz_001.png",
+      "task_name": "主系表结构（SVC / SVP）",
+      "stage": "quiz",
+      "teacher_note": "让学生判断 The sky is blue. 中的表语。",
+      "question": "The sky is blue. 这句话中，表语是哪一个？",
+      "answer": "blue"
+    }
+  ]
+}

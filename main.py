@@ -1,23 +1,42 @@
 import json
+import logging
 import os
 import re
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
 import uvicorn
-from fastapi import BackgroundTasks, Depends, FastAPI
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from sqlalchemy import func, inspect, text
 from sqlalchemy.orm import Session
 
 import database.models
-from config import DEFAULT_STUDENT_ID
+from config import (
+    DEFAULT_STUDENT_ID,
+    TTS_BASE_URL,
+    TTS_DEFAULT_LANG,
+    TTS_DEFAULT_SPEED,
+    TTS_DEFAULT_VOICE,
+    TTS_ENABLED,
+    TTS_PROVIDER,
+    VOICE_CONVERSATION_PROVIDER,
+    QWEN_REALTIME_API_KEY,
+    QWEN_REALTIME_BASE_URL,
+    QWEN_REALTIME_WORKSPACE_ID,
+)
 from database.database import Base, SessionLocal, engine, get_db
 from database.models import ErrorBook, KnowledgeMastery, Student, StudentQuestion
+from livekit_utils import create_livekit_participant_token, livekit_is_configured
+from tts_client import TTSClientError, list_voices as tts_list_voices, stream_speech, synthesize_speech
+from voice.livekit_room_bridge import VoiceWorkerManager
+from voice.session_state import structured_voice_log
+from voice.utterance_manager import receive_ack
 from llm_wrapper import (
     bg_summarize_chat_history,
     chat_with_teacher_stream,
@@ -261,6 +280,34 @@ student_state = {
 }
 stream_state = {"session_summary": ""}
 stream_state_lock = threading.Lock()
+
+FEATURE_PPT_MODE = True
+
+COURSE_SLIDE_MAP = {
+    "课程导读与开场白": {
+        "hook": "sp_intro_001",
+    },
+    "主谓结构（SV）": {
+        "core": "sp_sv_001",
+        "quiz": "sp_sv_quiz_001",
+    },
+    "主谓宾结构（SVO）": {
+        "core": "sp_svo_001",
+        "quiz": "sp_svo_quiz_001",
+    },
+    "主谓双宾结构（SVOO）": {
+        "core": "sp_svoo_001",
+        "quiz": "sp_svoo_quiz_001",
+    },
+    "主谓宾补结构（SVOC）": {
+        "core": "sp_svoc_001",
+        "quiz": "sp_svoc_quiz_001",
+    },
+    "主系表结构（SVC / SVP）": {
+        "core": "sp_svc_001",
+        "quiz": "sp_svc_quiz_001",
+    },
+}
 
 TASK_COMPLETED_MARKER = "[TASK_COMPLETED]"
 RETRY_REQUIRED_MARKER = "[RETRY_REQUIRED]"
@@ -661,7 +708,7 @@ def _build_spoken_reference_summary(reference_text: str) -> str:
 
     summary_lines: list[str] = []
     if formula_lines:
-        summary_lines.append("黑板上已经写好了当前知识点的核心公式。你只需要用中文解释它表示什么、怎么判断、什么时候容易错。")
+        summary_lines.append("黑板上已经写好了当前知识点的核心公式。你用英文主讲这个公式，需要时用中文确保理解。解释它表示什么、怎么判断、什么时候容易错。")
         for line in formula_lines[:2]:
             focus = re.sub(r"^-\s+", "", line).strip()
             if "=" in focus:
@@ -669,7 +716,7 @@ def _build_spoken_reference_summary(reference_text: str) -> str:
             if focus:
                 summary_lines.append(f"- 当前板书关键词：{focus}")
     if example_lines:
-        summary_lines.append("黑板上已经给了对错对比。你只解释错因、修改理由和判断依据。必要时可以点一个很短的英文例句，但不要整段照念。")
+        summary_lines.append("黑板上已经给了对错对比。你用英文解释错因和改法，必要时用一句中文补充判断依据。英文例句单独成句。")
     if note_lines:
         summary_lines.append("你可以借用下面这些人设钩子、比喻或讲解节奏，但要自然说人话，不要逐条朗读提示词。")
         for line in note_lines[:6]:
@@ -793,6 +840,56 @@ def _build_whiteboard_page_key(task_info: dict, stage_kind: str = "") -> str:
 def _build_whiteboard_stage_system_notice(task_info: dict, stage_kind: str = "") -> str:
     page_key = _build_whiteboard_page_key(task_info, stage_kind)
     return f"[SYSTEM:WB_STAGE_READY::{page_key}]"
+
+
+def _get_slide_id_for_task(task_info: dict, stage_kind: str = "") -> str:
+    """从 COURSE_SLIDE_MAP 查找当前 task + stage 对应的 slide_id。"""
+    task_name = str(task_info.get("task_name") or task_info.get("node_name") or "").strip()
+    stage_key = str(stage_kind or "").strip().lower() or "core"
+    mapping = COURSE_SLIDE_MAP.get(task_name, {})
+    slide_id = mapping.get(stage_key, mapping.get("core", ""))
+    if not slide_id:
+        # fallback: 尝试 task_name 下的第一个 slide
+        for key in ("hook", "core", "frame", "quiz"):
+            if mapping.get(key):
+                slide_id = mapping[key]
+                break
+    return str(slide_id or "").strip()
+
+
+def _emit_slide_goto(task_info: dict, stage_kind: str = "") -> str:
+    """生成 [SYSTEM:SLIDE:GOTO:id] 事件字符串。"""
+    if not FEATURE_PPT_MODE:
+        return ""
+    slide_id = _get_slide_id_for_task(task_info, stage_kind)
+    if not slide_id:
+        task_name = str(task_info.get("task_name") or task_info.get("node_name") or "?").strip()
+        print(f"[SlideMap] WARNING: no slide_id for task={task_name!r} stage={stage_kind!r}")
+        return ""
+    return f"[SYSTEM:SLIDE:GOTO:{slide_id}]\n"
+
+
+def _emit_slide_question(question_text: str) -> str:
+    """生成 [SYSTEM:SLIDE:QUESTION:text] 事件字符串。"""
+    if not FEATURE_PPT_MODE or not question_text:
+        return ""
+    safe_text = str(question_text).replace("\n", " | ").replace("\r", "").strip()
+    return f"[SYSTEM:SLIDE:QUESTION:{safe_text}]\n"
+
+
+def _emit_slide_reveal_answer(answer_text: str) -> str:
+    """生成 [SYSTEM:SLIDE:REVEAL_ANSWER:text] 事件字符串。"""
+    if not FEATURE_PPT_MODE or not answer_text:
+        return ""
+    safe_text = str(answer_text).replace("\n", " | ").replace("\r", "").strip()
+    return f"[SYSTEM:SLIDE:REVEAL_ANSWER:{safe_text}]\n"
+
+
+def _emit_slide_clear_overlay() -> str:
+    """生成 [SYSTEM:SLIDE:CLEAR_OVERLAY] 事件字符串。"""
+    if not FEATURE_PPT_MODE:
+        return ""
+    return "[SYSTEM:SLIDE:CLEAR_OVERLAY]\n"
 
 
 def _iter_whiteboard_stage_events(
@@ -1473,12 +1570,32 @@ app = FastAPI(title="AI English Teacher API")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 
 
+def _get_voice_commit_context() -> dict:
+    is_in_class = bool(student_state.get("is_in_class"))
+    awaiting_answer = bool(student_state.get("awaiting_answer"))
+    return {
+        "mode": "pending_question" if is_in_class and awaiting_answer else ("class_mode" if is_in_class else "normal_chat"),
+        "class_mode": is_in_class,
+        "pending_question": awaiting_answer,
+        "pending_question_text": str(student_state.get("pending_question_text") or ""),
+        "short_answer_allowed": False,
+    }
+
+
+voice_worker_manager = VoiceWorkerManager(context_provider=_get_voice_commit_context)
+
+
 @app.on_event("startup")
 def on_startup():
     Base.metadata.create_all(bind=engine)
     _ensure_student_question_schema()
     _ensure_knowledge_mastery_schema()
     _load_session_summary_from_db(CURRENT_STUDENT_ID)
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await voice_worker_manager.stop_all()
 
 
 app.add_middleware(
@@ -1503,6 +1620,11 @@ app.add_middleware(
 )
 
 
+def structured_tts_log(event: str, **payload) -> None:
+    tts_logger = logging.getLogger("uvicorn.error")
+    tts_logger.info(json.dumps({"event": event, **payload}, ensure_ascii=False, default=str))
+
+
 class UserInput(BaseModel):
     text: str
     history: list[dict] = Field(default_factory=list)
@@ -1512,6 +1634,25 @@ class ClassInput(BaseModel):
     text: str
     action: str = "chat"
     history: list[dict] = Field(default_factory=list)
+
+
+class LiveKitTokenRequest(BaseModel):
+    roomName: str | None = None
+    userId: str | None = None
+    displayName: str | None = None
+
+
+class VoiceAckRequest(BaseModel):
+    utterance_id: str
+    text: str
+    received_at: float | None = None
+
+
+class TTSSpeakRequest(BaseModel):
+    text: str
+    voice: str = TTS_DEFAULT_VOICE
+    lang: str = TTS_DEFAULT_LANG
+    speed: float = TTS_DEFAULT_SPEED
 
 
 @app.post("/chat_stream")
@@ -1621,6 +1762,348 @@ async def get_dashboard_data(db: Session = Depends(get_db)):
     }
 
 
+@app.post("/api/livekit/token")
+async def create_livekit_token(request: LiveKitTokenRequest):
+    if not livekit_is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "LiveKit is not configured. "
+                "Please set LIVEKIT_WS_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and VOICE_DEFAULT_ROOM."
+            ),
+        )
+    if VOICE_CONVERSATION_PROVIDER == "qwen_omni_realtime":
+        if not QWEN_REALTIME_API_KEY:
+            raise HTTPException(status_code=503, detail="QWEN_REALTIME_API_KEY is required for qwen_omni_realtime.")
+        if not (QWEN_REALTIME_WORKSPACE_ID or QWEN_REALTIME_BASE_URL):
+            raise HTTPException(
+                status_code=503,
+                detail="QWEN_REALTIME_WORKSPACE_ID is required for qwen_omni_realtime unless QWEN_REALTIME_BASE_URL is set.",
+            )
+
+    try:
+        token_payload = create_livekit_participant_token(
+            room_name=request.roomName,
+            user_id=request.userId,
+            display_name=request.displayName,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to create LiveKit token: {exc}") from exc
+
+    structured_voice_log(
+        "voice.token_worker_ensure_start",
+        room_id=token_payload.room_name,
+        room_name=token_payload.room_name,
+        user_identity=token_payload.identity,
+    )
+    try:
+        await voice_worker_manager.ensure_session(token_payload.room_name)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=f"Voice worker startup failed: {exc}") from exc
+    response_payload = token_payload.as_response()
+    response_payload["voiceConversationProvider"] = VOICE_CONVERSATION_PROVIDER
+    return response_payload
+
+
+@app.get("/api/livekit/worker-status")
+async def get_livekit_worker_status(roomName: str):
+    return voice_worker_manager.get_status(roomName)
+
+
+@app.post("/api/voice/ack")
+async def voice_ack(request: VoiceAckRequest):
+    """Frontend acknowledges receipt of a stt.final transcript."""
+    delivered = receive_ack(request.utterance_id, request.text)
+    if not delivered:
+        structured_voice_log(
+            "voice.ack.received_unknown_utterance",
+            utterance_id=request.utterance_id,
+            text=request.text,
+        )
+    return {"status": "ok", "delivered": delivered}
+
+
+@app.get("/api/tts/voices")
+async def get_tts_voices():
+    if not TTS_ENABLED:
+        raise HTTPException(status_code=503, detail="TTS is disabled.")
+    request_url = f"{TTS_BASE_URL.rstrip('/')}/voices"
+    started_at = time.perf_counter()
+    structured_tts_log(
+        "tts.request.begin",
+        text_length=0,
+        voice=None,
+        lang=None,
+        speed=None,
+        base_url=TTS_BASE_URL,
+        request_url=request_url,
+        method="GET",
+        elapsed_ms=0,
+        status_code=None,
+    )
+    try:
+        payload = await tts_list_voices()
+    except TTSClientError as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=0,
+            voice=None,
+            lang=None,
+            speed=None,
+            base_url=exc.base_url or TTS_BASE_URL,
+            request_url=exc.request_url or request_url,
+            method=exc.method or "GET",
+            elapsed_ms=elapsed_ms,
+            status_code=exc.status_code,
+            response_text=exc.response_text,
+            exception_repr=exc.exception_repr,
+        )
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    structured_tts_log(
+        "tts.request.success",
+        text_length=0,
+        voice=None,
+        lang=None,
+        speed=None,
+        base_url=TTS_BASE_URL,
+        request_url=request_url,
+        method="GET",
+        elapsed_ms=elapsed_ms,
+        status_code=200,
+    )
+    return payload
+
+
+@app.post("/api/tts/speak")
+async def proxy_tts_speak(request: TTSSpeakRequest):
+    text = request.text.strip()
+    voice = request.voice.strip() or TTS_DEFAULT_VOICE
+    lang = request.lang.strip() or TTS_DEFAULT_LANG
+    speed = request.speed
+
+    if not text:
+        raise HTTPException(status_code=400, detail="text must not be empty")
+
+    started_at = time.perf_counter()
+    structured_tts_log(
+        "tts.request.begin",
+        text_length=len(text),
+        voice=voice,
+        lang=lang,
+        speed=speed,
+        base_url=TTS_BASE_URL,
+        request_url=f"{TTS_BASE_URL.rstrip('/')}/speak",
+        method="POST",
+        elapsed_ms=0,
+        status_code=None,
+    )
+
+    try:
+        audio_bytes, media_type = await synthesize_speech(
+            text=text,
+            voice=voice,
+            lang=lang,
+            speed=speed,
+        )
+    except TTSClientError as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            base_url=exc.base_url or TTS_BASE_URL,
+            request_url=exc.request_url or f"{TTS_BASE_URL.rstrip('/')}/speak",
+            method=exc.method or "POST",
+            elapsed_ms=elapsed_ms,
+            status_code=exc.status_code,
+            response_text=exc.response_text,
+            exception_repr=exc.exception_repr,
+        )
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    except Exception as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            base_url=TTS_BASE_URL,
+            request_url=f"{TTS_BASE_URL.rstrip('/')}/speak",
+            method="POST",
+            elapsed_ms=elapsed_ms,
+            status_code=500,
+            response_text="",
+            exception_repr=repr(exc),
+        )
+        raise HTTPException(status_code=500, detail=f"TTS proxy failed: {exc}") from exc
+
+    elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+    structured_tts_log(
+        "tts.request.success",
+        text_length=len(text),
+        voice=voice,
+        lang=lang,
+        speed=speed,
+        base_url=TTS_BASE_URL,
+        request_url=f"{TTS_BASE_URL.rstrip('/')}/speak",
+        method="POST",
+        elapsed_ms=elapsed_ms,
+        status_code=200,
+    )
+    return Response(content=audio_bytes, media_type=media_type or "audio/wav")
+
+
+@app.websocket("/api/tts/stream")
+async def websocket_tts_stream(websocket: WebSocket):
+    await websocket.accept()
+    started_at = time.perf_counter()
+    payload = {}
+    text = ""
+    voice = TTS_DEFAULT_VOICE
+    lang = TTS_DEFAULT_LANG
+    speed = TTS_DEFAULT_SPEED
+    try:
+        payload = await websocket.receive_json()
+        text = str(payload.get("text") or "").strip()
+        voice = str(payload.get("voice") or TTS_DEFAULT_VOICE).strip() or TTS_DEFAULT_VOICE
+        lang = str(payload.get("lang") or TTS_DEFAULT_LANG).strip() or TTS_DEFAULT_LANG
+        speed = float(payload.get("speed") or TTS_DEFAULT_SPEED)
+
+        if not TTS_ENABLED:
+            await websocket.send_json({"type": "error", "detail": "TTS is disabled."})
+            await websocket.close(code=1011)
+            return
+        if not text:
+            await websocket.send_json({"type": "error", "detail": "text must not be empty"})
+            await websocket.close(code=1008)
+            return
+
+        structured_tts_log(
+            "tts.request.begin",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url="/api/tts/stream",
+            method="WEBSOCKET",
+            elapsed_ms=0,
+            status_code=None,
+        )
+        await websocket.send_json(
+            {
+                "type": "begin",
+                "provider": TTS_PROVIDER,
+                "media_type": "audio/mpeg",
+            }
+        )
+
+        chunk_count = 0
+        total_bytes = 0
+        first_audio_logged = False
+        async for chunk in stream_speech(text=text, voice=voice, lang=lang, speed=speed):
+            if not first_audio_logged:
+                first_audio_logged = True
+                first_chunk_elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+                structured_tts_log(
+                    "tts.backend.first_chunk",
+                    text_length=len(text),
+                    voice=voice,
+                    lang=lang,
+                    speed=speed,
+                    provider=TTS_PROVIDER,
+                    elapsed_ms=first_chunk_elapsed_ms,
+                )
+            chunk_count += 1
+            total_bytes += len(chunk)
+            await websocket.send_bytes(chunk)
+
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        await websocket.send_json(
+            {
+                "type": "end",
+                "provider": TTS_PROVIDER,
+                "chunk_count": chunk_count,
+                "total_bytes": total_bytes,
+                "elapsed_ms": elapsed_ms,
+            }
+        )
+        structured_tts_log(
+            "tts.request.success",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url="/api/tts/stream",
+            method="WEBSOCKET",
+            elapsed_ms=elapsed_ms,
+            status_code=200,
+            chunk_count=chunk_count,
+            total_bytes=total_bytes,
+        )
+        await websocket.close()
+    except WebSocketDisconnect:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url="/api/tts/stream",
+            method="WEBSOCKET",
+            elapsed_ms=elapsed_ms,
+            status_code=499,
+            response_text="client disconnected",
+            exception_repr="WebSocketDisconnect",
+        )
+    except TTSClientError as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url=exc.request_url or "/api/tts/stream",
+            method=exc.method or "WEBSOCKET",
+            elapsed_ms=elapsed_ms,
+            status_code=exc.status_code,
+            response_text=exc.response_text,
+            exception_repr=exc.exception_repr,
+        )
+        await websocket.send_json({"type": "error", "detail": exc.detail, "status_code": exc.status_code})
+        await websocket.close(code=1011)
+    except Exception as exc:
+        elapsed_ms = int((time.perf_counter() - started_at) * 1000)
+        structured_tts_log(
+            "tts.request.error",
+            text_length=len(text),
+            voice=voice,
+            lang=lang,
+            speed=speed,
+            provider=TTS_PROVIDER,
+            request_url="/api/tts/stream",
+            method="WEBSOCKET",
+            elapsed_ms=elapsed_ms,
+            status_code=500,
+            response_text="",
+            exception_repr=repr(exc),
+        )
+        await websocket.send_json({"type": "error", "detail": f"TTS stream failed: {exc}"})
+        await websocket.close(code=1011)
+
+
 @app.post("/course/exit")
 async def exit_course():
     global student_state
@@ -1685,6 +2168,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
             stage_kind: str = "",
         ):
             stage_filter = TaskCompletedBuffer(TASK_COMPLETED_MARKER)
+            if FEATURE_PPT_MODE:
+                slide_goto = _emit_slide_goto(task_info, stage_kind)
+                if slide_goto:
+                    yield slide_goto
             yield _build_whiteboard_stage_system_notice(task_info, stage_kind)
             for chunk in generate_agent_class_reply_stream(
                 task_info,
@@ -1734,6 +2221,11 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                     )
 
                     if stage_content:
+                        stage_kind_slug = stage_page_key.split("::", 1)[-1] if stage_page_key else stage_kind
+                        if FEATURE_PPT_MODE:
+                            slide_goto = _emit_slide_goto(task_info, stage_kind_slug)
+                            if slide_goto:
+                                yield slide_goto
                         yield _serialize_whiteboard_update(
                             {
                                 "action": "new_page",
@@ -1769,6 +2261,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                     if include_question and combined_question and stage.get("expects_answer"):
                         question_page_key = last_stage_page_key or stage_page_key or _build_whiteboard_page_key(task_info, f"question_{stage_kind or 'quiz'}")
                         question_title = last_stage_title or stage_title
+                        if FEATURE_PPT_MODE:
+                            slide_q = _emit_slide_question(combined_question)
+                            if slide_q:
+                                yield slide_q
                         yield _serialize_whiteboard_update(
                             {
                                 "action": "question",
@@ -1785,6 +2281,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                         return
                 return
 
+            if FEATURE_PPT_MODE:
+                slide_goto_formula = _emit_slide_goto(task_info, "formula")
+                if slide_goto_formula:
+                    yield slide_goto_formula
             for event_str in _iter_whiteboard_stage_events(
                 task_info,
                 include_new_page=True,
@@ -1802,6 +2302,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
 
             example_content = _build_whiteboard_example_content(task_info.get("reference") or "")
             if example_content:
+                if FEATURE_PPT_MODE:
+                    slide_goto_example = _emit_slide_goto(task_info, "example")
+                    if slide_goto_example:
+                        yield slide_goto_example
                 for event_str in _iter_whiteboard_stage_events(
                     task_info,
                     include_new_page=True,
@@ -1817,6 +2321,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                     "example",
                 )
                 if include_question:
+                    if FEATURE_PPT_MODE:
+                        whiteboard_q = str(task_info.get("whiteboard_question") or "").strip()
+                        if whiteboard_q:
+                            yield _emit_slide_question(whiteboard_q)
                     for event_str in _iter_whiteboard_stage_events(
                         task_info,
                         include_question=True,
@@ -1828,6 +2336,10 @@ async def handle_class_interaction_stream(request: ClassInput, db: Session = Dep
                 return
 
             if include_question:
+                if FEATURE_PPT_MODE:
+                    whiteboard_q = str(task_info.get("whiteboard_question") or "").strip()
+                    if whiteboard_q:
+                        yield _emit_slide_question(whiteboard_q)
                 for event_str in _iter_whiteboard_stage_events(
                     task_info,
                     include_question=True,
